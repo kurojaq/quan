@@ -1,7 +1,7 @@
 (function(){
   // ---- price chart tab: lightweight-charts candles + structural-level overlay, fed by the same yahoo proxy ----
   var PROXY_BASE='https://quanyahoo.jqnboggan.workers.dev';
-  var chart=null, series=null, priceLines=[], container=null, curSym=null, curRange='1d', curInterval='5m', booted=false;
+  var chart=null, series=null, priceLines=[], container=null, curSym=null, curRange='5d', curInterval='5m', booted=false;
   var titleEl, statusEl;
 
   function ensureChart(){
@@ -62,7 +62,7 @@
         chart.timeScale().fitContent();
         statusEl.textContent=sym+' · '+d.bars.length+' bars · '+new Date().toLocaleTimeString();
         refreshLevels();
-      }).catch(function(){ statusEl.textContent='proxy unreachable — run yahoo_proxy.py'; });
+      }).catch(function(){ statusEl.textContent='proxy unreachable — check your connection'; });
   }
 
   window.__chartOnLiveTick=function(sym,price){

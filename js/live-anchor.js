@@ -28,7 +28,7 @@
       } else {
         note.textContent=(d&&d.error)?('error: '+d.error):'no price returned';
       }
-    }).catch(function(){ note.textContent='proxy unreachable — run yahoo_proxy.py'; });
+    }).catch(function(){ note.textContent='proxy unreachable — check your connection'; });
   }
   btn.addEventListener('click',function(){
     on=!on;
