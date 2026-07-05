@@ -5,7 +5,7 @@
         spInstA=document.getElementById('spInstA'), spInstB=document.getElementById('spInstB'),
         splitSessT=document.getElementById('splitSessT'), wrap=document.querySelector('.wrap');
   if(!host||!bar) return;
-  const SEC={report:'tabReport',detector:'tabDetector',polar:'tabPolar',strike:'tabStrike',heat:'tabHeat'};
+  const SEC={report:'tabReport',detector:'tabDetector',polar:'tabPolar',strike:'tabStrike',heat:'tabHeat',chart:'tabChart',sim:'tabSim'};
   let vert=false, ratio=50;
   function sec(k){ return document.getElementById(SEC[k]); }
   function firstOther(v){ return Object.keys(SEC).find(k=>k!==v); }
@@ -14,8 +14,11 @@
     else if(k==='detector'){ window.__detResize&&window.__detResize(); }
     else if(k==='strike'){ window.__skResize&&window.__skResize(); }
     else if(k==='heat'){ window.__heatBoot&&window.__heatBoot(); window.__feedHeatmap&&window.__feedHeatmap(); }
+    else if(k==='chart'){ window.__chartBoot&&window.__chartBoot(); window.__chartResize&&window.__chartResize(); }
+    else if(k==='sim'){ window.__simBoot&&window.__simBoot(); window.__simRender&&window.__simRender(); }
+    else if(k==='report'){ window.__reportRender&&window.__reportRender(); }
   }
-  var ALLSEC=['tabDetector','tabPolar','tabStrike','tabHeat','tabHeatB'];
+  var ALLSEC=['tabReport','tabDetector','tabPolar','tabStrike','tabHeat','tabHeatB','tabChart','tabSim'];
   function paneSecId(pane,page){ if(page==='heat') return (pane==='B')?'tabHeatB':'tabHeat'; return SEC[page]; }
   function paneSec(pane,page){ return document.getElementById(paneSecId(pane,page)); }
   function nudgePane(pane,page,inst){
@@ -48,7 +51,7 @@
   function exitLayout(){
     host.classList.remove('split'); bar.classList.remove('on');
     if(wrap)wrap.classList.remove('splitFull');
-    ['tabDetector','tabPolar','tabStrike','tabHeat','tabHeatB'].forEach(function(id){ var s=document.getElementById(id); if(s){ s.style.order=''; s.style.flexGrow=''; s.style.flexBasis=''; } });
+    ALLSEC.forEach(function(id){ var s=document.getElementById(id); if(s){ s.style.order=''; s.style.flexGrow=''; s.style.flexBasis=''; } });
     var hbB=document.getElementById('tabHeatB'); if(hbB)hbB.classList.remove('on');
     setTimeout(function(){ if(window.__feedHeatmap)window.__feedHeatmap(true); },60);
   }
