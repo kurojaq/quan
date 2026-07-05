@@ -171,7 +171,10 @@ try:
                     _co=np.polyfit(_cw[_msk],_cl[_msk],9); _rr=np.roots(_co)
                     _p9=sorted(set(round(float(_r.real),3) for _r in _rr if abs(_r.imag)<1e-6 and -0.999<=_r.real<=0.999))
                     _p9t=_times(_p9); _o['p9_t']=(' \u00b7 '.join(_p9t[:6])) if _p9t else None
-            except Exception: _o['p9_t']=None
+                    # structured (cw, clock time, direction) per root, for chart-tab vertical markers: green=crossing up, red=crossing down
+                    _dco=np.polyder(_co)
+                    _o['p9']=[{'cw':_r,'time':_cwc(_r),'dir':('up' if np.polyval(_dco,_r)>0 else 'down')} for _r in _p9]
+            except Exception: _o['p9_t']=None; _o['p9']=None
             # Tension intersections — where the CL and CM lobes cross
             _txt=_times(_zc(_cl-_cm)); _o['tx_t']=(' \u00b7 '.join(_txt[:6])) if _txt else None
 except Exception as _ew: _o['_twerr']=str(_ew)

@@ -88,8 +88,37 @@
     var inst=(document.getElementById('instA')||{}).value||'', date=(document.getElementById('dayDate')||{}).value||'';
     var data=null; try{ data=window.__reportData?window.__reportData(inst,date):null; }catch(_){}
     drawLevels(data&&data.__raw);
+    drawP9Markers(data&&data.__raw, date);
   }
   window.__chartRefreshLevels=refreshLevels;
+
+  // ---- 9th-order intersection markers (payload engine's degree-9 fit of the CL tension) — green=crossing up, red=crossing down ----
+  var p9Lines=[];
+  function clearP9Lines(){ p9Lines.forEach(function(p){ try{ series.detachPrimitive(p); }catch(_){} }); p9Lines=[]; }
+  // seconds-since-ET-midnight (>=64800 rolls back to the prior calendar day, matching the session's 18:00 ET open) -> real Unix timestamp
+  function etSecToUnix(dateStr,secOfDay){
+    var d=new Date(dateStr+'T12:00:00Z'); if(secOfDay>=64800) d.setUTCDate(d.getUTCDate()-1);
+    var y=d.getUTCFullYear(), mo=d.getUTCMonth(), da=d.getUTCDate();
+    var h=Math.floor(secOfDay/3600), mi=Math.floor((secOfDay%3600)/60), se=secOfDay%60;
+    var guess=Date.UTC(y,mo,da,h+4,mi,se)/1000;
+    try{
+      var etH=+new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hourCycle:'h23',hour:'2-digit'}).formatToParts(new Date(guess*1000)).find(function(p){return p.type==='hour';}).value;
+      var diff=h-etH; if(diff>12)diff-=24; if(diff<-12)diff+=24;
+      guess+=diff*3600;
+    }catch(_){}
+    return guess;
+  }
+  function drawP9Markers(raw,date){
+    clearP9Lines();
+    if(!series||!chart||!raw||!raw.p9||!date) return;
+    raw.p9.forEach(function(root){
+      if(root==null||root.cw==null) return;
+      var sod=window.__cwToSec?window.__cwToSec(root.cw,date):null; if(sod==null) return;
+      var t=etSecToUnix(date,sod);
+      var col=root.dir==='up'?'rgba(70,200,120,0.55)':'rgba(220,90,90,0.55)';
+      try{ var vl=new VertLine(chart,t,col); series.attachPrimitive(vl); p9Lines.push(vl); }catch(_){}
+    });
+  }
 
   // ---- CME daily session vertical markers: open 17:00 CT, close 16:00 CT (America/Chicago, DST-aware) ----
   function chicagoHM(t){
