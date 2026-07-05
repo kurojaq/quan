@@ -1,0 +1,7 @@
+{
+ "MODULES": [
+  "_compass_compute",
+  "quan_engine",
+  "quan_realization"
+ ]
+}

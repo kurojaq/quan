@@ -716,3 +716,30 @@ textarea {
     padding: 4px 7px;
   }
 }
+
+/* ==== Compass tab (scoped: these class names are unique to this tab, kept under #tabCompass
+   defensively so nothing here can ever leak into the shared chassis classes) ==== */
+#tabCompass .compass-body{display:flex;flex-direction:column;min-height:0;padding:0;overflow:hidden;}
+#tabCompass .compass-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;}
+#tabCompass .viewrow{display:flex;align-items:center;gap:10px;padding:8px 0;flex-wrap:wrap;}
+#tabCompass .tog{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--cream);cursor:pointer;user-select:none;}
+#tabCompass .tog input{accent-color:var(--gold);}
+#tabCompass .ddwrap{position:relative;display:inline-flex;align-items:center;}
+#tabCompass .ddbtn{display:inline-flex;align-items:center;gap:7px;}
+#tabCompass .ddbtn .cnt{font-size:9px;color:var(--cream-dim);background:var(--panel);border-radius:8px;padding:1px 6px;letter-spacing:0;}
+#tabCompass .ddbtn .car{opacity:.55;font-size:9px;}
+#tabCompass .ddpanel{position:absolute;top:calc(100% + 5px);left:0;z-index:60;background:var(--glass-strong);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:0.5px solid var(--glass-line);border-radius:var(--radius-md);padding:9px 11px;display:none;flex-direction:column;gap:8px;min-width:148px;box-shadow:var(--shadow);}
+#tabCompass .ddwrap.open .ddpanel{display:flex;}
+#tabCompass .ddpanel .tog{font-size:12px;}
+#tabCompass .sw{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;}
+#tabCompass .scrubrow{display:flex;align-items:center;gap:12px;padding:6px 12px;flex-wrap:wrap;}
+#tabCompass .scrubrow .k{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--cream-dim);}
+#tabCompass .scrubtip{position:fixed;display:none;z-index:60;background:var(--glass-strong);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:0.5px solid var(--glass-line);border-radius:var(--radius-sm);color:var(--gold);font:11px/1.5 var(--font-mono);padding:6px 9px;pointer-events:none;white-space:nowrap;box-shadow:var(--shadow-sm);}
+#tabCompass .scrubread{font-family:var(--font-mono);font-size:11px;color:var(--cream-dim);white-space:nowrap;}
+#tabCompass .content{padding:0 12px;}
+#tabCompass canvas{width:100%;border:0.5px solid var(--line);border-radius:var(--radius-sm);background:var(--bg);margin:8px 0;display:block;}
+#tabCompass .read{display:flex;flex-wrap:wrap;gap:18px;font-size:12px;color:var(--cream-dim);background:var(--panel);border:0.5px solid var(--line);border-radius:var(--radius-sm);padding:9px 14px;margin:4px 0 12px;}
+#tabCompass .read b{color:var(--cream);}
+#tabCompass .foot{color:var(--label);font-size:11px;margin:12px;border-top:0.5px solid var(--line);padding-top:8px;}
+#tabCompass code{background:var(--panel);border:0.5px solid var(--line);border-radius:4px;padding:1px 4px;color:var(--gold);}
+#tabCompass .SessT{color:var(--cream);font:600 12px var(--font-mono);font-variant-numeric:tabular-nums;}

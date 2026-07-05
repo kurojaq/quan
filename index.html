@@ -54,6 +54,7 @@
     <button class="tabbtn" data-tab="strike">Strike Field</button>
     <button class="tabbtn" data-tab="heat">Heat Map</button>
     <button class="tabbtn" data-tab="chart">Chart</button>
+    <button class="tabbtn" data-tab="compass">Compass</button>
     <button class="tabbtn" data-tab="sim">Account Sim</button>
     <button class="tabbtn splitplus" data-tab="split" id="splitTab" title="Split view — show two tabs at once">+</button>
     <div class="gctrls">
@@ -76,10 +77,10 @@
     <button class="sb-lay" id="spLayV">▤ Stacked</button>
     <span class="sb-k" style="margin-left:6px">Left / Top</span>
     <select class="field" id="spInstA"></select>
-    <select class="field" id="spPaneA"><option value="report">Report</option><option value="detector">Detector</option><option value="polar">Field Study</option><option value="strike">Strike Field</option><option value="heat">Heat Map</option><option value="chart">Chart</option><option value="sim">Account Sim</option></select>
+    <select class="field" id="spPaneA"><option value="report">Report</option><option value="detector">Detector</option><option value="polar">Field Study</option><option value="strike">Strike Field</option><option value="heat">Heat Map</option><option value="chart">Chart</option><option value="compass">Compass</option><option value="sim">Account Sim</option></select>
     <span class="sb-k">Right / Bottom</span>
     <select class="field" id="spInstB"></select>
-    <select class="field" id="spPaneB"><option value="report">Report</option><option value="detector">Detector</option><option value="polar">Field Study</option><option value="strike">Strike Field</option><option value="heat" selected>Heat Map</option><option value="chart">Chart</option><option value="sim">Account Sim</option></select>
+    <select class="field" id="spPaneB"><option value="report">Report</option><option value="detector">Detector</option><option value="polar">Field Study</option><option value="strike">Strike Field</option><option value="heat" selected>Heat Map</option><option value="chart">Chart</option><option value="compass">Compass</option><option value="sim">Account Sim</option></select>
     <span class="sb-sess" id="splitSess"><span class="sb-k">Session t</span><span class="v" id="splitSessT">0.0000</span></span>
     <button class="sb-x" id="splitExit">✕ Exit split</button>
   </div>
@@ -311,6 +312,85 @@
     <div id="chartStatus" style="position:absolute;left:14px;bottom:9px;font-size:11px;color:var(--cream-dim);z-index:2;pointer-events:none;"></div>
   </div>
   </section>
+  <section class="tabsec" id="tabCompass">
+  <header>
+    <div class="brand">
+      <span class="inf">&#8734;</span>
+      <span class="name">The Qu'an</span>
+      <span class="sub">Compass</span>
+    </div>
+    <div class="hdr-right">
+      <div class="instrbar"><span class="k">Inst</span><select id="cp_inst"></select></div>
+      <div class="datebar"><span class="k">Date</span><input type="date" id="cp_day"></div>
+      <div class="slot"><span class="tag">Anchor</span><input type="number" step="any" id="cp_anc" class="panchor" placeholder="strike"><button class="ctool" id="cp_lock" title="Lock anchor for this date (stop price auto-fill)">&#128275;</button></div>
+      <div class="slot"><select class="field" id="cp_upKind"><option value="chain">Chain</option><option value="price">Price</option><option value="greeks">Greeks</option></select><select class="field" id="cp_upSeries" title="Series bucket: Daily (sessions) / EOM / Quarterly (horizons)"><option value="weekly">Daily</option><option value="eom">EOM</option><option value="quarterly">Quarterly</option></select><label class="upload">CSV<span class="fn" id="cp_gFn">none</span><input type="file" id="cp_gFile" accept=".csv" multiple></label><button class="ctool" id="cp_clrPrice" title="Clear stored price for this date (memory + cache) so a fresh price upload re-maps correctly">&#9851;</button></div>
+      <div class="sessbar"><span class="k">Session T</span><span class="v SessT" id="cp_sessT">0.0000</span></div>
+      <button class="ctool" id="compassPriceLink" type="button" title="Price now lives on the Chart tab" onclick="document.querySelector('[data-tab=&quot;chart&quot;]').click();">&#128200; Price</button>
+    </div>
+  </header>
+  <div class="viewrow">
+   <select class="field" id="cp_view"><option value="all">All</option><option value="compass">Compass</option><option value="fold">Fold</option><option value="sop">SOP</option><option value="termseg">Horizon (cw)</option></select>
+   <select class="field" id="cp_cwExpand"><option value="both">-1 to 1</option><option value="settled">-1 to 0</option><option value="pred">0 to 1</option></select>
+   <select class="field" id="cp_pxMode" title="price axis range basis"><option value="auto">axis: auto</option><option value="sigfroz">axis: &#963; frozen</option><option value="siglive">axis: &#963; live</option><option value="strikes">axis: strikes</option><option value="fixed">axis: fixed &#177;</option></select>
+   <select class="field" id="cp_sopAnchor" title="SOP layers anchor basis"><option value="session">SOP: session</option><option value="live">SOP: live</option></select>
+   <select class="field" id="cp_horizonMode" title="Multi-month horizon fan (EOM + quarterly, solved at live)"><option value="on">Horizons: on</option><option value="off">Horizons: off</option></select>
+   <select class="field" id="cp_horizonAnchor" title="Horizon anchor: session=opening (where they started, shared origin) / live=current"><option value="session">Horizon anc: session</option><option value="live">Horizon anc: live</option></select>
+   <div class="ddwrap"><button type="button" class="field ddbtn" id="cp_ddOverlays">Overlays<span class="cnt" id="cp_ddOverlaysCnt"></span><span class="car">&#9662;</span></button>
+    <div class="ddpanel">
+     <label class="tog"><input type="checkbox" id="cp_px" checked> Price overlay</label>
+     <label class="tog"><input type="checkbox" id="cp_zc" checked> <span class="cy">ZC marks</span></label>
+     <label class="tog"><input type="checkbox" id="cp_gk" checked><span class="sw" style="background:#b28cd6"></span>Greeks</label>
+    </div></div>
+   <div class="ddwrap"><button type="button" class="field ddbtn" id="cp_ddLayers">SOP layers<span class="cnt" id="cp_ddLayersCnt"></span><span class="car">&#9662;</span></button>
+    <div class="ddpanel">
+     <label class="tog"><input type="checkbox" id="cp_lyproduct" checked><span class="sw" style="background:#ffffff"></span>product</label>
+     <label class="tog"><input type="checkbox" id="cp_lycurvature" checked><span class="sw" style="background:#d9463b"></span>curvature</label>
+     <label class="tog"><input type="checkbox" id="cp_lygradient" checked><span class="sw" style="background:#e8b53a"></span>gradient</label>
+     <label class="tog"><input type="checkbox" id="cp_lytension" checked><span class="sw" style="background:#3f9d6b"></span>tension</label>
+    </div></div>
+  </div>
+  <div class="chartwrap compass-body" id="compassChartwrap">
+   <button class="ctool fullscreen-btn" id="compassFullBtn" type="button" title="Fullscreen">&#9974;</button>
+   <div class="compass-scroll">
+    <div class="scrubrow"><span class="k">Detector</span><span class="scrubread" id="cp_scrubRead">cw 0.00 · now (boundary)</span></div>
+    <div class="scrubtip" id="cp_scrubTip"></div>
+    <div class="scrubrow" id="cp_playRow"><span class="k">Playback</span><button class="ctool" id="cp_playBtn" title="Build/animate the session: walks the anchor along the real intraday price path; SOP forward half morphs as price moves">&#9654; play</button><input type="range" id="cp_playSlider" min="0" max="0" value="0" step="1" style="flex:1;max-width:440px"><button class="ctool" id="cp_playLive" title="Exit playback, return to live/now">&#9211; live</button><select class="field" id="cp_playDetail" title="Playback fidelity: real engine solves sampled along the price path. Higher = finer price-reaction detail, longer build."><option value="40">Detail: standard (40)</option><option value="80">Detail: fine (80)</option><option value="140">Detail: HD (140)</option></select><span class="scrubread" id="cp_playRead">&mdash; press play (needs intraday price history)</span></div>
+    <div id="cp_dbar" style="display:flex;flex-wrap:wrap;gap:13px;align-items:center;padding:4px 12px;font:11px/1.45 'SF Mono',Menlo,Consolas,monospace;color:var(--dim);border-bottom:.5px solid var(--line);background:var(--panel2);">
+     <span><b style="color:var(--cream);letter-spacing:.5px;">d</b> <span id="cp_d_d">&mdash;</span></span>
+     <span id="cp_d_gate" style="color:#777;">gate &mdash;</span>
+     <span>thr <span id="cp_d_thr">0.50</span></span>
+     <span title="live price">P <span id="cp_d_live">&mdash;</span></span>
+     <span title="settled anchor">A <span id="cp_d_set">&mdash;</span></span>
+     <span title="displacement">&Delta; <span id="cp_d_disp">&mdash;</span></span>
+     <span title="ATM IV">&sigma; <span id="cp_d_sig">&mdash;</span></span>
+     <span title="session fraction">f <span id="cp_d_f">&mdash;</span></span>
+     <span title="remaining sessions to expiry">rem <span id="cp_d_rem">&mdash;</span></span>
+     <span title="T in years">T <span id="cp_d_T">&mdash;</span></span>
+    </div>
+    <div id="cp_glbar" style="display:flex;flex-wrap:wrap;gap:13px;align-items:center;padding:5px 12px;font:11px/1.45 'SF Mono',Menlo,Consolas,monospace;color:var(--dim);border-bottom:.5px solid var(--line);background:var(--panel2);">
+     <span style="color:var(--cream);letter-spacing:.6px;">GREEN-LIGHT</span>
+     <span id="cp_gl_state" style="font-weight:bold;padding:1px 9px;border-radius:3px;color:#777;">&mdash;</span>
+     <span title="session T">T <span id="cp_gl_frac">&mdash;</span></span>
+     <span id="cp_gl_win" style="color:#9aa0a6;">&mdash;</span>
+     <span id="cp_gl_zc" style="color:#777;">&mdash;</span>
+     <span style="flex:1;min-width:8px;"></span>
+     <button class="ctool" id="cp_gl_log" title="Snapshot this session's green vs churn window ranges to the test log">log session</button>
+     <button class="ctool" id="cp_gl_export" title="Download accumulated green-light test log (CSV)">export</button>
+     <span id="cp_gl_logn" style="color:#777;"></span>
+    </div>
+    <div class="content">
+     <canvas id="cp_cRipn" width="1440" height="560" data-h="560"></canvas>
+     <canvas id="cp_cFold" width="1440" height="430" data-h="430"></canvas>
+     <div class="read" id="cp_readR"></div>
+     <canvas id="cp_cSop" width="1440" height="520" data-h="520"></canvas>
+     <div class="read" id="cp_readS"></div>
+     <canvas id="cp_cTermseg" width="1440" height="560" data-h="560"></canvas>
+     <div class="read" id="cp_readT"></div>
+    </div>
+    <div class="foot">Upload chain CSVs (filename carries instrument + <code>exp-MM_DD_YY</code>); stored per instrument by <b>expiry</b> date with its anchor. Pick a date = current session; the prior stored day supplies the settled chain + its anchor automatically. Session T = live CME-session fraction (18:00 ET&#8594;17:00 ET). Display = translation; fold = current cell k &times; prev cell k. Price is shown on the Chart tab.</div>
+   </div>
+  </div>
+  </section>
   <section class="tabsec" id="tabSim">
   <header>
     <div class="brand">
@@ -352,6 +432,7 @@
 <script src="js/chart-controls.js" defer></script>
 <script src="js/live-anchor.js" defer></script>
 <script src="js/chart-tab.js" defer></script>
+<script src="js/compass.js" defer></script>
 <script src="js/theme-toggle.js" defer></script>
 <script src="js/split-view.js" defer></script>
 <script src="js/auth-config.js" defer></script>

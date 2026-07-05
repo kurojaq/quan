@@ -28,5 +28,6 @@
   wireToolsDropdown('brcToolsBtn','brcToolsWrap');
   wireFullscreen('brcFullBtn', document.getElementById('brcWrap'), function(){ window.dispatchEvent(new Event('resize')); });
   wireFullscreen('chartFullBtn', document.getElementById('chartWrap'), function(){ window.__chartResize&&window.__chartResize(); });
+  wireFullscreen('compassFullBtn', document.getElementById('compassChartwrap'), function(){ window.__compassResize&&window.__compassResize(); });
   wireFullscreen('polarFullBtn', document.getElementById('polarPanel'), function(){ window.__polarResize&&window.__polarResize(); window.__sopResize&&window.__sopResize(); });
 })();
