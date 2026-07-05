@@ -20,7 +20,8 @@
   function tick(){
     var inst=(document.getElementById('instA')||{}).value||'?', sym=currentSymbol();
     if(!sym){ note.textContent='no Yahoo symbol mapped for '+inst; return; }
-    fetch(PROXY_BASE+'/quote?symbol='+encodeURIComponent(sym)).then(function(r){ return r.json(); }).then(function(d){
+    var _h={}; var _t=window.__authToken&&window.__authToken(); if(_t) _h['Authorization']='Bearer '+_t;
+    fetch(PROXY_BASE+'/quote?symbol='+encodeURIComponent(sym),{headers:_h}).then(function(r){ return r.json(); }).then(function(d){
       if(d && typeof d.price==='number'){
         if(window.__qSetAnchor) window.__qSetAnchor(d.price);
         if(window.__chartOnLiveTick) window.__chartOnLiveTick(sym,d.price);

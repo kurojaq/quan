@@ -1,4 +1,6 @@
 (function(){
+  // when Supabase auth is configured, js/auth.js owns the #lock overlay — stand down
+  if(window.__SUPA && window.__SUPA.url && window.__SUPA.anonKey) return;
   const lock=document.getElementById('lock'),book=document.getElementById('bookBtn'),
         hintline=document.getElementById('bookHint'),box=document.getElementById('lockBox'),
         inp=document.getElementById('lockInput'),go=document.getElementById('lockGo'),

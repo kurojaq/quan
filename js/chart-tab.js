@@ -120,7 +120,8 @@
     curSym=sym;
     if(titleEl) titleEl.textContent=sym+' · '+curRange+'/'+curInterval;
     statusEl.textContent='loading '+sym+'…';
-    fetch(PROXY_BASE+'/history?symbol='+encodeURIComponent(sym)+'&range='+curRange+'&interval='+curInterval)
+    var _h={}; var _t=window.__authToken&&window.__authToken(); if(_t) _h['Authorization']='Bearer '+_t;
+    fetch(PROXY_BASE+'/history?symbol='+encodeURIComponent(sym)+'&range='+curRange+'&interval='+curInterval,{headers:_h})
       .then(function(r){ return r.json(); }).then(function(d){
         if(!d||!d.bars||!d.bars.length){ statusEl.textContent=(d&&d.error)?('error: '+d.error):'no bars returned'; return; }
         series.setData(d.bars.map(function(b){ return {time:b.time,open:b.open,high:b.high,low:b.low,close:b.close}; }));

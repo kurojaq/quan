@@ -74,11 +74,43 @@ async function fetchHistory(symbol, rang, interval) {
   return { symbol, bars, currency: meta.currency ?? null, exchangeName: meta.exchangeName ?? null };
 }
 
+// --- optional Supabase JWT gate (HS256) -------------------------------------
+// Off by default. To require login for live data, set two Worker env vars:
+//   AUTH_REQUIRED = "1"
+//   SUPABASE_JWT_SECRET = <Settings -> API -> JWT Secret from your Supabase project>
+// The client (js/chart-tab.js, js/live-anchor.js) then sends Authorization: Bearer <token>.
+function b64urlToBytes(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  const bin = atob(s);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+async function verifyJWT(token, secret) {
+  const parts = (token || '').split('.');
+  if (parts.length !== 3) return null;
+  const data = new TextEncoder().encode(parts[0] + '.' + parts[1]);
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+  const ok = await crypto.subtle.verify('HMAC', key, b64urlToBytes(parts[2]), data);
+  if (!ok) return null;
+  let payload;
+  try { payload = JSON.parse(new TextDecoder().decode(b64urlToBytes(parts[1]))); } catch (_) { return null; }
+  if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) return null;
+  return payload;
+}
+
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
+    if (env && env.AUTH_REQUIRED === '1') {
+      const auth = request.headers.get('Authorization') || '';
+      const token = auth.replace(/^Bearer\s+/i, '');
+      const claims = env.SUPABASE_JWT_SECRET ? await verifyJWT(token, env.SUPABASE_JWT_SECRET) : null;
+      if (!claims) return json(401, { error: 'authentication required' });
     }
     const symbol = url.searchParams.get('symbol') || '';
     if (!symbol) return json(400, { error: 'missing ?symbol=' });

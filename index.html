@@ -32,8 +32,13 @@
   <div class="book-hintline" id="bookHint">click the book</div>
   <div class="lockbox" id="lockBox">
     <div class="lockprompt">Enter the word</div>
+    <div id="lockLoginWrap" style="display:none;flex-direction:column;gap:9px;align-items:center;">
+      <div class="lockrow">
+        <input id="lockEmail" type="email" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="email">
+      </div>
+    </div>
     <div class="lockrow" id="lockRow">
-      <input id="lockInput" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="••••••••">
+      <input id="lockInput" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" placeholder="••••••••">
       <button id="lockGo">Unlock</button>
     </div>
     <div class="lockhint" id="lockHint"></div>
@@ -404,6 +409,8 @@
 <script src="js/chart-tab.js" defer></script>
 <script src="js/theme-toggle.js" defer></script>
 <script src="js/split-view.js" defer></script>
+<script src="js/auth-config.js" defer></script>
+<script src="js/auth.js" defer></script>
 <script src="js/lock-screen.js" defer></script>
 <script src="js/warehouse.js" defer></script>
 <script src="js/instrument-adapter.js" defer></script>
