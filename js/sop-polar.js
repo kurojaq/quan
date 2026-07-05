@@ -709,6 +709,10 @@
     else { const xv=viewLo+((mx-PAD_L)/pW)*(viewHi-viewLo); const cur=viewHi-viewLo;
       let s=e.deltaY<0?0.85:1/0.85, w=cur*s; const lo=xv-(xv-viewLo)*(w/cur); viewLo=lo; viewHi=lo+w; }
     draw(); },{passive:false});
+  if(window.__wireZoomPan) window.__wireZoomPan(canvas,{
+    getViewLo:()=>viewLo, setViewLo:v=>viewLo=v, getViewHi:()=>viewHi, setViewHi:v=>viewHi=v,
+    panY:(dy,ph)=>{ const span=yHi-yLo, d=(dy/ph)*span; yLo+=d; yHi+=d; }
+  }, draw, {wireWheel:false, wireReset:false, domainLo:-Infinity, domainHi:Infinity});   // wheel-zoom + dblclick-reset already wired above; this only adds drag-to-pan
   canvas.addEventListener('mousemove',e=>{ if(!pts.length&&!statePts.length&&!pgMode)return; const r=canvas.getBoundingClientRect();
     cursor={x:e.clientX-r.left,y:e.clientY-r.top}; if(!tool)draw(); });
   canvas.addEventListener('mouseleave',()=>{ cursor=null; draw(); });
@@ -857,6 +861,7 @@
   // tolerance match) from 2 series to 3 -- see js/detector.js for the original 2-series pattern.
   function findBreaches(d){ const out=[]; for(let i=0;i<d.length-1;i++){ const a=d[i],b=d[i+1];
     if((a<=0&&b>0)||(a>0&&b<=0)){ const t=-a/(b-a); out.push(i+t); } } return out; }
+  let fsViewLo=0,fsViewHi=1,fsYZoom=1,fsYPan=0;   // Field Study's own zoom/pan state (0..1 chronometer-watch pair axis, unlike Detector's -1..1 CW)
   function drawFieldStudy(){
     const f=fit(field,fctx); if(!f) return; const {w,h}=f;
     fctx.fillStyle=BG; fctx.fillRect(0,0,w,h);
@@ -865,8 +870,9 @@
     const series=[{d:d.ds,c:WHITE,lab:'DS (Difference/Sum)'},{d:d.dualPhase,c:GOLD,lab:'Dual Phase'},{d:d.swf,c:CYAN,lab:'SWF (DIPLTRPD/SOPPM)'}];
     const x=d.pair;
     const padL=42,padR=14,padT=30,padB=30, x0=padL,x1=w-padR,y0=padT,y1=h-padB;
-    const [ylo,yhi]=range(series);
-    const xAt=t=>x0+t*(x1-x0), yAt=v=>y1-(v-ylo)/(yhi-ylo)*(y1-y0);
+    const [ylo0,yhi0]=range(series);
+    const ycen=(ylo0+yhi0)/2-fsYPan*(yhi0-ylo0), yhalf=(yhi0-ylo0)/2/fsYZoom, ylo=ycen-yhalf, yhi=ycen+yhalf;
+    const xAt=t=>x0+((t-fsViewLo)/(fsViewHi-fsViewLo))*(x1-x0), yAt=v=>y1-(v-ylo)/(yhi-ylo)*(y1-y0);
     fctx.fillStyle=PLOT; fctx.fillRect(x0,y0,x1-x0,y1-y0);
     // grid
     fctx.lineWidth=0.5; fctx.font='9px monospace'; fctx.fillStyle='#a6a299'; fctx.strokeStyle='rgba(255,255,255,0.05)'; fctx.textAlign='center';
@@ -923,4 +929,9 @@
     const r=field.getBoundingClientRect(); const padL=42,padR=14,x0=padL,x1=r.width-padR;
     hoverF=Math.max(0,Math.min(1,(e.clientX-r.left-x0)/(x1-x0))); drawFieldStudy(); });
   field.addEventListener('mouseleave',()=>{ hoverF=null; drawFieldStudy(); });
+  if(window.__wireZoomPan) window.__wireZoomPan(field,{
+    getViewLo:()=>fsViewLo, setViewLo:v=>fsViewLo=v, getViewHi:()=>fsViewHi, setViewHi:v=>fsViewHi=v,
+    invX:px=>{ const r=field.getBoundingClientRect(); const x0=42,x1=r.width-14; return fsViewLo+((px-x0)/(x1-x0))*(fsViewHi-fsViewLo); },
+    zoomY:f=>fsYZoom=Math.max(0.5,Math.min(10,fsYZoom*f)), panY:(dy,ph)=>fsYPan-=dy/ph, resetY:()=>{fsYZoom=1;fsYPan=0;}
+  }, drawFieldStudy, {domainLo:0, domainHi:1, resetLo:0, resetHi:1});
 })();
