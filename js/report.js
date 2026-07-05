@@ -25,7 +25,7 @@
   function sessFrac(){
     try{
       var d=window.__sessionDateNow?window.__sessionDateNow():null;
-      var kind=(d&&window.__sessionKind)?window.__sessionKind(d):'full';
+      var kind=(d&&window.__effectiveSessionKind)?window.__effectiveSessionKind(d):'full';
       if(kind==='closed') return 0; // no session is running today (weekend/holiday) -> no intraday decay to apply
       var raw=(window.__sessionT?Number(window.__sessionT()):0)||0;
       if(kind==='early') raw=Math.min(1,raw/EARLY_CLOSE_FRAC); // today's session fully elapses at the early-close hour, not 17:00

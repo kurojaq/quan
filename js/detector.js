@@ -131,14 +131,17 @@ const BAKED_PRICE={};  /* demo price dataset removed — back dates now show onl
   function sessionDate(tSec){ const P={}; for(const p of _etFmt.formatToParts(new Date(tSec*1000))) P[p.type]=p.value;
     let h=+P.hour; if(h>=24)h-=24; const dt=new Date(Date.UTC(+P.year,(+P.month)-1,+P.day)); if(h>=18) dt.setUTCDate(dt.getUTCDate()+1); return dt.toISOString().slice(0,10); }
   function sessionFrac(tSec){ const P={}; for(const p of _etClock.formatToParts(new Date(tSec*1000))) P[p.type]=p.value;
-    let h=+P.hour; if(h>=24)h-=24; const sod=h*3600+(+P.minute)*60+(+P.second); let el=(h>=18)?(sod-64800):(sod+21600); let pt=el/82800; return pt<0?0:(pt>1?1:pt); }
+    let h=+P.hour; if(h>=24)h-=24; const sod=h*3600+(+P.minute)*60+(+P.second); let el=(h>=18)?(sod-64800):(sod+21600); let pt=el/82800; pt=pt<0?0:(pt>1?1:pt);
+    return window.__sessFrac?window.__sessFrac(pt,sessionDate(tSec)):pt; }
   function sessionT(){ const P={}; for(const p of _etClock.formatToParts(new Date())) P[p.type]=p.value;
-    let h=+P.hour; if(h>=24)h-=24; const sod=h*3600+(+P.minute)*60+(+P.second); let el=(h>=18)?(sod-64800):(sod+21600); let pt=el/82800; return pt<0?0:(pt>1?1:pt); }
+    let h=+P.hour; if(h>=24)h-=24; const sod=h*3600+(+P.minute)*60+(+P.second); let el=(h>=18)?(sod-64800):(sod+21600); let pt=el/82800; pt=pt<0?0:(pt>1?1:pt);
+    return window.__sessFrac?window.__sessFrac(pt,sessionDate(Date.now()/1000)):pt; }
   try{ window.__sessionT=sessionT; window.__sessionDateNow=function(){ return sessionDate(Date.now()/1000); }; }catch(_st){}
   function tickT(){ sessTEl.textContent=sessionT().toFixed(4); }
-  function cwClock(cw){ let t=Math.round(64800+Math.abs(cw)*82800); t=((t%86400)+86400)%86400; return String(Math.floor(t/3600)).padStart(2,'0')+':'+String(Math.floor((t%3600)/60)).padStart(2,'0'); }
+  function cwClock(cw){ const t=__cwToSec(cw); return String(Math.floor(t/3600)).padStart(2,'0')+':'+String(Math.floor((t%3600)/60)).padStart(2,'0'); }
   // ---- canonical session-position -> ET instant, single source of truth reused by every tab's clock display (see clockT()) ----
-  function __cwToSec(cw){ let t=Math.round(64800+Math.abs(cw)*82800); return ((t%86400)+86400)%86400; }
+  // dateStr (optional) lets a caller resolve against the manual Full/Early/Closed override (js/session-calendar.js); omitted = plain full-session math
+  function __cwToSec(cw,dateStr){ if(window.__sessCwSec) return window.__sessCwSec(cw,dateStr!=null?dateStr:date); let t=Math.round(64800+Math.abs(cw)*82800); return ((t%86400)+86400)%86400; }
   try{ window.__cwToSec=__cwToSec; window.__cwClock=cwClock; }catch(_cwc){}
 
   // ---- shared US market holiday / early-close calendar (CME-style), generated so it doesn't need hand-updating per year ----
@@ -419,6 +422,10 @@ const BAKED_PRICE={};  /* demo price dataset removed — back dates now show onl
     else { const cw=GEO.invX(mx); const cur=viewHi-viewLo; let w=cur*(e.deltaY<0?0.85:1/0.85); w=Math.max(0.04,Math.min(2,w));
       let lo=cw-(cw-viewLo)*(w/cur), hi=lo+w; if(w>=2-1e-9){lo=-1;hi=1;} if(lo<-1){lo=-1;hi=lo+w;} if(hi>1){hi=1;lo=hi-w;} viewLo=lo; viewHi=hi; }
     draw(); }, {passive:false});
+  if(window.__wireZoomPan) window.__wireZoomPan(canvas,{
+    getViewLo:()=>viewLo, setViewLo:v=>viewLo=v, getViewHi:()=>viewHi, setViewHi:v=>viewHi=v,
+    invX:px=>GEO?GEO.invX(px):0, panY:(dy,ph)=>yPan-=dy/ph
+  }, draw, {wireWheel:false, wireReset:false});   // wheel-zoom + dblclick-reset already wired above; this only adds drag-to-pan
   $('resetView').addEventListener('click',resetView);
 
   let drawing=false, lastPt=null;
