@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Qu'an — Client View</title>
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<link rel="stylesheet" href="css/theme.css">
+<style>
+  body{margin:0;background:var(--bg,#0a0a0a);color:var(--fg,#e6e6e6);font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;}
+  .vhdr{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 16px;border-bottom:0.5px solid #2a2a2a;}
+  .vhdr h1{font-size:14px;font-weight:600;margin:0;letter-spacing:.02em;}
+  .vtabbar{display:flex;gap:6px;padding:10px 16px;border-bottom:0.5px solid #2a2a2a;}
+  .vtab{background:transparent;color:#9a9a9a;border:0.5px solid #3a3a3a;border-radius:8px;padding:6px 12px;font-size:12.5px;cursor:pointer;}
+  .vtab.on{background:#fff;color:#000;border-color:#fff;}
+  .vdaterow{display:flex;gap:6px;padding:8px 16px;flex-wrap:wrap;}
+  .vpane{display:none;height:calc(100vh - 150px);padding:0 16px 16px;box-sizing:border-box;}
+  .vpane.on{display:block;}
+  #vPaneHeat iframe{width:100%;height:100%;border:0;background:#1a1a1a;}
+  #vPaneChart{display:none;}
+  #vPaneChart.on{display:flex;flex-direction:column;}
+  #chartMount{flex:1 1 auto;min-height:0;}
+  .verr{padding:16px;color:#e85c5c;}
+</style>
+</head>
+<body>
+<div class="vhdr">
+  <h1 id="vLabel">Loading…</h1>
+  <select class="field" id="vInst" style="margin-left:auto;"></select>
+</div>
+<div id="vError" class="verr"></div>
+<div class="vtabbar">
+  <button class="vtab" data-vtab="heat" type="button">Heat Map</button>
+  <button class="vtab" data-vtab="chart" type="button">Chart</button>
+  <button class="vtab on" data-vtab="report" type="button">Report</button>
+</div>
+<div class="vdaterow" id="vDates"></div>
+
+<div class="vpane" id="vPaneHeat"><iframe id="heatFrame" title="Deep Strike Heat Map" src="heatmap.html"></iframe></div>
+
+<div class="vpane" id="vPaneChart">
+  <div class="chart-tools-wrap">
+    <span class="fn" id="chartPriceTitle">—</span>
+    <button class="chart-tf on" data-range="5d" data-interval="5m" type="button">5D/5m</button>
+    <button class="chart-tf" data-range="1mo" data-interval="15m" type="button">1M/15m</button>
+    <button class="chart-tf" data-range="6mo" data-interval="1d" type="button">6M/1D</button>
+    <button class="ctool" id="chartRefreshBtn" type="button">&#8635;</button>
+    <span class="expnote" id="chartStatus"></span>
+  </div>
+  <div id="chartMount"></div>
+</div>
+
+<div class="vpane on" id="vPaneReport">
+  <div class="rptScroll">
+    <div id="vReportBody" class="rptBody"></div>
+  </div>
+</div>
+
+<input type="hidden" id="instA">
+<input type="hidden" id="dayDate">
+
+<script src="js/live-anchor.js" defer></script>
+<script src="js/session-calendar.js" defer></script>
+<script src="js/chart-tab.js" defer></script>
+<script src="js/view-report.js" defer></script>
+<script src="js/view-app.js" defer></script>
+</body>
+</html>

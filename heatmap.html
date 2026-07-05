@@ -700,10 +700,24 @@ window.__feedGreeks=function(text,name,inst,date,exp,anchor){ try{
   afterLoad(inst,date);
   if(typeof grkFn!=='undefined'&&grkFn)grkFn.textContent=name||'(terminal)';
 }catch(err){console.warn('feedGreeks',err);} };
-window.addEventListener('message',function(ev){ var d=ev&&ev.data||{}; if(!d||d.type!=='quanFeed')return;
-  if(d.kind==='chain')window.__feedChain(d.text,d.name,d.inst,d.date,d.exp,d.anchor);
-  else if(d.kind==='greeks')window.__feedGreeks(d.text,d.name,d.inst,d.date,d.exp,d.anchor);
-  else if(d.kind==='setView'){ try{ if(d.inst&&instSel)instSel.value=d.inst; if(d.date&&dayDate)dayDate.value=d.date; if(typeof loadDate==='function')loadDate(); }catch(_e){} }
+window.addEventListener('message',function(ev){ var d=ev&&ev.data||{}; if(!d||!d.type)return;
+  if(d.type==='quanFeed'){
+    if(d.kind==='chain')window.__feedChain(d.text,d.name,d.inst,d.date,d.exp,d.anchor);
+    else if(d.kind==='greeks')window.__feedGreeks(d.text,d.name,d.inst,d.date,d.exp,d.anchor);
+    else if(d.kind==='setView'){ try{ if(d.inst&&instSel)instSel.value=d.inst; if(d.date&&dayDate)dayDate.value=d.date; if(typeof loadDate==='function')loadDate(); }catch(_e){} }
+  }
+  // ---- publish/client-view bridge (see functions/api/publish.js, view.html) ----
+  else if(d.type==='quanGetHeatmap'){
+    try{ if(ev.source) ev.source.postMessage({type:'quanHeatmapData',reqId:d.reqId,data:{meta:M,rows:ROWS}},'*'); }catch(_qgh){}
+  }
+  else if(d.type==='quanLoadSnapshot'){
+    try{
+      var snap=d.data||{}; Object.keys(M).forEach(function(k){delete M[k];}); Object.assign(M,snap.meta||{});
+      ROWS.length=0; (snap.rows||[]).forEach(function(r){ROWS.push(r);});
+      if(M.inst){ m_inst.textContent=M.inst; m_exp.textContent=M.exp; m_anchor.textContent=M.anchor; m_atm.textContent=M.atm; }
+      if(typeof render==='function') render();
+    }catch(_qls){ console.warn('quanLoadSnapshot',_qls); }
+  }
 });
 try{ if(window.parent&&window.parent!==window) window.parent.postMessage({type:'quanReady'},'*'); }catch(_){}
 instSel.onchange=loadDate;

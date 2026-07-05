@@ -66,6 +66,25 @@
         <span class="expnote" id="liveAnchorNote">off</span>
       </div>
       <div class="slot"><button class="ctool" id="themeToggleBtn" type="button" title="Switch between dark and light theme">&#9680; Dark</button></div>
+      <div class="slot" id="publishSlot" style="position:relative;">
+        <button class="ctool" id="publishBtn" type="button" title="Publish the current Report + Heat Map to client links">&#128228; Publish</button>
+        <div id="publishPanel" style="display:none;position:absolute;top:100%;right:0;z-index:9997;width:280px;padding:12px;margin-top:6px;background:#141414;border:0.5px solid #3a3a3a;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,0.5);font-size:12px;color:#e6e6e6;">
+          <div style="font-weight:600;margin-bottom:6px;">Publish current view</div>
+          <div id="publishCur" style="color:#9a9a9a;margin-bottom:8px;">— · —</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+            <button id="publishNowBtn" class="ctool" type="button">Publish Now</button>
+            <span id="publishStatus" style="color:#9a9a9a;"></span>
+          </div>
+          <div style="border-top:0.5px solid #3a3a3a;margin-bottom:10px;"></div>
+          <div style="font-weight:600;margin-bottom:6px;">Client links</div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">
+            <input type="text" id="pubLabel" placeholder="Client label" style="background:#1e1e1e;border:0.5px solid #3a3a3a;border-radius:6px;color:#e6e6e6;padding:5px 7px;">
+            <select id="pubInstruments" multiple size="4" style="background:#1e1e1e;border:0.5px solid #3a3a3a;border-radius:6px;color:#e6e6e6;"></select>
+            <button id="pubCreateBtn" class="ctool" type="button">Create link</button>
+          </div>
+          <div id="pubLinkList" style="display:flex;flex-direction:column;gap:8px;max-height:220px;overflow:auto;"></div>
+        </div>
+      </div>
       <div class="slot"><span class="tag">Exp</span><div class="expsel" id="expSel"><button class="expbtn" id="exp_Daily" data-exp="Daily" type="button"><span class="expdot">&#9675;</span>Daily<span class="expoi"></span></button><button class="expbtn" id="exp_EOM" data-exp="EOM" type="button"><span class="expdot">&#9675;</span>EOM<span class="expoi"></span></button></div><span class="expnote" id="expNote"></span></div>
       <div class="slot"><select class="field" id="upKind" style="padding:5px 6px;font-size:10px;letter-spacing:.06em;"><option value="chain">Chain</option><option value="greeks">Greeks</option></select><label class="upload">CSV<span class="fn" id="gFn">none</span><input type="file" id="gFile" accept=".csv"></label></div>
     </div>
@@ -482,6 +501,7 @@
 
 <script src="js/heatmap-loader.js" defer></script>
 <script src="js/report.js" defer></script>
+<script src="js/publish-panel.js" defer></script>
 <div id="rptPrintDoc"></div>
 <script src="js/account-sim.js" defer></script>
 </body>

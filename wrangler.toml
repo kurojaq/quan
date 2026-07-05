@@ -12,10 +12,19 @@ name = "quan"
 compatibility_date = "2024-11-01"
 pages_build_output_dir = "."
 
+# Published client-view snapshots (see functions/api/publish.js, client-tokens.js, view.js).
+# NOTE: this binding also needs to be added by hand in the Cloudflare Pages dashboard
+# (Settings -> Functions -> KV namespace bindings) for the deployed project -- a
+# wrangler.toml binding isn't guaranteed to apply to a Git-integration Pages deploy.
+[[kv_namespaces]]
+binding = "QUAN_PUBLISH"
+id = "88472c90139149dea44668ce0c0a7d8a"
+
 # Secrets/vars are set in the dashboard (Settings → Environment variables), not
 # committed here. Required keys are listed in functions/api/_shared.js and
 # documented in STRIPE_SETUP.md:
 #   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
 #   STRIPE_PRICE_OPERATOR_MONTHLY/ANNUAL, STRIPE_PRICE_DESK_MONTHLY/ANNUAL,
 #   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+#   OPERATOR_EMAIL (gates /api/publish and /api/client-tokens to the app owner)
 #   (optional) APP_BASE_URL

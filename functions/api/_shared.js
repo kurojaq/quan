@@ -123,6 +123,18 @@ export async function getUserFromRequest(env, request) {
   return user && user.id ? user : null;
 }
 
+// ---- gate the publish / client-link endpoints to the app owner only -----
+// There is no "operator" role in the DB (team_members.role is for a subscriber's
+// own team) -- the whole app has exactly one operator, so a plain env var is the
+// simplest correct check. Returns the user on success, or a Response to return
+// as-is (401 signed out, 403 signed in but not the operator).
+export async function requireOperator(env, request) {
+  const user = await getUserFromRequest(env, request);
+  if (!user) return unauthorized();
+  if (!env.OPERATOR_EMAIL || user.email !== env.OPERATOR_EMAIL) return json({ error: 'not authorized' }, 403);
+  return user;
+}
+
 // ---- Supabase: service-role REST (bypasses RLS — webhook writes) --------
 export async function supaAdmin(env, path, { method = 'GET', body, headers = {} } = {}) {
   const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {

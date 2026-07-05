@@ -10,6 +10,7 @@ Site map after the restructure:
 |-----------------|------------------------------------------|
 | `/`             | `index.html` — the marketing landing page |
 | `/app`          | `app.html` — the terminal (clean URL)     |
+| `/view.html?token=...` | the limited client-facing view (Heat Map + Chart + Report, 3 days back) |
 | `/api/*`        | Pages Functions (`functions/api/*.js`)    |
 
 > Cloudflare Pages serves `app.html` at `/app` automatically (clean URLs), so the
@@ -59,6 +60,7 @@ Set these under **Pages project → Settings → Environment variables** (add th
 | `STRIPE_PRICE_OPERATOR_ANNUAL`  | plain | Stripe price id |
 | `STRIPE_PRICE_DESK_MONTHLY`     | plain | Stripe price id |
 | `STRIPE_PRICE_DESK_ANNUAL`      | plain | Stripe price id |
+| `OPERATOR_EMAIL` | plain | your own Supabase login email — gates `/api/publish` and `/api/client-tokens` to you only |
 | `APP_BASE_URL` *(optional)* | plain | e.g. `https://quan.app` — otherwise the request origin is used |
 
 The **service role key bypasses Row-Level Security** — it lives only in Pages
@@ -72,6 +74,19 @@ put it in client code.
 Run [`supabase/schema.sql`](supabase/schema.sql) once in the Supabase SQL editor.
 It adds the `subscriptions` table and its RLS policy on top of the existing
 profiles/teams tables.
+
+---
+
+## 3b. KV namespace (client-view publishing)
+
+The operator's "Publish" button (in the terminal) and the client-facing
+`view.html` page both read/write a KV namespace called `QUAN_PUBLISH`
+(`wrangler.toml` already has the binding + namespace id). Because Git-integration
+Pages deploys don't reliably pick up `[[kv_namespaces]]` from `wrangler.toml`,
+add the same binding by hand once:
+
+**Pages project → Settings → Functions → KV namespace bindings → Add binding.**
+Variable name: `QUAN_PUBLISH`. KV namespace: `QUAN_PUBLISH`.
 
 ---
 
