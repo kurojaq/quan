@@ -1,23 +1,12 @@
 (function(){
   const $=id=>document.getElementById(id);
-  const canvas=$('pcv'); if(!canvas||typeof THREE==='undefined') return;
-  const tip=$('ptip');
-  let M=1600, CW=null, P=null,C=null,G=null,E=null, arrs=[], zc=[], dipIdx=0, ready=false, lastRW=null;
+  if(!$('pAnchor')) return;   // Field Study tab not present on this page
+  let ready=false, lastRW=null;
   let lastRipn=null;                 // RIPN handshake inspection data from the last compute()
   let _ripnSel=Object.create(null);  // operator-selected anchor row, keyed per (instrument|session)
-  let mode2d=false, hover2d=null;
-  const cv2=$('pcv2d'), ctx2=cv2?cv2.getContext('2d'):null;
-  const els={cw:$('pCw'),t:$('pT'),clk:$('pClk'),p:$('pProd'),c:$('pCurv'),g:$('pGrad'),e:$('pEnv'),z:$('pDip'),src:$('pSrc')};
 
   const sessT=cw=>(cw+1)/2;
-  function clockOf(cw){const f=sessT(cw);let mins=Math.round(f*23*60);let hh=(18*60+mins)%(24*60);const H=Math.floor(hh/60),Mn=hh%60;const ap=H<12?'AM':'PM';let h=H%12;if(h===0)h=12;return h+':'+String(Mn).padStart(2,'0')+' '+ap+' ET';}
-  function nowCW(){const now=new Date();const utc=now.getTime()+now.getTimezoneOffset()*60000;const et=new Date(utc-4*3600000);let mins=et.getHours()*60+et.getMinutes();let since=(mins-18*60+1440)%1440;let f=Math.max(0,Math.min(1,since/(23*60)));return f*2-1;}
   const fmt=v=>(v>=0?'+':'')+v.toFixed(4), fmt0=v=>v.toFixed(4);
-  function cr(p0,p1,p2,p3,t){const t2=t*t,t3=t2*t;return 0.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t2+(-p0+3*p1-3*p2+p3)*t3);}
-  function resample(src){const N0=src.length;const out=new Float32Array(M);
-    for(let m=0;m<M;m++){const f=m/(M-1)*(N0-1);const i=Math.min(Math.floor(f),N0-2);const t=f-i;
-      out[m]=cr(src[Math.max(i-1,0)],src[i],src[Math.min(i+1,N0-1)],src[Math.min(i+2,N0-1)],t);}return out;}
-  const nrm=a=>{let m=0;for(const v of a)m=Math.max(m,Math.abs(v));m=m||1;const o=new Float32Array(a.length);for(let i=0;i<a.length;i++)o[i]=a[i]/m;return o;};
   // ===== Qu'an engine (ingest_chain + realization_waves) — JS port, validated bit-for-bit vs Python =====
   function cleanNum(s){ if(s==null) return NaN; s=String(s).replace(/,/g,'').replace(/s$/,'').trim();
     if(s===''||s==='N/A'||s==='nan'||s==='None') return NaN; const v=parseFloat(s); return isFinite(v)?v:NaN; }
@@ -28,7 +17,7 @@
     out.push(cur); return out; }
   function ingestChain(text){
     const lines=text.replace(/\r/g,'').split('\n').filter(l=>l.length);
-    const head=parseCsvLine(lines[0]).map(h=>h.replace(/^\ufeff/,'').replace(/^"|"$/g,'').trim());
+    const head=parseCsvLine(lines[0]).map(h=>h.replace(/^﻿/,'').replace(/^"|"$/g,'').trim());
     const nth=(name,k)=>{ let c=0; for(let i=0;i<head.length;i++){ if(head[i]===name){ if(c===k) return i; c++; } } return -1; };
     const ix={strike:nth('Strike',0),callPrem:nth('Premium',0),putPrem:nth('Premium',1),
       callOI:nth('Open Int',0),putOI:nth('Open Int',1)};
@@ -79,12 +68,24 @@
       for(let k=0;k<CW_STEPS;k++){ const d=cwStep(k); const cc_next=(k+1)<CW_STEPS?cc[k+1]:0.0; cd[k]=d!==0?(cc_next-cc[k])/d:0.0; }
       covered=(ai+CW_STEPS)<=br.length;
     }
-    const pairs=B=>{ const sop=[]; for(let nn=0;nn<PAIR_ROWS;nn++) sop.push(B[nn]+B[20-nn]); return sop; };
-    const sopG=pairs(cc), sopC=pairs(cd); const fold=sopG.map((g,i)=>g*sopC[i]);
+    // pairs: fold the 21-cell axis from opposite ends toward center (golden-reference TSC(Curvature) schema)
+    //   sop=Sum of Pairs, pm=Pairs Multiplied, pd=Pairs Divided, dip=Difference In Pairs Left-to-Right (DIPLTR)
+    const pairs=B=>{ const sop=[],pm=[],pd=[],dip=[]; for(let nn=0;nn<PAIR_ROWS;nn++){ const hival=B[nn],loval=B[20-nn];
+      sop.push(hival+loval); pm.push(hival*loval); pd.push(loval!==0?hival/loval:0); dip.push(hival-loval); } return {sop,pm,pd,dip}; };
+    const pG=pairs(cc), pC=pairs(cd);
+    const sopG=pG.sop, sopC=pC.sop; const fold=sopG.map((g,i)=>g*sopC[i]);
     const cross=[]; for(let i=1;i<PAIR_ROWS;i++){ if(fold[i]===0) continue; const sc=Math.sign(fold[i]), sp=Math.sign(fold[i-1]); if(sc!==0&&sp!==0&&sc!==sp) cross.push(Math.round(cw[i]*100)/100); }
+    // ---- Field Study derivations (golden-reference TSC(Curvature) schema; gradient pairing used as canonical) ----
+    const ds=pG.sop.map((s,i)=>s!==0?pG.dip[i]/s:0);                    // Difference/Sum (the "DS" sheet)
+    const soppm=pG.sop.map((s,i)=>pG.pm[i]!==0?s/pG.pm[i]:0);           // Sum of Pairs / Pairs Multiplied
+    const diplTRpd=pG.pd.map((d,i)=>d!==0?pG.dip[i]/d:0);               // DIPLTR / Pairs Divided
+    const swf=soppm.map((s,i)=>s!==0?diplTRpd[i]/s:0);                  // SWF: DIPLTRPD/SOPPM chain
+    function dphase(A,B){ const nn=A.length; const out=[]; for(let k=0;k<nn-1;k++){ const s1=A[k]+A[k+1],s2=B[k]+B[k+1];
+      const num=s1!==0?(A[k+1]-A[k])/s1:0, den=s2!==0?(B[k+1]-B[k])/s2:0; out.push(den!==0?num/den:0); } out.push(0); return out; }
+    const dp21=dphase(cc,cd); const dualPhase=[]; for(let nn=0;nn<PAIR_ROWS;nn++) dualPhase.push(dp21[nn]);   // the "Dual Phase" sheet
     // RIPN inspection rows for the handshake panel: [idx, strike, RIPN[0,1], AP, tuning(BR)]
     const ripn_rows=[]; for(let r=0;r<n;r++) ripn_rows.push([r, strikes[r], (isFinite(bi[r])?bi[r]:null), (isFinite(ap[r])?ap[r]:null), (r<br.length&&isFinite(br[r])?br[r]:null)]);
-    return {cw,cc,cd,sopG,sopC,fold,cross,atm_strike:strikes[ai],anchor_strike:strikes[ai],n_strikes:n,covered,
+    return {cw,cc,cd,sopG,sopC,fold,cross,ds,dualPhase,swf,atm_strike:strikes[ai],anchor_strike:strikes[ai],n_strikes:n,covered,
             ripn_rows,auto_idx:auto_ai,used_idx:ai,manual_anchor:manual,method:RIPN_METHOD};
   }
 
@@ -95,222 +96,53 @@
     if(rows.length<17) return {err:'Need ≥17 strikes (got '+(rows?rows.length:0)+').'};
     const rw=realizationWaves(rows, anchor, anchorIdx);
     if(!rw) return {err:'Engine could not resolve a pressure field from this chain.'};
-    lastRW=rw;   // engine-exact 11-pair-row waves for the SOP Field tab (panel set)
+    lastRW=rw;   // engine-exact 11-pair-row waves for the Field Study tab
     // RIPN handshake inspection data (Quanyun) — the operator's view of the initialization point
     lastRipn={rows:rw.ripn_rows, auto:rw.auto_idx, used:rw.used_idx, manual:rw.manual_anchor,
               anchor_strike:rw.anchor_strike, method:rw.method, n:rw.n_strikes};
-    // SOP fold is symmetric (Sum of Pairs) — mirror the 11 pair-rows onto the full 21-cell CW axis.
-    const mir=arr11=>{ const o=new Array(CW_STEPS); for(let k=0;k<CW_STEPS;k++) o[k]=arr11[Math.min(k,20-k)]; return o; };
-    const prod21=mir(rw.fold), grad21=mir(rw.sopG), curv21=mir(rw.sopC);
-    M=1600; CW=new Float32Array(M); for(let m=0;m<M;m++) CW[m]=-1+2*m/(M-1);
-    const product=resample(prod21), gradient=resample(grad21), curvature=resample(curv21);
-    const envelope=new Float32Array(M); for(let i=0;i<M;i++){let s=0,c=0;for(let k=-120;k<=120;k++){const j=i+k;if(j>=0&&j<M){s+=product[j];c++;}}envelope[i]=s/c;}
-    P=nrm(product);C=nrm(curvature);G=nrm(gradient);E=nrm(envelope); arrs=[P,C,G,E];
-    // dips = the engine's REAL coherence-break crossings (+ their mirror), plus the deepest fold point
-    const idxOf=c=>Math.max(0,Math.min(M-1,Math.round((c+1)/2*(M-1))));
-    const set=new Set(); rw.cross.forEach(c=>{ set.add(idxOf(c)); set.add(idxOf(-c)); });
-    zc=[...set];
-    dipIdx=0; for(let i=1;i<M;i++) if(P[i]<P[dipIdx]) dipIdx=i;
     const _degen=!rw.fold.some(x=>Math.abs(x)>1e-9);
     const _alabel=(rw.method==='atm'?'ATM ':'anchor ')+rw.anchor_strike.toFixed(0)+(rw.method==='atm'?'':(rw.manual_anchor?' (handshake)':' (auto)'));
-    return {ok:true, degenerate:_degen, src:'engine · '+rw.method+' · '+_alabel+' · '+rw.n_strikes+' strikes · coherence breaks CW '+(rw.cross.length?rw.cross.join(', '):'none')+(rw.covered?'':' · \u26A0 window not fully covered')};
+    return {ok:true, degenerate:_degen, src:'engine · '+rw.method+' · '+_alabel+' · '+rw.n_strikes+' strikes · coherence breaks CW '+(rw.cross.length?rw.cross.join(', '):'none')+(rw.covered?'':' · ⚠ window not fully covered')};
   }
 
-  let renderer,scene,cam,diskGroup,planet,pHalo,stemGroup,dipGroup,diskLines=[],diskRiders=[],dipMeshes=[];
-  const LINEC=[0xffffff,0xd9463b,0xe8b53a,0x3f9d6b], baseR=[2.0,2.7,3.4,4.1];
-  let HS=1.5, BRI=0.72, zoom=1, rotX=-0.62, rotY=0;
-  const angOf=idx=>(CW[idx]+1)/2*Math.PI*2;
-  function diskPt(li,idx){const R=baseR[li];return new THREE.Vector3(R*Math.cos(angOf(idx)),arrs[li][idx]*HS,R*Math.sin(angOf(idx)));}
-  function foldColor(v){const c=new THREE.Color();const cool=new THREE.Color(0x6fd3ff),mid=new THREE.Color(0xf6f2e9),warm=new THREE.Color(0xffc24d);if(v<0)c.copy(cool).lerp(mid,1+v);else c.copy(mid).lerp(warm,Math.min(v,1));return c;}
-  function applyCam(){const d=16/zoom;cam.position.set(d*Math.sin(rotY)*Math.cos(rotX),d*Math.sin(rotX)+5,d*Math.cos(rotY)*Math.cos(rotX));cam.lookAt(0,0,0);}
-  function psize(){const w=canvas.clientWidth,h=canvas.clientHeight;if(!w||!h||!renderer)return;renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();}
-  window.__polarResize=psize;
-
-  function initScene(){
-    renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
-    scene=new THREE.Scene(); scene.add(new THREE.AmbientLight(0xffffff,0.95));
-    cam=new THREE.PerspectiveCamera(52,1,0.1,1500);
-    const STAR=600,sgg=new THREE.BufferGeometry(),sp=new Float32Array(STAR*3);
-    for(let i=0;i<STAR;i++){sp[i*3]=(Math.random()*2-1)*42;sp[i*3+1]=(Math.random()*2-1)*24;sp[i*3+2]=(Math.random()*2-1)*30-12;}
-    sgg.setAttribute('position',new THREE.BufferAttribute(sp,3));
-    scene.add(new THREE.Points(sgg,new THREE.PointsMaterial({color:0xbfb9a8,size:0.08,transparent:true,opacity:0.4})));
-    diskGroup=new THREE.Group(); scene.add(diskGroup);
-    const disk=new THREE.Mesh(new THREE.CircleGeometry(4.5,90),new THREE.MeshBasicMaterial({color:0x141210,transparent:true,opacity:0.4,side:THREE.DoubleSide}));disk.rotation.x=-Math.PI/2;diskGroup.add(disk);
-    for(const rr of baseR){const seg=[];for(let j=0;j<=90;j++){const t=j/90*Math.PI*2;seg.push(new THREE.Vector3(rr*Math.cos(t),0,rr*Math.sin(t)));}diskGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(seg),new THREE.LineBasicMaterial({color:0x2a2620})));}
-    diskGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.5,24,24),new THREE.MeshBasicMaterial({color:0xffe9b0,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending})));
-    stemGroup=new THREE.Group(); diskGroup.add(stemGroup);
-    dipGroup=new THREE.Group(); diskGroup.add(dipGroup);
-    planet=new THREE.Mesh(new THREE.SphereGeometry(0.2,24,24),new THREE.MeshBasicMaterial({color:0xfff4d8}));
-    pHalo=new THREE.Mesh(new THREE.SphereGeometry(0.34,24,24),new THREE.MeshBasicMaterial({color:0xfff4d8,transparent:true,opacity:0.3,blending:THREE.AdditiveBlending,depthWrite:false}));
-    diskGroup.add(planet,pHalo); applyCam();
-  }
-  function rebuildGeom(){
-    diskLines.forEach(l=>{diskGroup.remove(l);l.geometry.dispose();l.material.dispose();}); diskLines=[];
-    diskRiders.forEach(r=>{diskGroup.remove(r);r.geometry.dispose();r.material.dispose();}); diskRiders=[];
-    while(stemGroup.children.length){const c=stemGroup.children.pop();c.geometry.dispose();c.material.dispose();}
-    while(dipGroup.children.length){const c=dipGroup.children.pop();c.geometry.dispose();c.material.dispose();} dipMeshes=[];
-    LINEC.forEach((col,li)=>{const pts=[];for(let m=0;m<M;m+=2)pts.push(diskPt(li,m));const ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:col,transparent:true,opacity:0.35+BRI*0.55}));diskGroup.add(ln);diskLines.push(ln);});
-    LINEC.forEach(col=>{const m=new THREE.Mesh(new THREE.SphereGeometry(0.12,14,14),new THREE.MeshBasicMaterial({color:col}));diskGroup.add(m);diskRiders.push(m);});
-    for(let m=0;m<M;m+=40){const a=angOf(m),R=baseR[3];stemGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(R*Math.cos(a),0,R*Math.sin(a)),new THREE.Vector3(R*Math.cos(a),P[m]*HS,R*Math.sin(a))]),new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0.12})));}
-    [dipIdx,...zc].forEach((idx,n)=>{const m=new THREE.Mesh(new THREE.SphereGeometry(n===0?0.16:0.1,14,14),new THREE.MeshBasicMaterial({color:0x6fd3ff}));m.position.copy(diskPt(0,idx));m.userData.idx=idx;dipGroup.add(m);dipMeshes.push(m);});
-  }
-  function readAt(hi){ hi=Math.max(0,Math.min(M-1,hi|0));
-    els.cw.textContent=fmt(CW[hi]); els.t.textContent=fmt0(sessT(CW[hi])); els.clk.textContent=clockOf(CW[hi]);
-    els.p.textContent=fmt(P[hi]);els.c.textContent=fmt(C[hi]);els.g.textContent=fmt(G[hi]);els.e.textContent=fmt(E[hi]);
-    let best=1e9,bi=dipIdx;for(const zi of zc){const d=Math.abs(CW[zi]-CW[hi]);if(d<best){best=d;bi=zi;}}{const d=Math.abs(CW[dipIdx]-CW[hi]);if(d<best){best=d;bi=dipIdx;}}
-    els.z.textContent='CW '+fmt(CW[bi])+(best<0.01?'  (IN IT)':'  \u0394 '+best.toFixed(4)); }
-  function update(headF){
-    if(!ready) return; const hi=Math.min(Math.floor(headF),M-1);
-    const hp=diskPt(3,hi); planet.position.copy(hp); pHalo.position.copy(hp);
-    planet.material.color.copy(foldColor(P[hi])); pHalo.material.color.copy(foldColor(P[hi]));
-    diskRiders.forEach((m,li)=>m.position.copy(diskPt(li,hi)));
-    readAt(hi);
-  }
-  // ===== 2-D SOP wave field (same data as the disk, flattened onto the CW axis) =====
-  const C2=['#ffffff','#d9463b','#e8b53a','#3f9d6b'];   // product, curvature, gradient, envelope
-  function fit2d(){ if(!cv2) return; const w=cv2.clientWidth,h=cv2.clientHeight; if(!w||!h) return;
-    const dpr=Math.min(devicePixelRatio||1,2); const W=Math.round(w*dpr),H=Math.round(h*dpr);
-    if(cv2.width!==W||cv2.height!==H){cv2.width=W;cv2.height=H;} }
-  function draw2d(){
-    if(!ctx2||!cv2) return; fit2d();
-    const w=cv2.clientWidth,h=cv2.clientHeight; if(!w||!h) return;
-    const dpr=Math.min(devicePixelRatio||1,2); ctx2.setTransform(dpr,0,0,dpr,0,0); ctx2.clearRect(0,0,w,h);
-    ctx2.fillStyle='#07090d'; ctx2.fillRect(0,0,w,h);
-    if(!ready){ ctx2.fillStyle='#8f8c82'; ctx2.font='12px monospace'; ctx2.textAlign='left'; ctx2.fillText('load a session chain + anchor',16,26); return; }
-    const padL=34,padR=12,padT=18,padB=22, x0=padL,x1=w-padR,y0=padT,y1=h-padB;
-    const YMIN=-1.1,YMAX=1.1;
-    const xAt=cw=>x0+(cw+1)/2*(x1-x0), yAt=v=>y0+(YMAX-v)/(YMAX-YMIN)*(y1-y0), xIdx=i=>xAt(CW[i]);
-    ctx2.fillStyle='#0b0f14'; ctx2.fillRect(x0,y0,x1-x0,y1-y0);
-    // grid + labels
-    ctx2.lineWidth=0.5; ctx2.font='9px monospace'; ctx2.fillStyle='#a6a299';
-    ctx2.strokeStyle='rgba(255,255,255,0.05)'; ctx2.textAlign='center';
-    for(let t=-10;t<=10;t++){ const X=xAt(t/10); ctx2.beginPath(); ctx2.moveTo(X,y0); ctx2.lineTo(X,y1); ctx2.stroke();
-      if(t%2===0) ctx2.fillText((t/10).toFixed(1),X,y1+12); }
-    ctx2.textAlign='right';
-    for(let yy=-1;yy<=1;yy+=0.5){ const Y=yAt(yy); ctx2.beginPath(); ctx2.moveTo(x0,Y); ctx2.lineTo(x1,Y); ctx2.stroke(); ctx2.fillText(yy.toFixed(1),x0-4,Y+3); }
-    ctx2.strokeStyle='rgba(232,227,214,0.7)'; const yz=yAt(0); ctx2.beginPath(); ctx2.moveTo(x0,yz); ctx2.lineTo(x1,yz); ctx2.stroke();
-    ctx2.strokeStyle='rgba(255,255,255,0.08)'; ctx2.strokeRect(x0,y0,x1-x0,y1-y0);
-    // curves (envelope -> gradient -> curvature -> product on top)
-    const order=[[E,C2[3],1.3],[G,C2[2],1.3],[C,C2[1],1.3],[P,C2[0],1.9]];
-    for(const [a,col,lw] of order){ ctx2.strokeStyle=col; ctx2.lineWidth=lw; ctx2.beginPath();
-      for(let i=0;i<M;i+=2){ const X=xIdx(i),Y=yAt(Math.max(YMIN,Math.min(YMAX,a[i]))); i?ctx2.lineTo(X,Y):ctx2.moveTo(X,Y); } ctx2.stroke(); }
-    // coherence dips: dashed cyan verticals + dots on the product line
-    ctx2.setLineDash([3,3]); ctx2.strokeStyle='rgba(111,211,255,0.5)'; ctx2.lineWidth=1;
-    zc.forEach(zi=>{ const X=xIdx(zi); ctx2.beginPath(); ctx2.moveTo(X,y0); ctx2.lineTo(X,y1); ctx2.stroke(); }); ctx2.setLineDash([]);
-    zc.forEach(zi=>{ ctx2.fillStyle='#6fd3ff'; ctx2.beginPath(); ctx2.arc(xIdx(zi),yAt(P[zi]),2.6,0,7); ctx2.fill(); });
-    { ctx2.strokeStyle='#6fd3ff'; ctx2.lineWidth=1.5; ctx2.beginPath(); ctx2.arc(xIdx(dipIdx),yAt(P[dipIdx]),5,0,7); ctx2.stroke(); }  // deepest fold
-    // playhead (scrub/now)
-    const hi=Math.max(0,Math.min(M-1,headF|0)); ctx2.strokeStyle='rgba(255,244,216,0.4)'; ctx2.lineWidth=1; ctx2.beginPath(); ctx2.moveTo(xIdx(hi),y0); ctx2.lineTo(xIdx(hi),y1); ctx2.stroke();
-    // active marker = hover (trace) else playhead
-    const act=(hover2d!=null)?hover2d:hi, Xa=xIdx(act);
-    if(hover2d!=null){ ctx2.strokeStyle='rgba(255,255,255,0.85)'; ctx2.lineWidth=1; ctx2.beginPath(); ctx2.moveTo(Xa,y0); ctx2.lineTo(Xa,y1); ctx2.stroke(); }
-    order.forEach(([a,col])=>{ const Y=yAt(Math.max(YMIN,Math.min(YMAX,a[act]))); ctx2.fillStyle=col; ctx2.beginPath(); ctx2.arc(Xa,Y,3,0,7); ctx2.fill(); ctx2.strokeStyle='rgba(0,0,0,0.5)'; ctx2.lineWidth=0.5; ctx2.stroke(); });
-    ctx2.fillStyle='rgba(214,210,198,0.8)'; ctx2.font='10px monospace'; ctx2.textAlign='right'; ctx2.fillText('SOP fold field \u00b7 product \u00d7 curvature \u00d7 gradient',x1,11);
-    readAt(act);
-  }
-  function setZoom(mult){zoom=Math.max(0.3,Math.min(4,zoom*mult));applyCam();}
-  $('pzin').onclick=()=>setZoom(1.2); $('pzout').onclick=()=>setZoom(0.83);
-  canvas.addEventListener('wheel',e=>{e.preventDefault();setZoom(e.deltaY>0?0.92:1.08);},{passive:false});
-  let dragging=false,pxm=0,pym=0; const ray=new THREE.Raycaster();
-  canvas.addEventListener('pointerdown',e=>{dragging=true;pxm=e.clientX;pym=e.clientY;});
-  addEventListener('pointerup',()=>dragging=false);
-  addEventListener('pointermove',e=>{ if(pmode!=='disk') return; if(!ready||!cam) return; const r=canvas.getBoundingClientRect(); if(!r.width){tip.style.display='none';return;} const mx=e.clientX-r.left,my=e.clientY-r.top;
-    if(dragging){rotY+=(e.clientX-pxm)*0.01;rotX=Math.max(-1.45,Math.min(1.45,rotX+(e.clientY-pym)*0.01));pxm=e.clientX;pym=e.clientY;applyCam();tip.style.display='none';return;}
-    if(mx<0||my<0||mx>r.width||my>r.height){tip.style.display='none';return;}
-    const ndc=new THREE.Vector2((mx/r.width)*2-1,-(my/r.height)*2+1);ray.setFromCamera(ndc,cam);
-    const hits=ray.intersectObjects(dipMeshes,false);
-    if(hits.length){const idx=hits[0].object.userData.idx,cw=CW[idx],win=0.06,lo=Math.max(-1,cw-win),hiw=Math.min(1,cw+win);
-      tip.innerHTML='<b>Coherence dip</b><br>CW '+fmt(cw)+' &middot; session-t '+fmt0(sessT(cw))+'<br>clock &asymp; '+clockOf(cw)+'<br>window: '+clockOf(lo)+' &rarr; '+clockOf(hiw)+'<span class="warn">framework-defined window — candidate to lock &amp; score, not a validated price-collapse window.</span>';
-      tip.style.display='block';tip.style.left=Math.min(mx+14,r.width-250)+'px';tip.style.top=(my+12)+'px';
-    } else tip.style.display='none'; });
-
-  const playBtn=$('pPlay'),scrub=$('pScrub'),snap=$('pSnap'),spd=$('pSpd'),hsR=$('pHs'),bri=$('pBri');
-  let playing=false,headF=0,live=true;   // live = planet rides the real session clock (nowCW), advancing through the session
-  function setLiveBadge(){ if(snap) snap.classList.toggle('on',live); }
-  playBtn.onclick=function(){ if(live){ live=false; playing=false; } else { playing=!playing; } this.textContent=(playing||live)?'\u23F8':'\u25B6'; setLiveBadge(); };
-  scrub.addEventListener('input',()=>{ live=false; playing=false; playBtn.textContent='\u25B6'; headF=(+scrub.value)/1000*(M-1); setLiveBadge(); });
-  snap.onclick=()=>{ live=true; playing=false; playBtn.textContent='\u23F8'; setLiveBadge(); };   // re-engage live session tracking
-  setLiveBadge();
-  hsR.addEventListener('input',()=>{HS=(+hsR.value)/10; if(ready) rebuildGeom();});
-  bri.addEventListener('input',()=>{BRI=(+bri.value)/100;diskLines.forEach(ln=>ln.material.opacity=0.35+BRI*0.55);});
-
-  // ---- Polar Disk / TSC / Headline toggle ----
-  const bDisk=$('pVdisk'), b2d=$('pV2d'), bHead=$('pVhead'), bPanel=$('pVpanels'), bPG=$('pVpgxc'), bTN=$('pVtensor'), bLT=$('pVlatent'), bCxg=$('pVcxg'), pzoomEl=canvas.parentElement.querySelector('.pzoom'), headView=$('pHeadView'), panelView=$('pPanelView'), pgView=$('pPGxCView'), tnView=$('pTensorView'), ltView=$('pLatentView'), cxgView=$('pCxGView');
-  const _psec=canvas.closest('.tabsec'); const diskCtls=_psec?[_psec.querySelector('.preadout'),_psec.querySelector('.ptimebar'),_psec.querySelector('.pctl'),_psec.querySelector('footer')]:[];
-  let pmode='head';   // disk | tsc | head | panels | pgxc | tensor | latent | cxg
-  function setPMode(m){ pmode=m; mode2d=(m==='tsc'); hover2d=null; tip.style.display='none';
-    const B={disk:bDisk,tsc:b2d,head:bHead,panels:bPanel,pgxc:bPG,tensor:bTN,latent:bLT,cxg:bCxg};
-    for(const k in B){ if(B[k]) B[k].classList.toggle('on',m===k); }
-    { const _sel=document.getElementById('pViewSel'); if(_sel&&_sel.value!==m)_sel.value=m; }
-    canvas.style.display=(m==='disk')?'block':'none';
-    if(cv2)cv2.style.display=(m==='tsc')?'block':'none';
+  // ---- Headline / Field Study toggle ----
+  let pmode='head';
+  const headView=$('pHeadView'), fieldView=$('pFieldView');
+  function setPMode(m){ pmode=m;
+    const _sel=$('pViewSel'); if(_sel&&_sel.value!==m)_sel.value=m;
     if(headView)headView.style.display=(m==='head')?'flex':'none';
-    if(panelView)panelView.style.display=(m==='panels')?'flex':'none';
-    if(pgView)pgView.style.display=(m==='pgxc')?'flex':'none';
-    if(tnView)tnView.style.display=(m==='tensor')?'flex':'none';
-    if(ltView)ltView.style.display=(m==='latent')?'flex':'none';
-    if(cxgView)cxgView.style.display=(m==='cxg')?'flex':'none';
-    if(pzoomEl)pzoomEl.style.display=(m==='disk')?'':'none';
-    diskCtls.forEach(el=>{ if(el) el.style.display=(m==='disk')?'':'none'; });   // readout/scrubber/sliders/legend are disk-only
-    if(m==='disk') psize(); else if(m==='tsc') draw2d(); else if(window.__sopResize) window.__sopResize(); }
-  if(bDisk)bDisk.addEventListener('click',()=>setPMode('disk'));
-  if(b2d)b2d.addEventListener('click',()=>setPMode('tsc'));
-  if(bHead)bHead.addEventListener('click',()=>setPMode('head'));
-  if(bPanel)bPanel.addEventListener('click',()=>setPMode('panels'));
-  if(bPG)bPG.addEventListener('click',()=>setPMode('pgxc'));
-  if(bTN)bTN.addEventListener('click',()=>setPMode('tensor'));
-  if(bLT)bLT.addEventListener('click',()=>setPMode('latent'));
-  if(bCxg)bCxg.addEventListener('click',()=>setPMode('cxg'));
-  try{setPMode('head');}catch(_e){}
-  { const pvSel=document.getElementById('pViewSel'); if(pvSel)pvSel.addEventListener('change',()=>setPMode(pvSel.value)); }
-  // trace cursor on the 2-D graph: free-move along CW, snap to nearest dip to pinpoint it
-  if(cv2){
-    cv2.addEventListener('mousemove',e=>{ if(!ready||!mode2d) return; const r=cv2.getBoundingClientRect(); const w=r.width;
-      const padL=34,padR=12,x0=padL,x1=w-padR; const mx=e.clientX-r.left;
-      let cw=Math.max(-1,Math.min(1,(mx-x0)/(x1-x0)*2-1)); let idx=Math.round((cw+1)/2*(M-1));
-      let snapZ=null,bestpx=11; for(const zi of [dipIdx,...zc]){ const d=Math.abs((x0+(CW[zi]+1)/2*(x1-x0))-mx); if(d<bestpx){bestpx=d;snapZ=zi;} }
-      if(snapZ!=null) idx=snapZ; hover2d=Math.max(0,Math.min(M-1,idx));
-      if(snapZ!=null){ const cwv=CW[snapZ],win=0.06,lo=Math.max(-1,cwv-win),hiw=Math.min(1,cwv+win);
-        tip.innerHTML='<b>Coherence dip</b><br>CW '+fmt(cwv)+' &middot; session-t '+fmt0(sessT(cwv))+'<br>clock &asymp; '+clockOf(cwv)+'<br>window: '+clockOf(lo)+' &rarr; '+clockOf(hiw)+'<span class="warn">framework-defined window &mdash; candidate to lock &amp; score, not a validated price-collapse window.</span>';
-        tip.style.display='block'; tip.style.left=Math.min(mx+14,w-250)+'px'; tip.style.top=((e.clientY-r.top)+12)+'px';
-      } else tip.style.display='none'; });
-    cv2.addEventListener('mouseleave',()=>{ hover2d=null; tip.style.display='none'; });
+    if(fieldView)fieldView.style.display=(m==='field')?'flex':'none';
+    if(window.__sopResize) window.__sopResize();
   }
+  { const pvSel=$('pViewSel'); if(pvSel)pvSel.addEventListener('change',()=>setPMode(pvSel.value)); }
+  try{ setPMode('head'); }catch(_e){}
 
   let _lastCsv=null;
   // Per-instrument data is owned centrally by the header hub (window.__q*). This tab is a render target.
-  window.__polarClear=function(){ _lastCsv=null; ready=false; lastRW=null; if(diskGroup)diskGroup.visible=false;
-    $('pFn').textContent='no session loaded'; els.src.textContent='no session loaded'; els.src.style.color='#8f8c82'; showAnchorPrompt(null); emitSop(); };
+  window.__polarClear=function(){ _lastCsv=null; ready=false; lastRW=null;
+    $('pFn').textContent='no session loaded'; const s=$('pSrc'); if(s){s.textContent='no session loaded'; s.style.color='#8f8c82';} showAnchorPrompt(null); emitSop(); };
   window.__polarSetAnchor=function(v){ $('pAnchor').value=(v==null?'':v); if(_lastCsv!=null) runEngine(); };
-  // ---- engine-exact SOP panel data for the SOP Field tab (golden 'SOP Folding' sheet formulas) ----
+  // ---- engine-exact SOP panel data for the Field Study tab (golden 'SOP Folding' sheet formulas) ----
   function emitSop(){ window.dispatchEvent(new CustomEvent('quan:sop')); }
   window.__sopData=function(){ const rw=lastRW; if(!ready||!rw) return null;
     const g=rw.sopG,c=rw.sopC,J=rw.fold,n=g.length, pair=[],tension=[],pcurv=[],gc=[],cg=[];
     for(let i=0;i<n;i++){ pair.push(Math.round(i*0.1*1e10)/1e10);
       const Jn=J[i],Jx=(i+1<n?J[i+1]:0); tension.push(Jn+Jx); pcurv.push(Jx-Jn);   // K=J+next, L=Jnext-J
       gc.push(c[i]!==0?g[i]/c[i]:0); cg.push(g[i]!==0?c[i]/g[i]:0); }                 // H=SOPG/SOPC, I=SOPC/SOPG
-    // three latent paths — quan_paths._latent_paths, Euler dt=0.1 (brief's render_latent_paths)
-    const Q=new Array(n).fill(0),P=new Array(n).fill(0),R=new Array(n).fill(0);
-    for(let i=1;i<n;i++){ if(i<3) Q[i]=Q[i-1]+g[i-1]*0.1; else { const r=(c[i-1]!==0)?g[i-1]/c[i-1]:0; Q[i]=Q[i-1]+r*0.1; }
-      P[i]=P[i-1]+c[i-1]*0.1; R[i]=R[i-1]+P[i-1]*0.1; }
-    // workbook SOP-Folding latent cols feeding the Tensor Surface: O(col15), Q(col17). L=pcurv, H=gc.
-    const Owb=new Array(n).fill(0), Qwb=new Array(n).fill(0);
-    Qwb[0]=g[0]; if(n>1) Qwb[1]=Qwb[0]+g[0]*0.1; for(let i=2;i<n;i++) Qwb[i]=Qwb[i-1]+gc[i-1]*0.1;
-    Owb[0]=0; if(n>1) Owb[1]=0; for(let i=2;i<n;i++) Owb[i]=Owb[i-1]-pcurv[i-1];
     return {pair,sopG:g,sopC:c,product:J,tension,pcurv,gc,cg,
-      cw:rw.cw,pg:rw.cc,pc:rw.cd,                                 // PGxC: 21-cell pressure gradient/curvature
-      latent:{Q,P,R},                                            // three latent paths
-      tensor:{O:Owb,Q:Qwb,chrono:pair.slice()},                  // Book Tensor surface inputs (|O|·exp(-(off-Q)^2))
+      ds:rw.ds, dualPhase:rw.dualPhase, swf:rw.swf,                        // Field Study: DS / Dual Phase / SWF
+      cw:rw.cw,pg:rw.cc,pc:rw.cd,                                 // 21-cell pressure gradient/curvature
       atm:rw.atm_strike,n_strikes:rw.n_strikes,covered:rw.covered,cross:rw.cross}; };
   function showAnchorPrompt(msg){ const el=$('pAnchorPrompt'); if(!el) return;
     if(msg){ const m=$('pAnchorPromptMsg'); if(m) m.textContent=msg; el.style.display='flex'; } else el.style.display='none'; }
-  function runEngine(){ if(_lastCsv==null){ showAnchorPrompt(null); lastRW=null; lastRipn=null; emitSop(); window.dispatchEvent(new CustomEvent('quan:ripn')); return; } const anchor=parseFloat($('pAnchor').value);
+  function runEngine(){ if(_lastCsv==null){ showAnchorPrompt(null); lastRW=null; lastRipn=null; ready=false; emitSop(); window.dispatchEvent(new CustomEvent('quan:ripn')); return; } const anchor=parseFloat($('pAnchor').value);
     const _sel=_ripnSel[_ripnKey()];
     const res=compute(_lastCsv, anchor, (_sel==null?null:_sel));
-    if(res.err){ els.src.textContent=res.err; els.src.style.color='#e07a6a'; showAnchorPrompt(res.err); ready=false; lastRW=null; lastRipn=null; emitSop(); window.dispatchEvent(new CustomEvent('quan:ripn')); return; }
-    els.src.style.color='#6f675a'; els.src.textContent=res.src;
-    showAnchorPrompt(res.degenerate ? "This expiry's ATM open interest is empty \u2014 pressure field can't resolve. Toggle to the other expiry (Daily/EOM), or load an EOD/settlement chain." : null);
-    ready=true; if(scene) rebuildGeom(); psize(); headF=0; scrub.value=0; emitSop(); window.dispatchEvent(new CustomEvent('quan:ripn')); }
+    const srcEl=$('pSrc');
+    if(res.err){ if(srcEl){srcEl.textContent=res.err; srcEl.style.color='#e07a6a';} showAnchorPrompt(res.err); ready=false; lastRW=null; lastRipn=null; emitSop(); window.dispatchEvent(new CustomEvent('quan:ripn')); return; }
+    if(srcEl){ srcEl.style.color='#6f675a'; srcEl.textContent=res.src; }
+    showAnchorPrompt(res.degenerate ? "This expiry's ATM open interest is empty — pressure field can't resolve. Toggle to the other expiry (Daily/EOM), or load an EOD/settlement chain." : null);
+    ready=true; emitSop(); window.dispatchEvent(new CustomEvent('quan:ripn')); }
   // ---- RIPN HANDSHAKE bridge (Quanyun): the operator's reference-sample selection drives the whole chain ----
   function _ripnKey(){ try{ const a=window.__qActiveChain&&window.__qActiveChain(); if(a&&a.inst) return a.inst+'|'+(a.date||''); }catch(_){} return '_default'; }
   window.__ripnData=function(){ return lastRipn; };                       // {rows:[idx,strike,RIPN,AP,tuning], auto, used, manual, anchor_strike, method, n}
@@ -321,20 +153,20 @@
   // ---- RIPN handshake panel: the parsed RIPN column as a clickable table (Quanyun's primary interface) ----
   (function(){
     const $r=id=>document.getElementById(id);
-    const fz=(v,d)=>(v==null||!isFinite(v))?'\u2014':(+v).toFixed(d);
-    const fAP=v=>{ if(v==null||!isFinite(v)) return '\u2014'; const a=Math.abs(v); return (v<0?'\u2212':'')+(a>=1e6?(a/1e6).toFixed(1)+'M':a>=1e3?(a/1e3).toFixed(0)+'k':a.toFixed(0)); };
+    const fz=(v,d)=>(v==null||!isFinite(v))?'—':(+v).toFixed(d);
+    const fAP=v=>{ if(v==null||!isFinite(v)) return '—'; const a=Math.abs(v); return (v<0?'−':'')+(a>=1e6?(a/1e6).toFixed(1)+'M':a>=1e3?(a/1e3).toFixed(0)+'k':a.toFixed(0)); };
     function render(){
       const p=$r('ripnPanel'); if(!p) return; const head=$r('ripnHead'), tbl=$r('ripnTbl');
       const d=window.__ripnData&&window.__ripnData();
-      if(!d||!d.rows||!d.rows.length){ if(head)head.textContent='No chain loaded \u2014 the RIPN column appears once the engine has a chain + anchor.'; if(tbl)tbl.innerHTML=''; return; }
+      if(!d||!d.rows||!d.rows.length){ if(head)head.textContent='No chain loaded — the RIPN column appears once the engine has a chain + anchor.'; if(tbl)tbl.innerHTML=''; return; }
       const auto=d.auto, used=d.used;
-      head.innerHTML='anchor <b style="color:var(--cream)">'+(d.anchor_strike!=null?(+d.anchor_strike).toFixed(0):'\u2014')+'</b> \u00b7 '
+      head.innerHTML='anchor <b style="color:var(--cream)">'+(d.anchor_strike!=null?(+d.anchor_strike).toFixed(0):'—')+'</b> · '
         +(d.manual?'<span style="color:#e8b53a">handshake</span>':'<span style="color:#6fd3ff">auto</span>')
-        +' \u00b7 row '+used+(auto>=0&&auto!==used?' \u00b7 auto was '+auto:'')+' \u00b7 '+d.n+' strikes';
+        +' · row '+used+(auto>=0&&auto!==used?' · auto was '+auto:'')+' · '+d.n+' strikes';
       let h='<thead><tr>'+['#','strike','RIPN','AP','tuning'].map(x=>'<th style="position:sticky;top:0;background:#26262d;text-align:right;padding:3px 7px;color:#8f8c82;font-weight:600;font-size:9.5px;border-bottom:0.5px solid #3a3a42">'+x+'</th>').join('')+'</tr></thead><tbody>';
       for(const r of d.rows){ const idx=r[0],strike=r[1],ripn=r[2],ap=r[3],tun=r[4];
         const isAuto=idx===auto, isUsed=idx===used, anchorRipn=(ripn===0||ripn===1);
-        const mark=isUsed?'<span style="color:#e8b53a">\u25b8</span> ':(isAuto?'<span style="color:#6fd3ff">\u00b7</span> ':'');
+        const mark=isUsed?'<span style="color:#e8b53a">▸</span> ':(isAuto?'<span style="color:#6fd3ff">·</span> ':'');
         h+='<tr data-idx="'+idx+'" class="ripnRow" style="cursor:pointer;'+(isUsed?'background:#3a3320':'')+'">'
           +'<td style="text-align:right;padding:2px 7px;color:#8f8c82">'+mark+idx+'</td>'
           +'<td style="text-align:right;padding:2px 7px;color:var(--cream)">'+(+strike).toFixed(0)+'</td>'
@@ -356,7 +188,7 @@
     window.addEventListener('quan:ripn', render);
     bind(); if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', bind);
   })();
-  window.__polarLoadChain=function(text,name){ $('pFn').textContent=name; _lastCsv=text; if(diskGroup)diskGroup.visible=true; runEngine(); };
+  window.__polarLoadChain=function(text,name){ $('pFn').textContent=name; _lastCsv=text; runEngine(); };
   $('pFile').addEventListener('change',e=>{const f=e.target.files[0]; if(!f) return; const r=new FileReader();
     r.onload=ev=>{ if(window.__qLoadChain) window.__qLoadChain(ev.target.result,f.name); else window.__polarLoadChain(ev.target.result,f.name); }; r.readAsText(f); });
   $('pAnchor').addEventListener('change',()=>{ if(window.__qSetAnchor) window.__qSetAnchor($('pAnchor').value); else runEngine(); });
@@ -368,17 +200,7 @@
     $('pLock').title=anchorLocked?'Anchor locked for session — click to unlock':'Lock anchor for the session'; });
 
   let booted=false;
-  window.__polarBoot=function(){ if(booted) return; booted=true; initScene(); psize(); if(ready) rebuildGeom();
-    (function loop(){requestAnimationFrame(loop);
-      if(ready){
-        if(live){ const cw=nowCW(); headF=(cw+1)/2*(M-1); scrub.value=Math.floor((cw+1)/2*1000); }
-        else if(playing){ headF+=(+spd.value)*0.55; if(headF>=M-1)headF=0; scrub.value=Math.floor(headF/(M-1)*1000); }
-      }
-      if(pmode==='tsc'){ draw2d(); }
-      else if(pmode==='disk' && ready){ update(headF);
-        const tms=performance.now()*0.005,pulse=1+0.28*Math.sin(tms); planet.scale.setScalar(pulse); pHalo.scale.setScalar(1+0.5*Math.sin(tms+0.5)); }
-      if(pmode==='disk' && renderer&&scene&&cam) renderer.render(scene,cam);
-    })(); };
+  window.__polarBoot=function(){ if(booted) return; booted=true; if(window.__sopResize) window.__sopResize(); };
 })();
 
 (function(){
@@ -962,16 +784,11 @@
 
 (function(){
   const $=id=>document.getElementById(id);
-  const head=$('sopHead'), grid=$('sopGrid'); if(!head||!grid) return;
-  const hctx=head.getContext('2d'), gctx=grid.getContext('2d');
-  const pgcv=$('sopPG'), tncv=$('sopTensor'), ltcv=$('sopLatent'), famcv=$('sopFam');
-  const pgctx=pgcv&&pgcv.getContext('2d'), tnctx=tncv&&tncv.getContext('2d'), ltctx=ltcv&&ltcv.getContext('2d'), famctx=famcv&&famcv.getContext('2d');
-  const hPG={t:null}, hLT={t:null}, hTN={i:null}; let _tnMap=null, famState='curv';
-  const CURV_TITLES=['Pairs Multiplied','Pairs Divided','PM/PD','PD/PM','Sum of Pairs Curvature','Sum of Pairs','PM/PD Curvature','Sum/Difference','Sum*Diff','S/D Curvature','Dual Phase','Sum/ Sum Diff','Difference In Pairs Left to Right','Sum of Pairs/Pairs Multiplied','DIPLTR/PD','SOPPM/DIPLTRPD(SDD)','DIPLTRPD/SOPPM','SOPPM/DIPLTR(SMD)','DIPLTR/PD Tension','Pressure Curvature'];
-  const GRAD_TITLES=['Pairs Multiplied','Pairs Divided','PM/PD','PD/PM','Sum of Pairs Curvature','Sum of Pairs','PM/PD Curvature','Sum/Difference','Sum*Diff','S/D Curvature','Dual Phase','Sum/ Sum Diff','Difference In Pairs Left to Right','Sum of Pairs/Pairs Multiplied','DIPLTR/PD','SOPPM/DIPLTRPD(SDD)','DIPLTRPD/SOPPM','SOPPM/DIPLTR(SMD)','DIPLTR/PD Tension','Pressure Gradient','Pairs Multiplied Gradient','PM Curvature'];
-  const BG='#07090d',PLOT='#0b0f14',FG='#c7cdd7',GRID='rgba(255,255,255,0.06)',FRAME='rgba(255,255,255,0.10)',ZERO='rgba(255,255,255,0.72)',CYAN='#6fd3ff';
+  const head=$('sopHead'), field=$('sopField'); if(!head||!field) return;
+  const hctx=head.getContext('2d'), fctx=field.getContext('2d');
+  const BG='#07090d',PLOT='#0b0f14',FG='#c7cdd7',FRAME='rgba(255,255,255,0.10)',ZERO='rgba(255,255,255,0.72)',CYAN='#6fd3ff';
   const WHITE='#ffffff',RED='#d9463b',GOLD='#e8b53a',TEAL='#3f9d6b';
-  let hoverT=null;
+  let hoverT=null, hoverF=null;
   const cr=(p0,p1,p2,p3,t)=>{const t2=t*t,t3=t2*t;return 0.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t2+(-p0+3*p1-3*p2+p3)*t3);};
   function crEval(arr,t){ const n=arr.length; if(n<2) return arr[0]||0; const pos=t*(n-1); let i=Math.floor(pos); if(i>n-2)i=n-2; if(i<0)i=0; const lt=pos-i;
     return cr(arr[Math.max(i-1,0)],arr[i],arr[Math.min(i+1,n-1)],arr[Math.min(i+2,n-1)],lt); }
@@ -987,7 +804,7 @@
     const f=fit(head,hctx); if(!f) return; const {w,h}=f;
     hctx.fillStyle=BG; hctx.fillRect(0,0,w,h);
     const d=window.__sopData&&window.__sopData();
-    if(!d){ hctx.fillStyle='#6f675a'; hctx.font='12px monospace'; hctx.textAlign='left'; hctx.fillText('load a session chain + anchor (set on any chain tab) \u2014 the engine computes the SOP field',16,26); return; }
+    if(!d){ hctx.fillStyle='#6f675a'; hctx.font='12px monospace'; hctx.textAlign='left'; hctx.fillText('load a session chain + anchor (set on any chain tab) — the engine computes the SOP field',16,26); return; }
     const x=d.pair, lines=[{d:d.product,c:WHITE,lw:2.4,lab:'product'},{d:d.sopC,c:RED,lw:1.5,lab:'curvature'},{d:d.sopG,c:GOLD,lw:1.5,lab:'gradient'},{d:d.tension,c:TEAL,lw:1.5,lab:'tension/envelope'}];
     const padL=42,padR=14,padT=30,padB=30, x0=padL,x1=w-padR,y0=padT,y1=h-padB;
     const [ylo,yhi]=range(lines);
@@ -1013,8 +830,8 @@
         for(let s=0;s<=18;s++){ const t=s/18; const X=xAt(cr(p0x,p1x,p2x,p3x,t)), Y=yAt(cr(p0y,p1y,p2y,p3y,t)); (i===0&&s===0)?hctx.moveTo(X,Y):hctx.lineTo(X,Y); } }
       hctx.stroke(); }
     // title + xlabel
-    hctx.fillStyle=FG; hctx.font='12px monospace'; hctx.textAlign='left'; hctx.fillText('SOP wave field (headline) \u2014 product = fold/coherence wave',x0,18);
-    hctx.font='9px monospace'; hctx.fillStyle='#8f8c82'; hctx.textAlign='center'; hctx.fillText('chronometer watch  (0 ATM \u2192 1 expiry arc)',(x0+x1)/2,h-6);
+    hctx.fillStyle=FG; hctx.font='12px monospace'; hctx.textAlign='left'; hctx.fillText('SOP wave field (headline) — product = fold/coherence wave',x0,18);
+    hctx.font='9px monospace'; hctx.fillStyle='#8f8c82'; hctx.textAlign='center'; hctx.fillText('chronometer watch  (0 ATM → 1 expiry arc)',(x0+x1)/2,h-6);
     // legend lower-left
     hctx.textAlign='left'; hctx.font='9px monospace'; let ly=y1-4-lines.length*11;
     lines.forEach(ln=>{ hctx.strokeStyle=ln.c; hctx.lineWidth=2; hctx.beginPath(); hctx.moveTo(x0+6,ly); hctx.lineTo(x0+22,ly); hctx.stroke(); hctx.fillStyle=FG; hctx.fillText(ln.lab,x0+27,ly+3); ly+=11; });
@@ -1023,7 +840,7 @@
       hctx.strokeStyle='rgba(255,255,255,0.7)'; hctx.lineWidth=1; hctx.beginPath(); hctx.moveTo(X,y0); hctx.lineTo(X,y1); hctx.stroke();
       lines.forEach(ln=>{ const Y=yAt(crEval(ln.d,t)); hctx.fillStyle=ln.c; hctx.beginPath(); hctx.arc(X,Y,3,0,7); hctx.fill(); });
       let nb=null,bd=1; breaks.forEach(i=>{const dd=Math.abs(i/10-t); if(dd<bd){bd=dd;nb=i;}}); const isBrk=(nb!=null&&bd<=0.025);
-      const txt=['t '+t.toFixed(2)+' \u00b7 '+clockT(t)+(isBrk?'  \u25c6 coherence break':(nb!=null?'  \u00b7 break @ '+(nb/10).toFixed(1):'')),
+      const txt=['t '+t.toFixed(2)+' · '+clockT(t)+(isBrk?'  ◆ coherence break':(nb!=null?'  · break @ '+(nb/10).toFixed(1):'')),
         'product '+fmt(crEval(d.product,t))+'   tension '+fmt(crEval(d.tension,t)),
         'gradient '+fmt(crEval(d.sopG,t))+'   curvature '+fmt(crEval(d.sopC,t))];
       hctx.font='9px monospace'; let bw=0; txt.forEach(s=>bw=Math.max(bw,hctx.measureText(s).width)); bw+=12;
@@ -1033,182 +850,66 @@
     }
     // source note
     hctx.font='9px monospace'; hctx.fillStyle='#8f8c82'; hctx.textAlign='right';
-    hctx.fillText('ATM '+(d.atm!=null?Math.round(d.atm):'\u2014')+' \u00b7 '+d.n_strikes+' strikes \u00b7 breaks '+(breaks.length?breaks.map(i=>(i/10).toFixed(1)).join(', '):'none')+(d.covered?'':' \u00b7 \u26a0 not fully covered'), x1, 18);
+    hctx.fillText('ATM '+(d.atm!=null?Math.round(d.atm):'—')+' · '+d.n_strikes+' strikes · breaks '+(breaks.length?breaks.map(i=>(i/10).toFixed(1)).join(', '):'none')+(d.covered?'':' · ⚠ not fully covered'), x1, 18);
   }
-  // ---------- panel grid ----------
-  function miniPanel(x0,y0,w,h,lns,title){
-    const ix0=x0+30,iy0=y0+16,ix1=x0+w-8,iy1=y0+h-16;
-    const [ylo,yhi]=range(lns);
-    const xAt=t=>ix0+t*(ix1-ix0), yAt=v=>iy1-(v-ylo)/(yhi-ylo)*(iy1-iy0);
-    gctx.fillStyle=PLOT; gctx.fillRect(ix0,iy0,ix1-ix0,iy1-iy0);
-    gctx.fillStyle='#a6a299'; gctx.font='8px monospace';
-    gctx.strokeStyle='rgba(255,255,255,0.08)'; gctx.lineWidth=1; gctx.strokeRect(ix0,iy0,ix1-ix0,iy1-iy0);
-    gctx.textAlign='right'; for(let k=0;k<=2;k++){ const v=ylo+(yhi-ylo)*k/2, Y=yAt(v); gctx.fillText(v.toFixed(Math.abs(v)>=100?0:1),ix0-3,Y+3); }
-    if(ylo<0&&yhi>0){ gctx.strokeStyle=ZERO; gctx.lineWidth=0.6; const Y=yAt(0); gctx.beginPath(); gctx.moveTo(ix0,Y); gctx.lineTo(ix1,Y); gctx.stroke(); }
-    gctx.textAlign='center'; for(let t=0;t<=10;t+=5){ gctx.fillStyle='#a6a299'; gctx.fillText((t/10).toFixed(1),xAt(t/10),iy1+11); }
-    for(const ln of lns){ gctx.strokeStyle=ln.c; gctx.lineWidth=1.3; gctx.beginPath();
-      ln.d.forEach((v,i)=>{ const X=xAt(i/10),Y=yAt(v); i?gctx.lineTo(X,Y):gctx.moveTo(X,Y); }); gctx.stroke();
-      gctx.fillStyle=ln.c; ln.d.forEach((v,i)=>{ gctx.beginPath(); gctx.arc(xAt(i/10),yAt(v),1.8,0,7); gctx.fill(); }); }
-    gctx.fillStyle=FG; gctx.font='8.5px monospace'; gctx.textAlign='left'; gctx.fillText(title,ix0,y0+10);
-    if(lns.length>1){ gctx.textAlign='right'; let lx=ix1; lns.slice().reverse().forEach(ln=>{ const t=ln.lab||''; gctx.fillStyle=ln.c; gctx.fillText(t,lx,y0+10); lx-=gctx.measureText(t).width+12; }); }
-  }
-  function drawGrid(){
-    const f=fit(grid,gctx); if(!f) return; const {w,h}=f;
-    gctx.fillStyle=BG; gctx.fillRect(0,0,w,h);
+  // ---------- Field Study: DS / Dual Phase / SWF, one visualization with crossing + intersection times ----------
+  // Generalizes Detector's findBreaches (sign-flip + linear interpolation) and computeAligned (pairwise
+  // tolerance match) from 2 series to 3 -- see js/detector.js for the original 2-series pattern.
+  function findBreaches(d){ const out=[]; for(let i=0;i<d.length-1;i++){ const a=d[i],b=d[i+1];
+    if((a<=0&&b>0)||(a>0&&b<=0)){ const t=-a/(b-a); out.push(i+t); } } return out; }
+  function drawFieldStudy(){
+    const f=fit(field,fctx); if(!f) return; const {w,h}=f;
+    fctx.fillStyle=BG; fctx.fillRect(0,0,w,h);
     const d=window.__sopData&&window.__sopData();
-    gctx.fillStyle=FG; gctx.font='10px monospace'; gctx.textAlign='left'; gctx.fillText('SOP Folding \u2014 full panel set  (shared chronometer x-axis)',12,14);
-    if(!d){ gctx.fillStyle='#6f675a'; gctx.font='11px monospace'; gctx.fillText('(panels populate once a chain + anchor are loaded)',12,34); return; }
-    const panels=[
-      [[{d:d.product,c:WHITE}],'product (fold/coherence)'],
-      [[{d:d.tension,c:TEAL}],'Product Tension (J+next)'],
-      [[{d:d.pcurv,c:RED}],'Product Curvature'],
-      [[{d:d.gc,c:CYAN}],'SOPG / SOPC (ratio)'],
-      [[{d:d.cg,c:CYAN}],'SOPC / SOPG (inverse)'],
-      [[{d:d.sopG,c:GOLD,lab:'SOPG'},{d:d.sopC,c:RED,lab:'SOPC'}],'SOPG & SOPC (raw factors)'] ];
-    const cols=3,rows=2, top=20, pw=(w-12*2)/cols, ph=(h-top-8)/rows;
-    panels.forEach((p,i)=>{ const cx=i%cols, cy=(i/cols)|0; miniPanel(12+cx*pw, top+cy*ph, pw-8, ph-6, p[0], p[1]); });
+    if(!d){ fctx.fillStyle='#6f675a'; fctx.font='12px monospace'; fctx.textAlign='left'; fctx.fillText('load a session chain + anchor — the engine computes DS / Dual Phase / SWF',16,26); return; }
+    const series=[{d:d.ds,c:WHITE,lab:'DS (Difference/Sum)'},{d:d.dualPhase,c:GOLD,lab:'Dual Phase'},{d:d.swf,c:CYAN,lab:'SWF (DIPLTRPD/SOPPM)'}];
+    const x=d.pair;
+    const padL=42,padR=14,padT=30,padB=30, x0=padL,x1=w-padR,y0=padT,y1=h-padB;
+    const [ylo,yhi]=range(series);
+    const xAt=t=>x0+t*(x1-x0), yAt=v=>y1-(v-ylo)/(yhi-ylo)*(y1-y0);
+    fctx.fillStyle=PLOT; fctx.fillRect(x0,y0,x1-x0,y1-y0);
+    // grid
+    fctx.lineWidth=0.5; fctx.font='9px monospace'; fctx.fillStyle='#a6a299'; fctx.strokeStyle='rgba(255,255,255,0.05)'; fctx.textAlign='center';
+    for(let t=0;t<=10;t++){ const X=xAt(t/10); fctx.beginPath(); fctx.moveTo(X,y0); fctx.lineTo(X,y1); fctx.stroke(); if(t%2===0) fctx.fillText((t/10).toFixed(1),X,y1+13); }
+    fctx.textAlign='right';
+    for(let k=0;k<=4;k++){ const v=ylo+(yhi-ylo)*k/4, Y=yAt(v); fctx.beginPath(); fctx.moveTo(x0,Y); fctx.lineTo(x1,Y); fctx.stroke(); fctx.fillText(v.toFixed(Math.abs(v)>=100?0:1),x0-4,Y+3); }
+    if(ylo<0&&yhi>0){ fctx.strokeStyle=ZERO; fctx.lineWidth=0.8; const Y=yAt(0); fctx.beginPath(); fctx.moveTo(x0,Y); fctx.lineTo(x1,Y); fctx.stroke(); }
+    fctx.strokeStyle=FRAME; fctx.lineWidth=1; fctx.strokeRect(x0,y0,x1-x0,y1-y0);
+    // curves (straight-segment across the 11-point pair axis)
+    series.forEach(s=>{ fctx.strokeStyle=s.c; fctx.lineWidth=1.8; fctx.beginPath();
+      for(let i=0;i<x.length;i++){ const X=xAt(x[i]),Y=yAt(s.d[i]); i?fctx.lineTo(X,Y):fctx.moveTo(X,Y); } fctx.stroke(); });
+    // per-series zero-crossings ("breaches") + pairwise-aligned crossings across series (tol ±0.05 on the pair axis)
+    const TOL=0.05;
+    const breaches=series.map(s=>findBreaches(s.d).map(bi=>bi/10));
+    series.forEach((s,si)=>{ breaches[si].forEach(t=>{ const X=xAt(t),Y=yAt(0); fctx.fillStyle=s.c; fctx.beginPath(); fctx.arc(X,Y,3,0,7); fctx.fill(); }); });
+    const aligned=[];
+    for(let i=0;i<series.length;i++) for(let j=i+1;j<series.length;j++){
+      for(const a of breaches[i]) for(const b of breaches[j]) if(Math.abs(a-b)<=TOL) aligned.push((a+b)/2); }
+    fctx.setLineDash([6,4]); fctx.strokeStyle='rgba(127,209,224,0.55)'; fctx.lineWidth=1.4;
+    aligned.forEach(t=>{ const X=xAt(t); fctx.beginPath(); fctx.moveTo(X,y0); fctx.lineTo(X,y1); fctx.stroke(); }); fctx.setLineDash([]);
+    fctx.strokeStyle='rgba(127,209,224,0.9)'; fctx.lineWidth=1.6;
+    aligned.forEach(t=>{ const X=xAt(t); fctx.beginPath(); fctx.arc(X,(y0+y1)/2,8,0,Math.PI*2); fctx.stroke(); });
+    // title + xlabel
+    fctx.fillStyle=FG; fctx.font='12px monospace'; fctx.textAlign='left'; fctx.fillText('Field Study — DS / Dual Phase / SWF, crossing + intersection times',x0,18);
+    fctx.font='9px monospace'; fctx.fillStyle='#8f8c82'; fctx.textAlign='center'; fctx.fillText('chronometer watch  (0 ATM → 1 expiry arc)',(x0+x1)/2,h-6);
+    // legend lower-left
+    fctx.textAlign='left'; fctx.font='9px monospace'; let ly=y1-4-series.length*11;
+    series.forEach(s=>{ fctx.strokeStyle=s.c; fctx.lineWidth=2; fctx.beginPath(); fctx.moveTo(x0+6,ly); fctx.lineTo(x0+22,ly); fctx.stroke(); fctx.fillStyle=FG; fctx.fillText(s.lab,x0+27,ly+3); ly+=11; });
+    // hover crosshair
+    if(hoverF!=null){ const t=hoverF, X=xAt(t);
+      fctx.strokeStyle='rgba(255,255,255,0.7)'; fctx.lineWidth=1; fctx.beginPath(); fctx.moveTo(X,y0); fctx.lineTo(X,y1); fctx.stroke();
+      const txt=['t '+t.toFixed(2)+' · '+clockT(t)];
+      series.forEach(s=>{ const val=crEval(s.d,t); const Y=yAt(val); fctx.fillStyle=s.c; fctx.beginPath(); fctx.arc(X,Y,3,0,7); fctx.fill(); txt.push(s.lab+' '+fmt(val)); });
+      fctx.font='9px monospace'; let bw=0; txt.forEach(s=>bw=Math.max(bw,fctx.measureText(s).width)); bw+=12;
+      let bx=Math.min(X+10,x1-bw), by=y0+6; if(bx<x0)bx=x0;
+      fctx.fillStyle='rgba(18,18,22,0.94)'; fctx.strokeStyle='#4c4c54'; fctx.lineWidth=1; fctx.fillRect(bx,by,bw,txt.length*12+6); fctx.strokeRect(bx,by,bw,txt.length*12+6);
+      fctx.textAlign='left'; txt.forEach((s2,k)=>{ fctx.fillStyle=FG; fctx.fillText(s2,bx+6,by+13+k*12); });
+    }
+    fctx.font='9px monospace'; fctx.fillStyle='#8f8c82'; fctx.textAlign='right';
+    fctx.fillText((aligned.length?aligned.length+' aligned crossing'+(aligned.length===1?'':'s'):'no aligned crossings')+' · tol ±'+TOL, x1, 18);
   }
-  // ---------- generic full-axis (-1..+1) smoothed line chart (PGxC, Latent) ----------
-  function axisFit(cv,ctx){ const w=cv.clientWidth,h=cv.clientHeight; if(!w||!h) return null;
-    const dpr=Math.min(devicePixelRatio||1,2); const W=Math.round(w*dpr),H=Math.round(h*dpr);
-    if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;} ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h); return {w,h}; }
-  function drawAxisGraph(cv,ctx,hov,title,xlabel,lines,foot){
-    const f=axisFit(cv,ctx); if(!f) return; const {w,h}=f;
-    ctx.fillStyle=BG; ctx.fillRect(0,0,w,h);
-    if(!lines||!lines.length){ ctx.fillStyle='#8f8c82'; ctx.font='12px monospace'; ctx.textAlign='left'; ctx.fillText('load a session chain + anchor',16,26); return; }
-    const padL=42,padR=14,padT=28,padB=30, x0=padL,x1=w-padR,y0=padT,y1=h-padB;
-    let ylo=Infinity,yhi=-Infinity; for(const ln of lines) for(const v of ln.y) if(isFinite(v)){ if(v<ylo)ylo=v; if(v>yhi)yhi=v; }
-    if(!isFinite(ylo)){ylo=-1;yhi=1;} if(ylo===yhi){ylo-=1;yhi+=1;} const pdd=(yhi-ylo)*0.12; ylo-=pdd; yhi+=pdd;
-    const xAt=t=>x0+(t+1)/2*(x1-x0), yAt=v=>y1-(v-ylo)/(yhi-ylo)*(y1-y0);
-    ctx.fillStyle=PLOT; ctx.fillRect(x0,y0,x1-x0,y1-y0);
-    ctx.lineWidth=0.5; ctx.font='9px monospace'; ctx.fillStyle='#a6a299'; ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.textAlign='center';
-    for(let t=-10;t<=10;t++){ const X=xAt(t/10); ctx.beginPath(); ctx.moveTo(X,y0); ctx.lineTo(X,y1); ctx.stroke(); if(t%2===0) ctx.fillText((t/10).toFixed(1),X,y1+13); }
-    ctx.textAlign='right'; for(let k=0;k<=4;k++){ const v=ylo+(yhi-ylo)*k/4, Y=yAt(v); ctx.beginPath(); ctx.moveTo(x0,Y); ctx.lineTo(x1,Y); ctx.stroke(); ctx.fillText(v.toFixed(Math.abs(v)>=100?0:1),x0-4,Y+3); }
-    if(ylo<0&&yhi>0){ ctx.strokeStyle=ZERO; ctx.lineWidth=0.8; const Y=yAt(0); ctx.beginPath(); ctx.moveTo(x0,Y); ctx.lineTo(x1,Y); ctx.stroke(); }
-    ctx.strokeStyle=FRAME; ctx.lineWidth=1; ctx.strokeRect(x0,y0,x1-x0,y1-y0);
-    for(const ln of lines){ const yy=ln.y, xx=ln.x, m=yy.length; ctx.strokeStyle=ln.c; ctx.lineWidth=ln.lw||1.5; ctx.beginPath();
-      for(let i=0;i<m-1;i++){ const a=yy[Math.max(i-1,0)],b=yy[i],cc2=yy[i+1],dd=yy[Math.min(i+2,m-1)];
-        const xa=xx[Math.max(i-1,0)],xb=xx[i],xc=xx[i+1],xd=xx[Math.min(i+2,m-1)];
-        for(let s=0;s<=18;s++){ const tt=s/18; const X=xAt(cr(xa,xb,xc,xd,tt)), Y=yAt(cr(a,b,cc2,dd,tt)); (i===0&&s===0)?ctx.moveTo(X,Y):ctx.lineTo(X,Y); } }
-      ctx.stroke(); }
-    ctx.fillStyle=FG; ctx.font='12px monospace'; ctx.textAlign='left'; ctx.fillText(title,x0,18);
-    ctx.font='9px monospace'; ctx.fillStyle='#8f8c82'; ctx.textAlign='center'; ctx.fillText(xlabel,(x0+x1)/2,h-6);
-    if(foot){ ctx.textAlign='right'; ctx.fillStyle='#8f8c82'; ctx.font='9px monospace'; ctx.fillText(foot,x1,18); }
-    ctx.textAlign='left'; ctx.font='9px monospace'; let ly=y1-4-lines.length*11;
-    lines.forEach(ln=>{ ctx.strokeStyle=ln.c; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x0+6,ly); ctx.lineTo(x0+22,ly); ctx.stroke(); ctx.fillStyle=FG; ctx.fillText(ln.lab,x0+27,ly+3); ly+=11; });
-    if(hov.t!=null){ const t=hov.t, X=xAt(t), p=(t+1)/2;
-      ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(X,y0); ctx.lineTo(X,y1); ctx.stroke();
-      const txt=['t '+t.toFixed(2)+' \u00b7 '+clockT((t+1)/2)];
-      lines.forEach(ln=>{ const val=crEval(ln.y,p), Y=yAt(val); ctx.fillStyle=ln.c; ctx.beginPath(); ctx.arc(X,Y,3,0,7); ctx.fill(); txt.push(ln.lab+' '+fmt(val)); });
-      ctx.font='9px monospace'; let bw=0; txt.forEach(s=>bw=Math.max(bw,ctx.measureText(s).width)); bw+=12;
-      let bx=Math.min(X+10,x1-bw),by=y0+6; if(bx<x0)bx=x0;
-      ctx.fillStyle='rgba(18,18,22,0.94)'; ctx.strokeStyle='#4c4c54'; ctx.lineWidth=1; ctx.fillRect(bx,by,bw,txt.length*12+6); ctx.strokeRect(bx,by,bw,txt.length*12+6);
-      ctx.textAlign='left'; ctx.fillStyle=FG; txt.forEach((s,k)=>{ ctx.fillText(s,bx+6,by+13+k*12); }); }
-  }
-  function drawPGxC(){ const d=window.__sopData&&window.__sopData(); let lines=null;
-    if(d){ const cw=Array.from(d.cw), pg=Array.from(d.pg), pc=Array.from(d.pc), prod=pg.map((v,i)=>v*pc[i]);
-      lines=[{x:cw,y:pg,c:GOLD,lw:1.6,lab:'pressure gradient (CC)'},{x:cw,y:pc,c:RED,lw:1.6,lab:'pressure curvature (CD)'},{x:cw,y:prod,c:WHITE,lw:2.0,lab:'PG\u00d7C (product)'}]; }
-    drawAxisGraph(pgcv,pgctx,hPG,'PG\u00d7C \u2014 pressure gradient \u00d7 curvature (smoothed)','chronometer watch  (\u22121 below ATM \u00b7 0 ATM \u00b7 +1 above)',lines,d?(d.n_strikes+' strikes'):''); }
-  function drawLatent(){ const d=window.__sopData&&window.__sopData(); let lines=null,foot='';
-    if(d){ const Q=d.latent.Q,Pp=d.latent.P,R=d.latent.R,nn=Q.length,xs=[]; for(let i=0;i<nn;i++) xs.push(-1+2*i/(nn-1||1));
-      lines=[{x:xs,y:Q,c:CYAN,lw:1.6,lab:'Q \u00b7 SOPG-latent'},{x:xs,y:Pp,c:GOLD,lw:1.6,lab:'P \u00b7 SOPc-latent'},{x:xs,y:R,c:TEAL,lw:1.6,lab:'R \u00b7 SOPC-latent'}];
-      const nets=[Q[nn-1]-Q[0],Pp[nn-1]-Pp[0],R[nn-1]-R[0]], ups=nets.filter(v=>v>0).length; foot='majority '+(ups>=2?'UP':'DOWN')+' '+Math.max(ups,3-ups)+'/3'; }
-    drawAxisGraph(ltcv,ltctx,hLT,'Three latent paths (P/Q/R) \u2014 independent trajectories','chronometer watch (\u22121 .. +1)',lines,foot); }
-  // ---------- Book Tensor surface: |O|\u00b7exp(-(offset-Q)^2) per chronoT row ----------
-  function drawTensor(){ if(!tncv||!tnctx) return; const f=axisFit(tncv,tnctx); if(!f) return; const {w,h}=f; const ctx=tnctx;
-    ctx.fillStyle=BG; ctx.fillRect(0,0,w,h);
-    ctx.fillStyle=FG; ctx.font='12px monospace'; ctx.textAlign='left'; ctx.fillText('Book Tensor surface \u2014 |O|\u00b7exp(\u2212(offset\u2212Q)\u00b2) per chronoT',12,18);
-    const d=window.__sopData&&window.__sopData();
-    if(!d){ ctx.fillStyle='#8f8c82'; ctx.font='11px monospace'; ctx.fillText('load a session chain + anchor',12,38); _tnMap=null; return; }
-    const O=d.tensor.O, Qc=d.tensor.Q, chrono=d.tensor.chrono, n=O.length;
-    const offs=[]; for(let k=0;k<201;k++) offs.push(-50+0.5*k);
-    const TS=(i,o)=>Math.abs(O[i])*Math.exp(-Math.pow(o-Qc[i],2));
-    let peaks=[],asyms=[],active=[];
-    for(let i=0;i<n;i++){ let s=0,mx=-1,mxo=0,left=0,right=0; for(const o of offs){ const v=TS(i,o); s+=v; if(v>mx){mx=v;mxo=o;} if(o<0)left+=v; else if(o>0)right+=v; }
-      if(s>1e-9){ peaks.push(mxo); asyms.push((right-left)/((right+left)||1)); active.push(i); } }
-    const migr=peaks.length?Math.max.apply(null,peaks)-Math.min.apply(null,peaks):0;
-    const masym=asyms.length?asyms.reduce((a,b)=>a+b,0)/asyms.length:0;
-    const geom=(peaks.length&&Math.abs(peaks.reduce((a,b)=>a+b,0)/peaks.length)<5&&migr<10)?'COMPRESSION':'TRAJECTORY';
-    const dir=masym>0.05?'UP':masym<-0.05?'DOWN':'NEUTRAL';
-    const padL=42,padR=14,padT=36,padB=32, x0=padL,x1=w-padR,y0=padT,y1=h-padB;
-    let qlo=active.length?Math.min.apply(null,active.map(i=>Qc[i])):-3, qhi=active.length?Math.max.apply(null,active.map(i=>Qc[i])):3;
-    const xmin=Math.max(-50,qlo-4), xmax=Math.min(50,qhi+4);
-    const amax=Math.max(1,Math.max.apply(null,active.map(i=>Math.abs(O[i])).concat([1])));
-    const xAt=o=>x0+(o-xmin)/((xmax-xmin)||1)*(x1-x0), yAt=v=>y1-(v/amax)*(y1-y0)*0.92;
-    ctx.fillStyle=PLOT; ctx.fillRect(x0,y0,x1-x0,y1-y0);
-    ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=0.5; ctx.fillStyle='#a6a299'; ctx.font='9px monospace'; ctx.textAlign='center';
-    for(let k=0;k<=6;k++){ const o=xmin+(xmax-xmin)*k/6, X=xAt(o); ctx.beginPath(); ctx.moveTo(X,y0); ctx.lineTo(X,y1); ctx.stroke(); ctx.fillText(o.toFixed(1),X,y1+13); }
-    ctx.strokeStyle=FRAME; ctx.lineWidth=1; ctx.strokeRect(x0,y0,x1-x0,y1-y0);
-    const SAMP=120, last=active.length?active[active.length-1]:-1;
-    active.forEach(i=>{ const br=0.4+0.6*(n>1?i/(n-1):1), col='rgba('+Math.round(255*br)+','+Math.round(255*br)+','+Math.round(240*br)+',0.9)';
-      ctx.strokeStyle=col; ctx.lineWidth=(i===last)?1.8:1.0; ctx.beginPath();
-      for(let s=0;s<=SAMP;s++){ const o=xmin+(xmax-xmin)*s/SAMP, X=xAt(o), Y=yAt(TS(i,o)); s?ctx.lineTo(X,Y):ctx.moveTo(X,Y); } ctx.stroke();
-      ctx.fillStyle=col; ctx.beginPath(); ctx.arc(xAt(Qc[i]),yAt(Math.abs(O[i])),2,0,7); ctx.fill(); });
-    if(hTN.i!=null && active.indexOf(hTN.i)>=0){ const i=hTN.i; ctx.strokeStyle=CYAN; ctx.lineWidth=2; ctx.beginPath();
-      for(let s=0;s<=SAMP;s++){ const o=xmin+(xmax-xmin)*s/SAMP,X=xAt(o),Y=yAt(TS(i,o)); s?ctx.lineTo(X,Y):ctx.moveTo(X,Y);} ctx.stroke();
-      const txt=['chronoT '+chrono[i].toFixed(1)+' \u00b7 '+clockT(chrono[i]),'|O| '+fmt(Math.abs(O[i]))+'   peak @ '+Qc[i].toFixed(2)];
-      ctx.font='9px monospace'; let bw=0; txt.forEach(s=>bw=Math.max(bw,ctx.measureText(s).width)); bw+=12;
-      let bx=x0+8,by=y0+6; ctx.fillStyle='rgba(18,18,22,0.94)'; ctx.strokeStyle='#4c4c54'; ctx.lineWidth=1; ctx.fillRect(bx,by,bw,txt.length*12+6); ctx.strokeRect(bx,by,bw,txt.length*12+6);
-      ctx.textAlign='left'; ctx.fillStyle=FG; txt.forEach((s,k)=>ctx.fillText(s,bx+6,by+13+k*12)); }
-    ctx.fillStyle='#8f8c82'; ctx.font='9px monospace'; ctx.textAlign='center'; ctx.fillText('offset (strike-distance proxy)',(x0+x1)/2,h-6);
-    ctx.textAlign='right'; ctx.fillText('geometry '+geom+' \u00b7 direction '+dir+' \u00b7 peak migration '+migr.toFixed(2)+' \u00b7 mean asym '+masym.toFixed(3),x1,18);
-    ctx.textAlign='left'; ctx.fillStyle=FG; ctx.fillText('rows: chronoT 0 (dim) \u2192 1 (bright) \u00b7 dot = peak |O| at offset Q',x0,y0-6);
-    _tnMap={x0,x1,xmin,xmax,active,Qc};
-  }
-  // ---------- TSC Curvature/Gradient family DAG (ports the workbook TSC(Curvature)/TSC(Gradient) sheets) ----------
-  function tscFamily(B){
-    const cell=i=>(i>=0&&i<B.length&&isFinite(B[i]))?B[i]:0; const NP=11, D=[],E=[],K=[],O=[];
-    for(let p=0;p<NP;p++){ if(p===0){ const c=cell(10); D.push(c);E.push(c);K.push(c);O.push(c); }
-      else { D.push(cell(10-p)*cell(10+p)); const den=cell(10+p); E.push(den!==0?cell(10-p)/den:0);
-        K.push(cell(p-1)+cell(21-p)); O.push(cell(p-1)-cell(21-p)); } }
-    const div=(a,b)=>(b!==0&&isFinite(b))?a/b:0, diff=a=>a.map((v,p)=>(p+1<a.length?a[p+1]:0)-v), tens=a=>a.map((v,p)=>v+(p+1<a.length?a[p+1]:0));
-    const F=D.map((d,p)=>div(d,E[p])), G=diff(F), H=diff(G), I=E.map((e,p)=>div(e,D[p])), J=D.map((d,p)=>d*E[p]);
-    const Lg=diff(K), M=diff(Lg), N=tens(K), P=tens(O);
-    const R=K.map((k,p)=>div(k,D[p])), S=O.map((o,p)=>div(o,E[p])), T=tens(S);
-    const U=R.map((r,p)=>div(r,S[p])), V=S.map((s,p)=>div(s,R[p])), W=tens(V), X=R.map((r,p)=>r*S[p]);
-    const Y=K.map((k,p)=>div(k,O[p])), Z=diff(Y), AA=diff(Z);
-    const AC=O.map((o,p)=>div(o,K[p])), AK=K.map((k,p)=>k*O[p]), AL=K.map((k,p)=>div(k,Y[p]));
-    const Cp=[]; for(let p=0;p<NP;p++) Cp.push(Math.round(p*0.1*1e6)/1e6);
-    const AM=K.map((k,p)=>{ const On=(p+1<NP?O[p+1]:0), Cn=(p+1<NP?Cp[p+1]:Cp[p]+0.1); return div(div(k-O[p],k+On), div(Cn-Cp[p],Cp[p]+Cn)); });
-    return {pair:Cp,'Pairs Multiplied':D,'Pairs Divided':E,'PM/PD':F,'PM/PD Gradient':G,'PM/PD Curvature':H,'PD/PM':I,'PM*PD':J,
-      'Sum of Pairs':K,'Sum of Pairs Gradient':Lg,'Sum of Pairs Curvature':M,'Sum of Pairs Tension':N,
-      'Difference In Pairs Left to Right':O,'DIPLTR Tension':P,'Sum of Pairs/Pairs Multiplied':R,'DIPLTR/PD':S,'DIPLTR/PD Tension':T,
-      'SOPPM/DIPLTRPD(SDD)':U,'DIPLTRPD/SOPPM':V,'DIPLTRPD/SOPPM Tension':W,'SOPPM/DIPLTR(SMD)':X,
-      'Sum/Difference':Y,'S/D Gradient':Z,'S/D Curvature':AA,'Difference/Sum':AC,'Sum*Diff':AK,'Sum/ Sum Diff':AL,'Dual Phase':AM,
-      'Pressure Curvature':B.slice(0,NP),'Pressure Gradient':B.slice(0,NP),'Pairs Multiplied Gradient':diff(D),'PM Curvature':diff(diff(D))};
-  }
-  function famMini(ctx,x,y,w,h,ys,title){
-    const ix0=x+30,iy0=y+14,ix1=x+w-6,iy1=y+h-12;
-    let lo=Infinity,hi=-Infinity; for(const v of ys) if(isFinite(v)){ if(v<lo)lo=v; if(v>hi)hi=v; }
-    if(!isFinite(lo)){lo=-1;hi=1;} if(lo===hi){lo-=1;hi+=1;} const pd=(hi-lo)*0.12; lo-=pd; hi+=pd;
-    const m=ys.length, xa=i=>ix0+(m>1?i/(m-1):0)*(ix1-ix0), ya=v=>iy1-(v-lo)/(hi-lo)*(iy1-iy0);
-    ctx.fillStyle=PLOT; ctx.fillRect(ix0,iy0,ix1-ix0,iy1-iy0);
-    ctx.fillStyle='#a6a299'; ctx.font='7px monospace'; ctx.textAlign='right';
-    for(let k=0;k<=2;k++){ const v=lo+(hi-lo)*k/2,Y=ya(v); ctx.fillText(Math.abs(v)>=100?v.toFixed(0):v.toFixed(1),ix0-2,Y+2.5); }
-    if(lo<0&&hi>0){ ctx.strokeStyle=ZERO; ctx.lineWidth=0.5; const Y=ya(0); ctx.beginPath(); ctx.moveTo(ix0,Y); ctx.lineTo(ix1,Y); ctx.stroke(); }
-    ctx.strokeStyle=FRAME; ctx.lineWidth=1; ctx.strokeRect(ix0,iy0,ix1-ix0,iy1-iy0);
-    ctx.strokeStyle=CYAN; ctx.lineWidth=1.2; ctx.beginPath(); ys.forEach((v,i)=>{ const X=xa(i),Y=ya(v); i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); }); ctx.stroke();
-    ctx.fillStyle=CYAN; ys.forEach((v,i)=>{ ctx.beginPath(); ctx.arc(xa(i),ya(v),1.4,0,7); ctx.fill(); });
-    ctx.fillStyle=FG; ctx.font='8px monospace'; ctx.textAlign='left'; ctx.fillText(title.length>32?title.slice(0,31)+'\u2026':title,ix0,y+10);
-  }
-  function drawFamilies(){
-    if(!famcv||!famctx) return; const cont=famcv.parentElement; const W=cont.clientWidth; if(!W) return; const ctx=famctx;
-    const titles=(famState==='grad')?GRAD_TITLES:CURV_TITLES, cols=4, n=titles.length, rows=Math.ceil(n/cols), top=24, panelH=128, pad=8;
-    const H=top+rows*panelH+pad, dpr=Math.min(devicePixelRatio||1,2), Wp=Math.round(W*dpr), Hp=Math.round(H*dpr);
-    if(famcv.width!==Wp||famcv.height!==Hp){ famcv.width=Wp; famcv.height=Hp; } famcv.style.width=W+'px'; famcv.style.height=H+'px';
-    ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H); ctx.fillStyle='#07090d'; ctx.fillRect(0,0,W,H);
-    ctx.fillStyle=FG; ctx.font='10px monospace'; ctx.textAlign='left';
-    ctx.fillText('Time State Compass \u2014 '+(famState==='grad'?'Gradient':'Curvature')+' family  ('+n+' charts, shared chronometer axis 0\u20131)',10,15);
-    const d=window.__sopData&&window.__sopData();
-    if(!d){ ctx.fillStyle='#8f8c82'; ctx.font='11px monospace'; ctx.fillText('load a session chain + anchor',10,36); return; }
-    const B=(famState==='grad')?d.pg:d.pc, fam=tscFamily(B), pw=(W-pad*2)/cols;
-    titles.forEach((t,i)=>{ const cx=i%cols, cy=(i/cols)|0; famMini(ctx, pad+cx*pw, top+cy*panelH, pw-6, panelH-8, fam[t]||[], t); });
-  }
-  function _cxgFit(cv){ if(!cv) return null; const c=cv.getContext('2d'); const w=cv.clientWidth||cv.parentNode.clientWidth||620, h=cv.clientHeight||cv.parentNode.clientHeight||260; if(!w||!h) return null; const dpr=Math.min(devicePixelRatio||1,2); cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr); c.setTransform(dpr,0,0,dpr,0,0); return {c,w,h}; }
-  function drawCXG(){ if(!window.QuanCXG) return; const d=window.__sopData&&window.__sopData(); const rip=(window.__ripnCfg?window.__ripnCfg():null); const P = d ? window.QuanCXG.panelsFromPayload({cwAxis:Array.from(d.cw),pressureGradient:Array.from(d.pg),pressureCurvature:Array.from(d.pc),sopG:Array.from(d.sopG),sopC:Array.from(d.sopC),fold:Array.from(d.product),crossings_t:[],crossings_cw:[]}) : null; const pf=_cxgFit($('cxgPressure')); if(pf){ if(P) window.QuanCXG.drawAxisGraph(pf.c,pf.w,pf.h,Object.assign({ripn:rip},P.pressure)); else { pf.c.fillStyle='#07090d'; pf.c.fillRect(0,0,pf.w,pf.h); pf.c.fillStyle='#c7cdd7'; pf.c.font='11px monospace'; pf.c.fillText('load a session chain + anchor',16,24);} } const ff=_cxgFit($('cxgFold')); if(ff){ if(P) window.QuanCXG.drawMiniGrid(ff.c,ff.w,ff.h,P.fold.panels,rip); else { ff.c.fillStyle='#07090d'; ff.c.fillRect(0,0,ff.w,ff.h);} } }
-  function redraw(){ drawHead(); drawGrid(); drawPGxC(); drawLatent(); drawTensor(); drawFamilies(); drawCXG(); }
+  function redraw(){ drawHead(); drawFieldStudy(); }
   window.addEventListener('quan:ripn-tune', function(){ if($('tabPolar')&&$('tabPolar').classList.contains('on')) redraw(); });
-  document.querySelectorAll('.cxgsubhead').forEach(function(hd){ if(hd.__b) return; hd.__b=1; hd.addEventListener('click',function(){ const sub=hd.parentNode; sub.classList.toggle('collapsed'); sub.classList.toggle('open',!sub.classList.contains('collapsed')); setTimeout(drawCXG,0); }); });
   window.addEventListener('quan:sop',redraw);
   window.addEventListener('resize',()=>{ if($('tabPolar')&&$('tabPolar').classList.contains('on')) redraw(); });
   window.__sopResize=redraw;
@@ -1217,16 +918,9 @@
     const r=head.getBoundingClientRect(); const padL=42,padR=14,x0=padL,x1=r.width-padR;
     hoverT=Math.max(0,Math.min(1,(e.clientX-r.left-x0)/(x1-x0))); drawHead(); });
   head.addEventListener('mouseleave',()=>{ hoverT=null; drawHead(); });
-  function axisHover(cv,hov,drawFn){ if(!cv) return;
-    cv.addEventListener('mousemove',e=>{ if(!(window.__sopData&&window.__sopData())){hov.t=null;return;} const r=cv.getBoundingClientRect(); const x0=42,x1=r.width-14;
-      hov.t=Math.max(-1,Math.min(1,(e.clientX-r.left-x0)/((x1-x0)||1)*2-1)); drawFn(); });
-    cv.addEventListener('mouseleave',()=>{ hov.t=null; drawFn(); }); }
-  axisHover(pgcv,hPG,drawPGxC); axisHover(ltcv,hLT,drawLatent);
-  if(tncv){ tncv.addEventListener('mousemove',e=>{ if(!_tnMap){return;} const r=tncv.getBoundingClientRect();
-      const o=_tnMap.xmin+(e.clientX-r.left-_tnMap.x0)/((_tnMap.x1-_tnMap.x0)||1)*(_tnMap.xmax-_tnMap.xmin);
-      let best=null,bd=1e9; _tnMap.active.forEach(i=>{ const dd=Math.abs(_tnMap.Qc[i]-o); if(dd<bd){bd=dd;best=i;} }); hTN.i=best; drawTensor(); });
-    tncv.addEventListener('mouseleave',()=>{ hTN.i=null; drawTensor(); }); }
-  const fCurv=$('famCurv'), fGrad=$('famGrad');
-  if(fCurv)fCurv.addEventListener('click',()=>{ famState='curv'; fCurv.classList.add('on'); if(fGrad)fGrad.classList.remove('on'); drawFamilies(); });
-  if(fGrad)fGrad.addEventListener('click',()=>{ famState='grad'; fGrad.classList.add('on'); if(fCurv)fCurv.classList.remove('on'); drawFamilies(); });
+  // field study hover trace
+  field.addEventListener('mousemove',e=>{ const d=window.__sopData&&window.__sopData(); if(!d){hoverF=null;return;}
+    const r=field.getBoundingClientRect(); const padL=42,padR=14,x0=padL,x1=r.width-padR;
+    hoverF=Math.max(0,Math.min(1,(e.clientX-r.left-x0)/(x1-x0))); drawFieldStudy(); });
+  field.addEventListener('mouseleave',()=>{ hoverF=null; drawFieldStudy(); });
 })();

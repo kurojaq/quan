@@ -50,7 +50,7 @@
   <nav class="tabbar">
     <button class="tabbtn" data-tab="report">Report</button>
     <button class="tabbtn on" data-tab="detector">Detector</button>
-    <button class="tabbtn" data-tab="polar">SOP Field</button>
+    <button class="tabbtn" data-tab="polar">Field Study</button>
     <button class="tabbtn" data-tab="strike">Strike Field</button>
     <button class="tabbtn" data-tab="heat">Heat Map</button>
     <button class="tabbtn" data-tab="chart">Chart</button>
@@ -76,10 +76,10 @@
     <button class="sb-lay" id="spLayV">▤ Stacked</button>
     <span class="sb-k" style="margin-left:6px">Left / Top</span>
     <select class="field" id="spInstA"></select>
-    <select class="field" id="spPaneA"><option value="report">Report</option><option value="detector">Detector</option><option value="polar">SOP Field</option><option value="strike">Strike Field</option><option value="heat">Heat Map</option><option value="chart">Chart</option><option value="sim">Account Sim</option></select>
+    <select class="field" id="spPaneA"><option value="report">Report</option><option value="detector">Detector</option><option value="polar">Field Study</option><option value="strike">Strike Field</option><option value="heat">Heat Map</option><option value="chart">Chart</option><option value="sim">Account Sim</option></select>
     <span class="sb-k">Right / Bottom</span>
     <select class="field" id="spInstB"></select>
-    <select class="field" id="spPaneB"><option value="report">Report</option><option value="detector">Detector</option><option value="polar">SOP Field</option><option value="strike">Strike Field</option><option value="heat" selected>Heat Map</option><option value="chart">Chart</option><option value="sim">Account Sim</option></select>
+    <select class="field" id="spPaneB"><option value="report">Report</option><option value="detector">Detector</option><option value="polar">Field Study</option><option value="strike">Strike Field</option><option value="heat" selected>Heat Map</option><option value="chart">Chart</option><option value="sim">Account Sim</option></select>
     <span class="sb-sess" id="splitSess"><span class="sb-k">Session t</span><span class="v" id="splitSessT">0.0000</span></span>
     <button class="sb-x" id="splitExit">✕ Exit split</button>
   </div>
@@ -181,19 +181,14 @@
       <div class="brand">
         <span class="inf">&#8734;</span>
         <span class="name">The Qu'an</span>
-        <span class="sub">SOP Field</span>
+        <span class="sub">Field Study</span>
       </div>
-      <div class="slot" id="pViewSlot"><span class="tag">Field</span><select class="field" id="pViewSel" title="SOP view">
-        <option value="head">Headline</option>
-        <option value="disk">Polar Disk</option>
-        <option value="tsc">TSC</option>
-        <option value="panels">Panels</option>
-        <option value="pgxc">PGxC</option>
-        <option value="tensor">Book Tensor</option>
-        <option value="latent">Latent Paths</option>
-        <option value="cxg">CxG Families</option>
+      <div class="slot" id="pViewSlot"><span class="tag">View</span><select class="field" id="pViewSel" title="Field Study view">
+        <option value="head">SOP Headline</option>
+        <option value="field">Field Study</option>
       </select></div>
       <div class="hdr-right">
+        <span style="font-size:10.5px;color:var(--cream-dim)" id="pSrc"></span>
         <button class="ctool" id="ripnToggle" title="RIPN handshake — set the Chronometer initialization row (anchor)" style="font-size:11px">&#9678; RIPN</button>
         <div class="slot" style="display:none"><span class="tag">Anchor</span><input type="number" step="any" id="pAnchor" class="panchor" style="width:90px" placeholder="strike"><button class="ctool" id="pLock" title="Lock anchor for the session">&#128275;</button></div>
         <div class="slot" style="display:none"><span class="tag">Chain</span><label class="upload">CSV<span class="fn" id="pFn">none</span><input type="file" id="pFile" accept=".csv"></label></div>
@@ -201,8 +196,6 @@
     </header>
     <div class="polar-panel" id="polarPanel">
       <button class="ctool fullscreen-btn" id="polarFullBtn" type="button" title="Fullscreen">&#9974;</button>
-      <canvas id="pcv"></canvas>
-      <canvas id="pcv2d" style="display:none"></canvas>
       <div id="pAnchorPrompt" style="display:none;position:absolute;inset:0;z-index:4;pointer-events:none;align-items:center;justify-content:center;text-align:center;">
         <div style="background:#2a2a30ee;border:1px solid #5a5a64;border-radius:10px;padding:16px 22px;max-width:78%;box-shadow:0 6px 24px #0008;">
           <div style="font-size:22px;line-height:1;margin-bottom:7px;color:var(--cream)">&#9888;</div>
@@ -231,63 +224,16 @@
       <div id="pHeadView" style="display:none">
         <div class="sopcard"><canvas id="sopHead"></canvas></div>
       </div>
-      <div id="pPanelView" style="display:none">
-        <div class="sopcard"><canvas id="sopGrid"></canvas></div>
+      <div id="pFieldView" style="display:none">
+        <div class="sopcard"><canvas id="sopField"></canvas></div>
       </div>
-      <div id="pPGxCView" style="display:none">
-        <div class="sopcard"><canvas id="sopPG"></canvas></div>
-      </div>
-      <div id="pTensorView" style="display:none">
-        <div class="sopcard"><canvas id="sopTensor"></canvas></div>
-      </div>
-      <div id="pLatentView" style="display:none">
-        <div class="sopcard"><canvas id="sopLatent"></canvas></div>
-      </div>
-      <div id="pCxGView" style="display:none">
-        <div id="cxgScroll">
-          <div class="cxgsub open" id="cxs_pressure"><div class="cxgsubhead"><span>◉ Pressure · PG×C</span><span class="chev">▾</span></div><div class="cxgsubbody"><canvas id="cxgPressure"></canvas></div></div>
-          <div class="cxgsub" id="cxs_family"><div class="cxgsubhead"><span>▸ Family · Curvature / Gradient</span><span class="chev">▾</span></div><div class="cxgsubbody"><div class="famsub"><button class="vbtn on" id="famCurv">Curvature</button><button class="vbtn" id="famGrad">Gradient</button></div><div class="famscroll" style="height:240px"><canvas id="sopFam"></canvas></div></div></div>
-          <div class="cxgsub" id="cxs_fold"><div class="cxgsubhead"><span>▸ SOP-Fold · panel set</span><span class="chev">▾</span></div><div class="cxgsubbody" style="height:300px"><canvas id="cxgFold"></canvas></div></div>
-          <div class="cxgsub collapsed" id="cxs_dual"><div class="cxgsubhead"><span>▸ Dual-Phase · U / V</span><span class="chev">▾</span></div><div class="cxgsubbody"><div class="cxgslot">Dual-phase tensions (compass U=R/S, V=S/R) — inherits chronometer axis + RIPN tuning. Wire rw U/V to populate.</div></div></div>
-          <div class="cxgsub collapsed" id="cxs_ds"><div class="cxgsubhead"><span>▸ DS · Deep Strike</span><span class="chev">▾</span></div><div class="cxgsubbody"><div class="cxgslot">DS module — connect the Deep-Strike payload feed.</div></div></div>
-          <div class="cxgsub collapsed" id="cxs_swf"><div class="cxgsubhead"><span>▸ SWF · Surviving Wall Field</span><span class="chev">▾</span></div><div class="cxgsubbody"><div class="cxgslot">SWF module — connect the SWALLS feed.</div></div></div>
-        </div>
-      </div>
-      <!-- pViews relocated to SOP header -->
-      <div class="pzoom"><button id="pzin">+</button><button id="pzout">&minus;</button></div>
       <div id="ptip"></div>
     </div>
-    <div class="preadout">
-      <span class="cwv">CW: <b id="pCw">&minus;1.0000</b></span>
-      <span>session-t: <b id="pT">0.0000</b></span>
-      <span>clock: <b id="pClk">&mdash;</b></span>
-      <span>product: <b id="pProd">0.0000</b></span>
-      <span>curvature: <b id="pCurv">0.0000</b></span>
-      <span>gradient: <b id="pGrad">0.0000</b></span>
-      <span>envelope: <b id="pEnv">0.0000</b></span>
-      <span>nearest dip: <b id="pDip">&mdash;</b></span>
-      <span style="color:#6f675a" id="pSrc"></span>
-    </div>
-    <div class="ptimebar">
-      <button class="pctl-btn" id="pPlay" style="background:#34343a;color:var(--cream-dim);border:0.5px solid #4a4a52;border-radius:5px;padding:4px 10px;cursor:pointer">&#9208;</button>
-      <span style="font-size:10px;color:var(--cream-dim);min-width:24px">CW</span>
-      <input id="pScrub" type="range" min="0" max="1000" value="0">
-      <button class="pnow" id="pSnap">&#9678; now</button>
-    </div>
-    <div class="pctl">
-      <label>speed <input id="pSpd" type="range" min="1" max="40" value="12"></label>
-      <label>height <input id="pHs" type="range" min="5" max="40" value="15"></label>
-      <label>brightness <input id="pBri" type="range" min="20" max="100" value="72"></label>
-      <span style="flex:1"></span>
-      <span style="font-size:9px;color:#54514a">drag: rotate &middot; wheel / +&minus;: zoom &middot; &#9678; now snaps live</span>
-    </div>
     <footer><div class="plegend">
-      <span><i class="sw" style="background:#ffffff"></i>product</span>
-      <span><i class="sw" style="background:#d9463b"></i>curvature (SOPC)</span>
-      <span><i class="sw" style="background:#e8b53a"></i>gradient (SOPG)</span>
-      <span><i class="sw" style="background:#3f9d6b"></i>envelope</span>
-      <span><i class="dt" style="background:#fff4d8"></i>planet (now)</span>
-      <span><i class="dt" style="background:#6fd3ff"></i>coherence dip</span>
+      <span><i class="sw" style="background:#ffffff"></i>DS (Difference/Sum)</span>
+      <span><i class="sw" style="background:#e8b53a"></i>Dual Phase</span>
+      <span><i class="sw" style="background:#6fd3ff"></i>SWF (DIPLTRPD/SOPPM)</span>
+      <span><i class="dt" style="background:#7fd1e0"></i>aligned crossing</span>
     </div></footer>
   </section>
 
@@ -401,7 +347,6 @@
   </div>
 </div>
 <script src="js/detector.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="js/sop-polar.js" defer></script>
 <script src="js/tabs.js" defer></script>
 <script src="js/chart-controls.js" defer></script>
