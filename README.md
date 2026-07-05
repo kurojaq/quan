@@ -11,7 +11,8 @@ An options/futures dealer-positioning terminal: chain-derived structural levels,
 - `payload/` — the Payload Generator's shadow-DOM style/markup/script
 - `engine/report/`, `engine/payload/`, `engine/heatmap/` — three independently-maintained copies of the Python analysis engine (one per consumer above). They've diverged over time and are **not** interchangeable — don't merge them.
 - `assets/` — images
-- `yahoo_proxy.py` — optional local CORS proxy for live quotes/history from Yahoo Finance, used by the Live anchor toggle and the Chart tab
+- `workers/yahoo-proxy.js` — Cloudflare Worker that proxies Yahoo Finance quotes/history with CORS headers (Yahoo's own endpoint doesn't send any). Deployed at `quanyahoo.jqnboggan.workers.dev` and used by the Live anchor toggle and the Chart tab from any device, mobile included — no local process required.
+- `yahoo_proxy.py` — the same proxy as a local Python script, kept for offline dev / running your own instance instead of the shared Worker
 
 ## Running locally
 
@@ -21,15 +22,15 @@ Any static file server works, e.g.:
 python -m http.server 8000
 ```
 
-then open `http://localhost:8000/index.html`.
+then open `http://localhost:8000/index.html`. The Live toggle and Chart tab work out of the box against the deployed Worker — no extra setup needed.
 
-For live quotes/candles, also run the proxy in a separate terminal:
+If you'd rather point at your own proxy instance (e.g. while editing `workers/yahoo-proxy.js`), run the local Python equivalent:
 
 ```
 python yahoo_proxy.py
 ```
 
-It listens on `localhost:8791` and is only used by the "Live" toggle and the Chart tab — everything else works without it.
+it listens on `localhost:8791` — then temporarily swap `PROXY_BASE` in `js/chart-tab.js` and `js/live-anchor.js` back to `http://localhost:8791`.
 
 ## Deployment
 

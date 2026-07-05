@@ -1,6 +1,6 @@
 (function(){
-  // ---- price chart tab: lightweight-charts candles + structural-level overlay, fed by the same yahoo_proxy ----
-  var PROXY_BASE='http://localhost:8791';
+  // ---- price chart tab: lightweight-charts candles + structural-level overlay, fed by the same yahoo proxy ----
+  var PROXY_BASE='https://quanyahoo.jqnboggan.workers.dev';
   var chart=null, series=null, priceLines=[], container=null, curSym=null, curRange='1d', curInterval='5m', booted=false;
   var titleEl, statusEl;
 

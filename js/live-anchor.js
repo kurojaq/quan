@@ -1,5 +1,5 @@
 (function(){
-  // ---- live anchor: poll a local Yahoo Finance CORS proxy (yahoo_proxy.py) and drive the shared anchor from it ----
+  // ---- live anchor: poll a Yahoo Finance CORS proxy (Cloudflare Worker, see workers/yahoo-proxy.js) and drive the shared anchor from it ----
   // ---- full CME Group symbol/point-value tables, shared globally (Account Sim, the price Chart tab, and this live-anchor poll all read the same table) ----
   var YF_SYMS=window.__YF_SYMS||(window.__YF_SYMS={
     ES:'ES=F',MES:'MES=F',NQ:'NQ=F',MNQ:'MNQ=F',YM:'YM=F',MYM:'MYM=F',RTY:'RTY=F',M2K:'M2K=F',
@@ -11,7 +11,7 @@
     LE:'LE=F',GF:'GF=F',HE:'HE=F',DC:'DC=F',
     BTC:'BTC=F',MBT:'MBT=F',ETH:'ETH=F'
   });
-  var PROXY_BASE='http://localhost:8791';
+  var PROXY_BASE='https://quanyahoo.jqnboggan.workers.dev';
   var POLL_MS=10000;
   var btn=document.getElementById('liveAnchorBtn'), note=document.getElementById('liveAnchorNote');
   if(!btn||!note) return;
