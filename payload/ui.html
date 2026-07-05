@@ -1,0 +1,71 @@
+
+<div class="wrap">
+  <header>
+    <div class="brand"><span class="q">Qu'an</span> · Payload Generator<small id="build"></small></div>
+    <div id="status">engine idle — runs on first Generate</div>
+  </header>
+
+  <p class="lede">Drop the session's CSVs into the slot that matches each expiry's <b>role</b> — the slot you
+  choose is the role. Set the <b>anchor</b> (prior-session close), then Generate. The engine runs in-browser
+  (Pyodide) and emits two lines: the <b>master</b> (levels + SWALLS + prior-fold) and the <b>DS</b> (Risq).</p>
+
+  <div class="anchor">
+    <label for="anchor">Session anchor</label>
+    <input id="anchor" inputmode="decimal" placeholder="30726.5" autocomplete="off">
+    <span class="hint">this session's prior-session close — anchors the front and the DS. The just-expired's fold uses its own anchor, set in its card.</span>
+  </div>
+
+  <div class="rail"><span>← just-expired</span><span class="ln"></span><span>today</span></div>
+  <div class="routes">
+    <!-- JUST-EXPIRED -->
+    <div class="card">
+      <div class="eyebrow">just-expired · day prior</div>
+      <h3>Settled expiry<span class="req need">DS</span></h3>
+      <div class="feeds">feeds the <b>DS payload</b>, the master's <b>prior-merge</b> fold, and <b>SWALLS</b> (with the front)</div>
+      <div class="cardanchor"><label for="priorAnchor">its close</label><input id="priorAnchor" inputmode="decimal" placeholder="30141.5" autocomplete="off"><span class="h">the prior session's own anchor. The fold lands at this window — leave blank to reuse the session anchor (drops the lower shelf).</span></div>
+      <div class="slot"><span class="tag">chain</span>
+        <label class="filebtn"><input type="file" accept=".csv" data-role="expChain" hidden><span class="ic">＋</span><span class="filebtn-txt">Chain CSV</span></label>
+        <span class="fname" data-for="expChain">—</span><button class="clr" data-clear="expChain" hidden>×</button></div>
+      <div class="slot"><span class="tag">greeks</span>
+        <label class="filebtn"><input type="file" accept=".csv" data-role="expGreeks" hidden><span class="ic">＋</span><span class="filebtn-txt">Greeks CSV</span></label>
+        <span class="fname" data-for="expGreeks">optional</span><button class="clr" data-clear="expGreeks" hidden>×</button></div>
+    </div>
+    <!-- FRONT -->
+    <div class="card front">
+      <div class="eyebrow">front · today</div>
+      <h3>Active expiry<span class="req need">base</span></h3>
+      <div class="feeds">the master <b>base</b> — produces all the <b>levels</b>; also the <b>survivor</b> for SWALLS</div>
+      <div class="slot"><span class="tag">chain</span>
+        <label class="filebtn"><input type="file" accept=".csv" data-role="frontChain" hidden><span class="ic">＋</span><span class="filebtn-txt">Chain CSV</span></label>
+        <span class="fname" data-for="frontChain">—</span><button class="clr" data-clear="frontChain" hidden>×</button></div>
+      <div class="slot"><span class="tag">greeks</span>
+        <label class="filebtn"><input type="file" accept=".csv" data-role="frontGreeks" hidden><span class="ic">＋</span><span class="filebtn-txt">Greeks CSV</span></label>
+        <span class="fname" data-for="frontGreeks">optional</span><button class="clr" data-clear="frontGreeks" hidden>×</button></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="go" id="gen">Generate payloads</button>
+    <span id="err"></span>
+  </div>
+
+  <div class="out">
+    <h4>Master payload <span class="dest">→ Pine&nbsp;<code>payload</code></span></h4>
+    <div class="body">
+      <textarea id="masterOut" readonly placeholder="levels + SWALLS + prior-merge fold appear here"></textarea>
+      <div class="row"><button class="mini" id="mCopy" disabled>Copy</button><button class="mini" id="mDl" disabled>Download .txt</button></div>
+      <div class="note" id="mNote"></div>
+    </div>
+  </div>
+  <div class="out">
+    <h4>DS payload <span class="dest">→ Pine&nbsp;<code>payloadDS</code></span></h4>
+    <div class="body">
+      <textarea id="dsOut" readonly placeholder="difference/sum (Risq) line appears here"></textarea>
+      <div class="row"><button class="mini" id="dCopy" disabled>Copy</button><button class="mini" id="dDl" disabled>Download .txt</button></div>
+      <div class="note" id="dNote"></div>
+    </div>
+  </div>
+
+  <div class="foot">runs the real Qu'an engine in-browser · no data leaves the page · first Generate downloads Pyodide (a few seconds)</div>
+</div>
+

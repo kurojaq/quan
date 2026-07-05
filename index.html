@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<!-- ==========================================================================
+     QU'AN DASHBOARD — BASELINE (canonical, going forward · designated 2026-06-17)
+     Tuning: ATM-centered 21-cell pressure window + winsorized RIPN (BI_CLIP=5).
+       payload engine : #a142e4f2ebba  (baseline tuning + greek-source override + SWALLS surviving levels)
+       JS render path : base = atm-(CW_STEPS>>1)  /  foldEnergy base = atm-10
+     Payload drawer: optional chain-upload override (pressure+OI) + warehouse greeks
+     (GEX/walls from Barchart export, OI-weighted) passed to run(chain,anchor,greeks).
+     SWALLS: key surviving levels = peaks of longer-dated (survivor) expiries, magnitude-
+     ranked, persistence-gated (>=2 of front+survivors). Emitted only when survivors exist.
+     This is the reference build. The RIPN bracket-zero (argmin) variant is parked
+     as an experiment — see BASELINE_NOTES.md.
+     ========================================================================== -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Qu'an — Intermarket Breach Detector + Polar Disk</title>
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<link rel="stylesheet" href="css/theme.css">
+</head>
+<body>
+<div id="lock">
+  <img class="lockbg" alt="" src="assets/lockbg.jpg">
+  <img class="lock-wm" alt="Hūs Rihtlǽfan" src="assets/lock_watermark.png">
+  <img class="book" id="bookBtn" alt="Open the book" src="assets/book.png">
+  <div class="book-hintline" id="bookHint">click the book</div>
+  <div class="lockbox" id="lockBox">
+    <div class="lockprompt">Enter the word</div>
+    <div class="lockrow" id="lockRow">
+      <input id="lockInput" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="••••••••">
+      <button id="lockGo">Unlock</button>
+    </div>
+    <div class="lockhint" id="lockHint"></div>
+  </div>
+</div>
+<canvas id="matrixCanvas"></canvas>
+<script src="js/matrix-effect.js" defer></script>
+<div class="wrap">
+  <nav class="tabbar">
+    <button class="tabbtn" data-tab="report">Report</button>
+    <button class="tabbtn on" data-tab="detector">Detector</button>
+    <button class="tabbtn" data-tab="polar">SOP Field</button>
+    <button class="tabbtn" data-tab="strike">Strike Field</button>
+    <button class="tabbtn" data-tab="heat">Heat Map</button>
+    <button class="tabbtn" data-tab="chart">Chart</button>
+    <button class="tabbtn" data-tab="sim">Account Sim</button>
+    <button class="tabbtn splitplus" data-tab="split" id="splitTab" title="Split view — show two tabs at once">+</button>
+    <div class="gctrls">
+      <div class="instrbar"><select class="field" id="instA"></select></div>
+      <div class="datebar"><span class="k">Date</span><input type="date" id="dayDate"></div>
+      <div class="slot"><span class="tag">Anchor</span><input type="number" step="any" id="gAnchor" class="panchor" style="width:88px" placeholder="strike"><button class="ctool" id="gLock" title="Lock anchor for the session">&#128275;</button></div>
+      <div class="slot" id="liveAnchorSlot" title="Poll a local Yahoo Finance proxy (yahoo_proxy.py) and drive the anchor from the live quote">
+        <button class="ctool" id="liveAnchorBtn" type="button">&#9679; Live</button>
+        <span class="expnote" id="liveAnchorNote">off</span>
+      </div>
+      <div class="slot"><button class="ctool" id="themeToggleBtn" type="button" title="Switch between dark and light theme">&#9680; Dark</button></div>
+      <div class="slot"><span class="tag">Exp</span><div class="expsel" id="expSel"><button class="expbtn" id="exp_Daily" data-exp="Daily" type="button"><span class="expdot">&#9675;</span>Daily<span class="expoi"></span></button><button class="expbtn" id="exp_EOM" data-exp="EOM" type="button"><span class="expdot">&#9675;</span>EOM<span class="expoi"></span></button></div><span class="expnote" id="expNote"></span></div>
+      <div class="slot"><select class="field" id="upKind" style="padding:5px 6px;font-size:10px;letter-spacing:.06em;"><option value="chain">Chain</option><option value="greeks">Greeks</option></select><label class="upload">CSV<span class="fn" id="gFn">none</span><input type="file" id="gFile" accept=".csv"></label></div>
+    </div>
+    <div class="sessbar"><span class="k">Session t</span><span class="v" id="sessT" style="color:#7fd1e0">0.0000</span></div>
+  </nav>
+  <div class="splitBar" id="splitBar">
+    <span class="sb-k">Layout</span>
+    <button class="sb-lay on" id="spLayH">▥ Side by side</button>
+    <button class="sb-lay" id="spLayV">▤ Stacked</button>
+    <span class="sb-k" style="margin-left:6px">Left / Top</span>
+    <select class="field" id="spInstA"></select>
+    <select class="field" id="spPaneA"><option value="detector">Detector</option><option value="polar">SOP Field</option><option value="strike">Strike Field</option><option value="heat">Heat Map</option></select>
+    <span class="sb-k">Right / Bottom</span>
+    <select class="field" id="spInstB"></select>
+    <select class="field" id="spPaneB"><option value="detector">Detector</option><option value="polar">SOP Field</option><option value="strike">Strike Field</option><option value="heat" selected>Heat Map</option></select>
+    <span class="sb-sess" id="splitSess"><span class="sb-k">Session t</span><span class="v" id="splitSessT">0.0000</span></span>
+    <button class="sb-x" id="splitExit">✕ Exit split</button>
+  </div>
+  <div class="secHost" id="secHost">
+  <section class="tabsec" id="tabReport">
+  <header>
+    <div class="brand">
+      <span class="inf">&#8734;</span>
+      <span class="name">The Qu'an</span>
+      <span class="sub">Daily Chronometric Field Brief</span>
+    </div>
+    <div class="hdr-right">
+      <button class="rptbtn" id="rptLive" title="Live intraday DTE decay — re-pulls greeks/risk/IV as the session clock advances (chain-structure metrics need fresh chain data)">⟳ Live</button><button class="rptbtn" id="rptExport" title="Print / export this brief to PDF">Export PDF</button>
+    </div>
+  </header>
+  <div class="rptScroll">
+    <div class="rptBanner">
+      <div class="rptClass rwait" id="rptClass">AWAITING BRIEF DATA</div>
+      <div class="rptSub" id="rptSub">&mdash;</div>
+    </div>
+    <div class="rptBody" id="rptBody"></div>
+  </div>
+</section>
+<section class="tabsec on" id="tabDetector">
+  <header>
+    <div class="brand">
+      <span class="inf">&#8734;</span>
+      <span class="name">The Qu'an</span>
+      <span class="sub">Intermarket Breach Detector</span>
+    </div>
+    <div class="hdr-right">
+      <div class="slot">
+        <span class="tag">Chain</span>
+        <label class="upload">CSV<span class="fn" id="fnA">none</span><input type="file" id="fileA" accept=".csv"></label>
+      </div>
+      <div class="slot">
+        <span class="tag">ZN</span>
+        <label class="upload">CSV<span class="fn" id="fnB">none</span><input type="file" id="fileB" accept=".csv"></label>
+      </div>
+      <label class="toggle"><input type="checkbox" id="priceToggle">Price</label>
+      <label class="toggle" id="fitToggleWrap"><input type="checkbox" id="fitToggle" style="accent-color:#e8e3d6">Fit</label>
+      <label class="toggle" id="fitOrderWrap" title="polynomial orders to overlay (1\u20139)">P&le;<input type="range" id="fitOrder" min="1" max="9" value="6" style="width:80px;vertical-align:middle;accent-color:#e8e3d6;margin:0 5px"><span class="v" id="fitOrderV">6</span></label>
+      <div class="stat"><span class="k">Aligned</span><span class="v" id="alignCount">&mdash;</span></div>
+    </div>
+  </header>
+  <div class="subtabbar"><button class="subtab on" data-sub="det">Detector</button><button class="subtab" data-sub="brc">Breach</button></div>
+  <div class="subpanel on" id="subDet">
+  <div class="chartwrap" id="detChartwrap">
+    <div class="modeToggle" id="modeToggle">
+      <button data-mode="both" class="on">Both</button>
+      <button data-mode="A" id="btnA">A</button>
+      <button data-mode="B" id="btnB">ZN</button>
+    </div>
+    <span class="chart-title" id="chartTitle"></span>
+    <button class="ctool fullscreen-btn" id="detFullBtn" type="button" title="Fullscreen">&#9974;</button>
+    <div class="chart-tools-wrap" id="detToolsWrap">
+      <button class="ctool tools-trigger" id="detToolsBtn" type="button" title="Drawing tools">&#9998; &#9662;</button>
+      <div class="chart-tools" id="detToolsPanel">
+        <button class="ctool" id="textBox" title="Add text box">T</button>
+        <button class="ctool" id="drawToggle" title="Freehand draw">&#9998;</button>
+        <button class="ctool" id="lineTool" title="Line">&#9585;</button>
+        <button class="ctool" id="arrowTool" title="Arrow">&#8599;</button>
+        <button class="ctool" id="clearDraw" title="Clear drawings &amp; notes">&#10006;</button>
+        <button class="ctool" id="resetView" title="Reset view (or double-click)">&#8635;</button>
+      </div>
+    </div>
+    <span class="chart-hint">scroll: zoom &middot; shift+scroll: y &middot; dbl-click: reset</span>
+    <span class="chart-foot">Time State Compass</span>
+    <canvas id="chart"></canvas>
+    <canvas id="overlay"></canvas>
+    <div id="dotTip"></div>
+  </div>
+  <footer>
+    <div class="legend" id="legend"></div>
+    <div class="breaches" id="alignList"><span class="empty">&mdash; load both CSVs to find aligned crossings</span></div>
+  </footer>
+  </div>
+  <div class="subpanel" id="subBrc">
+  <div class="chartwrap" id="brcWrap">
+   <div class="modeToggle" id="brcMode"><button data-bt="CL" class="on">CL</button><button data-bt="CM">CM</button><span class="mt-div"></span><button data-bm="both" class="on">Both</button><button data-bm="NQ">NQ</button><button data-bm="ZN">ZN</button></div>
+   <span class="chart-title" id="brcTitle">Breach</span>
+   <button class="ctool fullscreen-btn" id="brcFullBtn" type="button" title="Fullscreen">&#9974;</button>
+   <div class="chart-tools-wrap" id="brcToolsWrap"><button class="ctool tools-trigger" id="brcToolsBtn" type="button" title="Drawing tools">&#9998; &#9662;</button><div class="chart-tools" id="brcToolsPanel"><button class="ctool" id="brcText" title="Add text box">T</button><button class="ctool" id="brcDraw" title="Freehand draw">&#9998;</button><button class="ctool" id="brcLine" title="Line">&#9585;</button><button class="ctool" id="brcArrow" title="Arrow">&#8599;</button><button class="ctool" id="brcClearD" title="Clear drawings &amp; notes">&#10006;</button><button class="ctool" id="brcResetV" title="Reset view (or double-click)">&#8635;</button></div></div>
+   <span class="chart-hint">scroll: zoom &middot; shift+scroll: y &middot; dbl-click: reset</span>
+   <span class="chart-foot">Time State Compass</span>
+   <svg id="brcSvg" viewBox="0 0 900 480" preserveAspectRatio="none"></svg>
+   <canvas id="brcOverlay"></canvas>
+  </div>
+  <footer>
+   <div class="legend" id="brcLegend"><span class="ltog" data-bk="poly"><span class="sw" style="border-top-color:var(--cream-dim)"></span>Poly&#8313;</span><span class="ltog off" data-bk="slope"><span class="sw" style="border-top-color:var(--cream-dim)"></span>Slope</span><span class="ltog" data-bk="pts"><span class="sw" style="border-top-color:var(--cream-dim)"></span>Pts</span><span class="ltog" data-bk="A"><span class="sw" style="border-top-color:var(--align)"></span>A &#9670; slope&times;</span><span class="ltog" data-bk="B"><span class="sw" style="border-top-color:var(--breach)"></span>B &#9650; poly&cap;slope</span><span class="ltog" data-bk="C"><span class="sw" style="border-top-color:var(--breach)"></span>C &#9679; zero</span></div>
+   <div class="breaches" id="brcRead"><span class="empty">&mdash; load Chain + ZN to compute breaches</span></div>
+   <div id="brcCrossReport" style="display:none"></div>
+  </footer>
+ </div>
+  </section>
+
+  <section class="tabsec" id="tabPolar">
+    <header>
+      <div class="brand">
+        <span class="inf">&#8734;</span>
+        <span class="name">The Qu'an</span>
+        <span class="sub">SOP Field</span>
+      </div>
+      <div class="slot" id="pViewSlot"><span class="tag">Field</span><select class="field" id="pViewSel" title="SOP view">
+        <option value="head">Headline</option>
+        <option value="disk">Polar Disk</option>
+        <option value="tsc">TSC</option>
+        <option value="panels">Panels</option>
+        <option value="pgxc">PGxC</option>
+        <option value="tensor">Book Tensor</option>
+        <option value="latent">Latent Paths</option>
+        <option value="cxg">CxG Families</option>
+      </select></div>
+      <div class="hdr-right">
+        <button class="ctool" id="ripnToggle" title="RIPN handshake — set the Chronometer initialization row (anchor)" style="font-size:11px">&#9678; RIPN</button>
+        <div class="slot" style="display:none"><span class="tag">Anchor</span><input type="number" step="any" id="pAnchor" class="panchor" style="width:90px" placeholder="strike"><button class="ctool" id="pLock" title="Lock anchor for the session">&#128275;</button></div>
+        <div class="slot" style="display:none"><span class="tag">Chain</span><label class="upload">CSV<span class="fn" id="pFn">none</span><input type="file" id="pFile" accept=".csv"></label></div>
+      </div>
+    </header>
+    <div class="polar-panel" id="polarPanel">
+      <button class="ctool fullscreen-btn" id="polarFullBtn" type="button" title="Fullscreen">&#9974;</button>
+      <canvas id="pcv"></canvas>
+      <canvas id="pcv2d" style="display:none"></canvas>
+      <div id="pAnchorPrompt" style="display:none;position:absolute;inset:0;z-index:4;pointer-events:none;align-items:center;justify-content:center;text-align:center;">
+        <div style="background:#2a2a30ee;border:1px solid #5a5a64;border-radius:10px;padding:16px 22px;max-width:78%;box-shadow:0 6px 24px #0008;">
+          <div style="font-size:22px;line-height:1;margin-bottom:7px;color:var(--cream)">&#9888;</div>
+          <div id="pAnchorPromptMsg" style="font-size:13px;font-weight:600;color:var(--cream);letter-spacing:.2px">Enter the session-open anchor price</div>
+          <div style="font-size:11px;color:var(--cream-dim);margin-top:5px">chain loaded · SOP renders once the engine has a chain + anchor</div>
+        </div>
+      </div>
+      <div id="ripnPanel" style="display:none;position:absolute;top:8px;left:8px;z-index:6;width:286px;max-height:calc(100% - 16px);background:#23232aef;border:0.5px solid #54545e;border-radius:8px;box-shadow:0 6px 24px #0009;flex-direction:column;font-size:11px;backdrop-filter:blur(3px)">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 9px;border-bottom:0.5px solid #44444c">
+          <div style="font-weight:600;letter-spacing:.4px;color:var(--cream)">RIPN handshake</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button id="ripnAutoBtn" class="ctool" title="Reset to the auto-suggested anchor" style="font-size:10px;padding:2px 7px">auto</button>
+            <button id="ripnClose" class="ctool" title="Hide" style="font-size:12px;padding:1px 7px">&times;</button>
+          </div>
+        </div>
+        <div id="ripnHead" style="padding:5px 9px;border-bottom:0.5px solid #3a3a42;color:var(--cream-dim);font-size:10px;line-height:1.5"></div>
+        <div id="ripnTblWrap" style="overflow:auto;flex:1 1 auto;min-height:0;max-height:340px">
+          <table id="ripnTbl" style="width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums"></table>
+        </div>
+        <div style="padding:5px 9px;border-top:0.5px solid #3a3a42;color:var(--cream-dim);font-size:9.5px;display:flex;gap:7px;align-items:center">
+          <span>row</span><input id="ripnIdxInput" inputmode="numeric" style="width:52px;background:#1a1a1f;border:0.5px solid #4a4a52;border-radius:4px;color:var(--cream);padding:2px 5px;font-size:10px" placeholder="#"><button id="ripnGo" class="ctool" style="font-size:10px;padding:2px 7px">go</button>
+          <span style="margin-left:auto;opacity:.7">click a row to re-anchor</span>
+        </div>
+        <div id="ripnTuneSec" style="padding:7px 9px;border-top:0.5px solid #3a3a42;color:var(--cream-dim);font-size:9.5px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-weight:600;color:var(--cream)">global RIPN tuning</span><span style="opacity:.6">applies to all views</span></div><div style="display:flex;flex-direction:column;gap:5px"><label style="display:flex;align-items:center;gap:7px">responsiveness<input id="ripnTune_responsiveness" type="range" min="0" max="2" step="0.05" value="1.00" style="flex:1"><span id="ripnTune_responsiveness_v" style="width:30px;text-align:right;color:#6fd3ff">1.00</span></label><label style="display:flex;align-items:center;gap:7px">sensitivity<input id="ripnTune_sensitivity" type="range" min="0" max="1" step="0.01" value="0.00" style="flex:1"><span id="ripnTune_sensitivity_v" style="width:30px;text-align:right;color:#6fd3ff">0.00</span></label><label style="display:flex;align-items:center;gap:7px">smoothing<input id="ripnTune_smoothing" type="range" min="0" max="0.95" step="0.05" value="0.20" style="flex:1"><span id="ripnTune_smoothing_v" style="width:30px;text-align:right;color:#6fd3ff">0.20</span></label><label style="display:flex;align-items:center;gap:7px">weighting<input id="ripnTune_weighting" type="range" min="0" max="1" step="0.05" value="1.00" style="flex:1"><span id="ripnTune_weighting_v" style="width:30px;text-align:right;color:#6fd3ff">1.00</span></label></div></div>
+      </div>
+      <div id="pHeadView" style="display:none">
+        <div class="sopcard"><canvas id="sopHead"></canvas></div>
+      </div>
+      <div id="pPanelView" style="display:none">
+        <div class="sopcard"><canvas id="sopGrid"></canvas></div>
+      </div>
+      <div id="pPGxCView" style="display:none">
+        <div class="sopcard"><canvas id="sopPG"></canvas></div>
+      </div>
+      <div id="pTensorView" style="display:none">
+        <div class="sopcard"><canvas id="sopTensor"></canvas></div>
+      </div>
+      <div id="pLatentView" style="display:none">
+        <div class="sopcard"><canvas id="sopLatent"></canvas></div>
+      </div>
+      <div id="pCxGView" style="display:none">
+        <div id="cxgScroll">
+          <div class="cxgsub open" id="cxs_pressure"><div class="cxgsubhead"><span>◉ Pressure · PG×C</span><span class="chev">▾</span></div><div class="cxgsubbody"><canvas id="cxgPressure"></canvas></div></div>
+          <div class="cxgsub" id="cxs_family"><div class="cxgsubhead"><span>▸ Family · Curvature / Gradient</span><span class="chev">▾</span></div><div class="cxgsubbody"><div class="famsub"><button class="vbtn on" id="famCurv">Curvature</button><button class="vbtn" id="famGrad">Gradient</button></div><div class="famscroll" style="height:240px"><canvas id="sopFam"></canvas></div></div></div>
+          <div class="cxgsub" id="cxs_fold"><div class="cxgsubhead"><span>▸ SOP-Fold · panel set</span><span class="chev">▾</span></div><div class="cxgsubbody" style="height:300px"><canvas id="cxgFold"></canvas></div></div>
+          <div class="cxgsub collapsed" id="cxs_dual"><div class="cxgsubhead"><span>▸ Dual-Phase · U / V</span><span class="chev">▾</span></div><div class="cxgsubbody"><div class="cxgslot">Dual-phase tensions (compass U=R/S, V=S/R) — inherits chronometer axis + RIPN tuning. Wire rw U/V to populate.</div></div></div>
+          <div class="cxgsub collapsed" id="cxs_ds"><div class="cxgsubhead"><span>▸ DS · Deep Strike</span><span class="chev">▾</span></div><div class="cxgsubbody"><div class="cxgslot">DS module — connect the Deep-Strike payload feed.</div></div></div>
+          <div class="cxgsub collapsed" id="cxs_swf"><div class="cxgsubhead"><span>▸ SWF · Surviving Wall Field</span><span class="chev">▾</span></div><div class="cxgsubbody"><div class="cxgslot">SWF module — connect the SWALLS feed.</div></div></div>
+        </div>
+      </div>
+      <!-- pViews relocated to SOP header -->
+      <div class="pzoom"><button id="pzin">+</button><button id="pzout">&minus;</button></div>
+      <div id="ptip"></div>
+    </div>
+    <div class="preadout">
+      <span class="cwv">CW: <b id="pCw">&minus;1.0000</b></span>
+      <span>session-t: <b id="pT">0.0000</b></span>
+      <span>clock: <b id="pClk">&mdash;</b></span>
+      <span>product: <b id="pProd">0.0000</b></span>
+      <span>curvature: <b id="pCurv">0.0000</b></span>
+      <span>gradient: <b id="pGrad">0.0000</b></span>
+      <span>envelope: <b id="pEnv">0.0000</b></span>
+      <span>nearest dip: <b id="pDip">&mdash;</b></span>
+      <span style="color:#6f675a" id="pSrc"></span>
+    </div>
+    <div class="ptimebar">
+      <button class="pctl-btn" id="pPlay" style="background:#34343a;color:var(--cream-dim);border:0.5px solid #4a4a52;border-radius:5px;padding:4px 10px;cursor:pointer">&#9208;</button>
+      <span style="font-size:10px;color:var(--cream-dim);min-width:24px">CW</span>
+      <input id="pScrub" type="range" min="0" max="1000" value="0">
+      <button class="pnow" id="pSnap">&#9678; now</button>
+    </div>
+    <div class="pctl">
+      <label>speed <input id="pSpd" type="range" min="1" max="40" value="12"></label>
+      <label>height <input id="pHs" type="range" min="5" max="40" value="15"></label>
+      <label>brightness <input id="pBri" type="range" min="20" max="100" value="72"></label>
+      <span style="flex:1"></span>
+      <span style="font-size:9px;color:#54514a">drag: rotate &middot; wheel / +&minus;: zoom &middot; &#9678; now snaps live</span>
+    </div>
+    <footer><div class="plegend">
+      <span><i class="sw" style="background:#ffffff"></i>product</span>
+      <span><i class="sw" style="background:#d9463b"></i>curvature (SOPC)</span>
+      <span><i class="sw" style="background:#e8b53a"></i>gradient (SOPG)</span>
+      <span><i class="sw" style="background:#3f9d6b"></i>envelope</span>
+      <span><i class="dt" style="background:#fff4d8"></i>planet (now)</span>
+      <span><i class="dt" style="background:#6fd3ff"></i>coherence dip</span>
+    </div></footer>
+  </section>
+
+  <section class="tabsec" id="tabStrike">
+  <header>
+    <div class="brand">
+      <span class="inf">&#8734;</span>
+      <span class="name">The Qu'an</span>
+      <span class="sub">Strike Field Charting</span>
+    </div>
+    <div class="hdr-right">
+      <div class="slot"><span class="tag">Column</span><select class="field" id="skCol"><option>load a chain</option></select></div>
+      <div class="slot" style="display:none"><span class="tag">Anchor</span><input type="number" step="any" id="skAnchor" class="panchor" style="width:90px" placeholder="strike"><button class="ctool" id="skLock" title="Lock anchor for the session">&#128275;</button></div>
+      <div class="slot" style="display:none"><span class="tag">Chain</span><label class="upload">CSV<span class="fn" id="skFn">none</span><input type="file" id="skFile" accept=".csv"></label></div>
+      <div class="slot" style="display:none"><span class="tag">Greeks</span><label class="upload">CSV<span class="fn" id="skGFn">none</span><input type="file" id="skGFile" accept=".csv"></label></div>
+      <label class="toggle"><input type="checkbox" id="skGreeks" checked style="accent-color:#e8e3d6">&Gamma; bars</label>
+      <label class="toggle"><input type="checkbox" id="skRaw" checked style="accent-color:#e8e3d6">Raw</label>
+      <div class="slot"><span class="tag">Orders &le;</span><input type="range" id="skOrder" min="1" max="9" value="6"><span class="v" id="skOrderV" style="min-width:12px">6</span></div>
+      <div class="stat"><span class="k">Points</span><span class="v" id="skN">&mdash;</span></div>
+    </div>
+  </header>
+  <div class="chartwrap" id="skChartwrap">
+    <span class="chart-title" id="skTitle"></span>
+    <div class="skviews" id="skViews" style="display:none">
+      <button class="vbtn" id="skVatm">ATM</button>
+      <button class="vbtn" id="skVfield">Field</button>
+      <button class="vbtn on" id="skVall">Show all</button>
+    </div>
+    <button class="ctool fullscreen-btn" id="skFullBtn" type="button" title="Fullscreen">&#9974;</button>
+    <div class="chart-tools-wrap" id="skToolsWrap">
+      <button class="ctool tools-trigger" id="skToolsBtn" type="button" title="Drawing tools">&#9998; &#9662;</button>
+      <div class="chart-tools" id="skToolsPanel">
+        <button class="ctool" id="skText" title="Add text box">T</button>
+        <button class="ctool" id="skDraw" title="Freehand draw">&#9998;</button>
+        <button class="ctool" id="skLine" title="Line">&#9585;</button>
+        <button class="ctool" id="skArrow" title="Arrow">&#8599;</button>
+        <button class="ctool" id="skClear" title="Clear drawings &amp; notes">&#10006;</button>
+        <button class="ctool" id="skReset" title="Reset view (or double-click)">&#8635;</button>
+      </div>
+    </div>
+    <span class="chart-hint">scroll: zoom &middot; shift+scroll: y &middot; dbl-click: reset</span>
+    <span class="chart-foot">Time State Compass</span>
+    <canvas id="skcv"></canvas>
+    <canvas id="skoverlay"></canvas>
+    <div id="skDotTip"></div>
+  </div>
+  <footer>
+    <div class="legend" id="skLegend"></div>
+  </footer>
+  </section>
+  <section class="tabsec" id="tabHeat"><div id="heatMount" style="flex:1 1 auto;min-height:0;display:flex;width:100%;background:#1a1a1e;"></div></section>
+  <section class="tabsec" id="tabHeatB"><div id="heatMountB" style="flex:1 1 auto;min-height:0;display:flex;width:100%;background:#1a1a1e;"></div></section>
+  <section class="tabsec" id="tabChart">
+  <header>
+    <div class="brand">
+      <span class="inf">&#8734;</span>
+      <span class="name">The Qu'an</span>
+      <span class="sub">Price Chart</span>
+    </div>
+    <div class="hdr-right">
+      <div class="slot" id="chartTfRow">
+        <button class="ctool chart-tf on" data-range="1d" data-interval="5m" type="button">1D</button>
+        <button class="ctool chart-tf" data-range="5d" data-interval="15m" type="button">5D</button>
+        <button class="ctool chart-tf" data-range="1mo" data-interval="1h" type="button">1M</button>
+        <button class="ctool chart-tf" data-range="6mo" data-interval="1d" type="button">6M</button>
+      </div>
+      <button class="ctool" id="chartRefreshBtn" type="button" title="Refresh">&#8635;</button>
+    </div>
+  </header>
+  <div class="chartwrap" id="chartWrap">
+    <span class="chart-title" id="chartPriceTitle"></span>
+    <button class="ctool fullscreen-btn" id="chartFullBtn" type="button" title="Fullscreen">&#9974;</button>
+    <div id="chartMount" style="position:absolute;inset:0;"></div>
+    <div id="chartStatus" style="position:absolute;left:14px;bottom:9px;font-size:11px;color:var(--cream-dim);z-index:2;pointer-events:none;"></div>
+  </div>
+  </section>
+  <section class="tabsec" id="tabSim">
+  <header>
+    <div class="brand">
+      <span class="inf">&#8734;</span>
+      <span class="name">The Qu'an</span>
+      <span class="sub">Forward Account Simulation</span>
+    </div>
+    <div class="hdr-right">
+      <div class="slot"><span class="tag">Account $</span><input type="number" id="simEquity" class="panchor" style="width:104px" value="100000" min="0" max="15000000" step="1000" autocomplete="off"></div>
+      <div class="slot" style="min-width:150px"><input type="range" id="simEquityR" min="0" max="15000000" step="1000" value="100000" style="width:140px;accent-color:var(--gold)" autocomplete="off"></div>
+      <div class="slot"><span class="tag">Leverage 1:</span><input type="number" id="simLev" class="panchor" style="width:64px" value="1" min="1" max="2000" step="1" autocomplete="off"></div>
+      <div class="slot" style="min-width:150px"><input type="range" id="simLevR" min="1" max="2000" step="1" value="1" style="width:140px;accent-color:var(--gold)" autocomplete="off"></div>
+      <div class="hdr-right" id="simLevPresets" style="gap:5px"></div>
+      <div class="slot"><button class="rptbtn rptbtn-on" id="simFacFutures" type="button">Futures</button><button class="rptbtn" id="simFacCFD" type="button" style="margin-left:5px">CFD</button></div>
+    </div>
+    <div class="hdr-right" id="simCfdRow" style="display:none">
+      <div class="slot"><span class="tag">CFD Anchor</span><input type="number" id="simCfdAnchor" class="panchor" style="width:90px" step="any" autocomplete="off" placeholder="broker quote"></div>
+      <div class="slot"><span class="tag">Spread</span><input type="number" id="simCfdSpread" class="panchor" style="width:60px" step="any" value="0" min="0" autocomplete="off"></div>
+      <div class="slot"><span class="tag">Digits</span><input type="number" id="simCfdDigits" class="panchor" style="width:44px" min="0" max="6" step="1" value="2" autocomplete="off"></div>
+      <div class="slot"><span class="tag">Stops Level</span><input type="number" id="simCfdStopsLevel" class="panchor" style="width:60px" step="any" value="0" min="0" autocomplete="off"></div>
+      <div class="slot"><span class="tag">Contract Size</span><input type="number" id="simCfdContractSize" class="panchor" style="width:80px" step="any" autocomplete="off"></div>
+      <div class="slot"><span class="tag">Swap L / S</span><input type="number" id="simCfdSwapLong" class="panchor" style="width:56px" step="any" value="0" autocomplete="off"><input type="number" id="simCfdSwapShort" class="panchor" style="width:56px" step="any" value="0" autocomplete="off"></div>
+    </div>
+  </header>
+  <div class="rptScroll">
+    <div class="rptBanner">
+      <div class="rptClass rwait" id="simClass">AWAITING BRIEF DATA</div>
+      <div class="rptSub" id="simSub">&mdash;</div>
+    </div>
+    <div class="rptBody" id="simBody"></div>
+  </div>
+  </section>
+  <div class="splitDiv" id="splitDiv"></div>
+  </div>
+</div>
+<script src="js/detector.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/sop-polar.js" defer></script>
+<script src="js/tabs.js" defer></script>
+<script src="js/chart-controls.js" defer></script>
+<script src="js/live-anchor.js" defer></script>
+<script src="js/chart-tab.js" defer></script>
+<script src="js/theme-toggle.js" defer></script>
+<script src="js/split-view.js" defer></script>
+<script src="js/lock-screen.js" defer></script>
+<script src="js/warehouse.js" defer></script>
+<script src="js/instrument-adapter.js" defer></script>
+<script src="js/strike-compass.js" defer></script>
+
+<button id="pdTab" class="pdtab" type="button" title="Payload engine"><span class="pdchev" id="pdChev">&#9664;</span><span class="pdtablbl">PAYLOAD</span></button>
+<aside id="pdPanel" class="pdpanel" aria-hidden="true">
+  <div class="pdhead"><span class="pdttl">Payload Engine</span><span class="pdr"><span class="pdsync" id="pdSync" style="font-size:10px;color:var(--cream-dim,#a2a2a2);font-family:ui-monospace,Menlo,monospace;margin-right:8px"></span><button id="pdClose" class="pdx" type="button" title="Close">&#215;</button></span></div>
+  <div class="pdbody" style="padding:14px;height:calc(100% - 46px);overflow:auto;box-sizing:border-box">
+    <div id="pgHost"></div>
+    <div id="pgLegacy" style="display:none">
+    <div id="pdStatus" style="font:11px ui-monospace,Menlo,monospace;color:var(--cream-dim,#a2a2a2);margin-bottom:8px">idle &mdash; open pulls the active chain</div>
+    <div id="pdErr" style="color:#b8b8b8;font:11px ui-monospace,Menlo,monospace;white-space:pre-wrap;margin-bottom:8px"></div>
+    <div style="margin-bottom:10px;padding:9px;border:1px solid #2a2a2a;border-radius:8px;background:#0f0f0f">
+      <div style="font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--cream-dim,#a2a2a2);margin-bottom:6px">Payload chain &mdash; override</div>
+      <input id="pdChainFile" type="file" accept=".csv" style="font-size:11px;color:#dedede;max-width:100%">
+      <div id="pdChainSrc" style="font:10px ui-monospace,Menlo,monospace;color:var(--cream-dim,#a2a2a2);margin-top:6px">using active chain</div>
+      <button id="pdChainClear" type="button" style="margin-top:6px;background:#1e1e1e;color:#dedede;border:1px solid #383838;border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer">Use active chain</button>
+    </div>
+    <label style="font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--cream-dim,#a2a2a2)">Payload</label>
+    <textarea id="pdOut" readonly spellcheck="false" placeholder="(generates from the dashboard's loaded chain + anchor)" style="width:100%;min-height:130px;background:#0a0a0a;border:1px solid #2a2a2a;border-radius:8px;color:#d3d3d3;font:12px/1.5 ui-monospace,Menlo,monospace;padding:10px;white-space:pre-wrap;word-break:break-all;resize:vertical;margin-top:4px;box-sizing:border-box"></textarea>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button id="pdCopy" type="button" disabled style="background:#1e1e1e;color:#dedede;border:1px solid #383838;border-radius:7px;padding:7px 12px;font-size:12px;cursor:pointer">Copy line</button>
+      <button id="pdDl" type="button" disabled style="background:#1e1e1e;color:#dedede;border:1px solid #383838;border-radius:7px;padding:7px 12px;font-size:12px;cursor:pointer">Download .txt</button>
+      <button id="pdRegen" type="button" style="background:#1e1e1e;color:#dedede;border:1px solid #383838;border-radius:7px;padding:7px 12px;font-size:12px;cursor:pointer">Regenerate</button>
+    </div>
+    <div id="pdFlags" style="margin-top:12px;font-size:12px;line-height:1.5;color:#d5d5d5"></div>
+  </div>
+  </div>
+</aside>
+<script src="js/payload-panel.js" defer></script>
+<script src="js/payload-generator-host.js" defer></script>
+
+
+
+
+<script src="js/breach-chart.js" defer></script>
+
+<script src="js/heatmap-loader.js" defer></script>
+<script src="js/report.js" defer></script>
+<div id="rptPrintDoc"></div>
+<script src="js/account-sim.js" defer></script>
+</body>
+</html>
