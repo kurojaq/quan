@@ -169,7 +169,12 @@
   .chart-tools-wrap .tools-trigger{position:relative;}
   .chart-tools-wrap .chart-tools{position:absolute;top:calc(100% + 4px);right:0;left:auto;display:none;flex-direction:column;gap:4px;background:var(--glass-strong);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:0.5px solid var(--glass-line);border-radius:var(--radius-md);padding:6px;max-width:none;overflow:visible;box-shadow:var(--shadow);}
   .chart-tools-wrap.open .chart-tools{display:flex;}
-  .chartwrap:fullscreen,.polar-panel:fullscreen{width:100vw;height:100vh;background:var(--bg);}
+  /* CSS-based "maximize" (not the real Fullscreen API — iOS Safari won't requestFullscreen()
+     arbitrary elements, only <video>/<iframe>), toggled by wireFullscreen() in chart-controls.js */
+  .maxed{position:fixed !important;inset:0 !important;width:auto !important;height:auto !important;
+    z-index:9500;background:var(--bg);
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);}
+  body.has-maxed{overflow:hidden;}
   #overlay{position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;pointer-events:none;}
   #skoverlay{position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;pointer-events:none;}
   #skoverlay.drawmode{pointer-events:auto;cursor:crosshair;}

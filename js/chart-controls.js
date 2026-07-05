@@ -1,16 +1,18 @@
 (function(){
-  // ---- shared "graphs globally" helpers: fullscreen toggle + tools-dropdown collapse, reused by Detector/Strike/Breach/SOP Field ----
+  // ---- shared "graphs globally" helpers: fullscreen toggle + tools-dropdown collapse, reused by Detector/Strike/Breach/Chart/Compass/SOP Field ----
+  // Uses a CSS-class "maximize" (position:fixed over the viewport) rather than the real
+  // Fullscreen API: iOS Safari doesn't support requestFullscreen() on arbitrary elements
+  // (only <video>/<iframe>), so a single CSS-based path keeps mobile and desktop identical.
   function wireFullscreen(btnId, containerEl, onResize){
     var btn=document.getElementById(btnId); if(!btn||!containerEl) return;
-    btn.addEventListener('click',function(){
-      if(document.fullscreenElement===containerEl){ if(document.exitFullscreen) document.exitFullscreen(); }
-      else if(containerEl.requestFullscreen){ containerEl.requestFullscreen(); }
-    });
-    document.addEventListener('fullscreenchange',function(){
-      var isFull=document.fullscreenElement===containerEl;
-      btn.classList.toggle('on',isFull);
+    function setMaxed(on){
+      containerEl.classList.toggle('maxed', on);
+      document.body.classList.toggle('has-maxed', on);
+      btn.classList.toggle('on', on);
       setTimeout(function(){ try{ onResize&&onResize(); }catch(_r){} },60);
-    });
+    }
+    btn.addEventListener('click',function(){ setMaxed(!containerEl.classList.contains('maxed')); });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&containerEl.classList.contains('maxed')) setMaxed(false); });
   }
   function wireToolsDropdown(triggerId, wrapId){
     var trigger=document.getElementById(triggerId), wrap=document.getElementById(wrapId);

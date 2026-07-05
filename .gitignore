@@ -4,3 +4,5 @@ golden_reference.xlsx
 quan-extract/
 yahoo_proxy.backup-*.py
 .claude/
+THREESESSION_COMPASS_ENGINE_1_16.html
+*.backup-*
