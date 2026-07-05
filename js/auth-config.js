@@ -9,6 +9,6 @@
  * Get them from your Supabase project: Settings -> API -> Project URL + anon public key.
  */
 window.__SUPA = {
-  url: '',       // e.g. 'https://abcdefgh.supabase.co'
-  anonKey: ''    // e.g. 'eyJhbGciOi...'  (anon / public key)
+  url: 'https://guyscjcqvgffitsxuzxx.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1eXNjamNxdmdmZml0c3h1enh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMzg1MDAsImV4cCI6MjA5ODgxNDUwMH0.nzAG3yUTTjmJtiqIO1fLuvA7_rgk6oFIW_9qLAN6r_o'
 };
