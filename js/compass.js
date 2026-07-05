@@ -100,9 +100,9 @@ function sessLabel(ts){ const P={}; for(const p of _etSL.formatToParts(new Date(
 const _etHMS=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hourCycle:'h23',hour:'2-digit',minute:'2-digit',second:'2-digit'});
 function sessFrac(ts){ const P={}; for(const p of _etHMS.formatToParts(new Date(ts*1000))) P[p.type]=p.value;
   let h=+P.hour; if(h>=24)h-=24; const sod=h*3600+(+P.minute)*60+(+P.second);
-  let el=(h>=18)?(sod-64800):(sod+21600); let pt=el/82800; return pt<0?0:(pt>1?1:pt); }
-function parsePrice(text){ const lines=text.trim().split(/\r?\n/); const hdr=lines[0].split(','); const ti=hdr.indexOf('time'), ci=hdr.indexOf('close');
-  const rows=[]; for(let i=1;i<lines.length;i++){const c=lines[i].split(',');const t=+c[ti],cl=+c[ci];if(t&&cl)rows.push([t,cl]);}
+  let el=(h>=18)?(sod-64800):(sod+21600); let pt=el/82800; pt=pt<0?0:(pt>1?1:pt);
+  return window.__sessFrac?window.__sessFrac(pt,sessLabel(ts)):pt; }
+function rowsToPriceSessions(rows){
   const byLab={}; rows.forEach(([t,cl])=>{const L=sessLabel(t);(byLab[L]=byLab[L]||[]).push([t,cl]);});
   const sessions={}, closeBy={};
   for(const L in byLab){const a=byLab[L];const step=Math.max(1,Math.floor(a.length/180));
@@ -110,7 +110,30 @@ function parsePrice(text){ const lines=text.trim().split(/\r?\n/); const hdr=lin
     sessions[L]=pts; closeBy[L]=a[a.length-1][1];}
   return {sessions,closeBy};
 }
+function parsePrice(text){ const lines=text.trim().split(/\r?\n/); const hdr=lines[0].split(','); const ti=hdr.indexOf('time'), ci=hdr.indexOf('close');
+  const rows=[]; for(let i=1;i<lines.length;i++){const c=lines[i].split(',');const t=+c[ti],cl=+c[ci];if(t&&cl)rows.push([t,cl]);}
+  return rowsToPriceSessions(rows);
+}
 function addDays(d,n){const x=new Date(d+'T00:00:00Z');x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10);}
+
+// ---------- live intraday price (same Yahoo Finance Worker the Chart tab uses) ----------
+const PROXY_BASE='https://quanyahoo.jqnboggan.workers.dev';
+async function fetchLivePrice(pi){
+  const sym=(window.__YF_SYMS||{})[pi]; if(!sym) return null;
+  const r=await fetch(PROXY_BASE+'/history?symbol='+encodeURIComponent(sym)+'&range=5d&interval=5m');
+  const d=await r.json(); if(!d||!d.bars||!d.bars.length) return null;
+  return rowsToPriceSessions(d.bars.map(b=>[b.time,b.close]));
+}
+async function pullLivePrice(){
+  const pi=inst||'NQ'; setStatus('pulling live price · '+pi+'…');
+  let np; try{ np=await fetchLivePrice(pi); }catch(_e){ np=null; }
+  if(!np){ setStatus('live price fetch failed','err'); return; }
+  const P=(PRICE[pi]=PRICE[pi]||{sessions:{},closeBy:{}}); P.sessions=P.sessions||{}; P.closeBy=P.closeBy||{};
+  for(const L in np.sessions){ P.sessions[L]=np.sessions[L]; P.closeBy[L]=np.closeBy[L]; }
+  persistInst(pi); refresh(); await autorun();
+  setStatus('live price pulled · '+pi+' · '+Object.keys(np.sessions).length+' sess','ok');
+}
+window.__compassPullPrice=pullLivePrice;
 
 // ---------- upload handlers ----------
 $('cp_gFile').onchange=async e=>{ const kind=$('cp_upKind').value; const files=[...e.target.files]; if(!files.length)return;
@@ -123,6 +146,17 @@ $('cp_gFile').onchange=async e=>{ const kind=$('cp_upKind').value; const files=[
    const ups=new Set(); const _sb=$('cp_upSeries')?$('cp_upSeries').value:'weekly'; let _mism=0, _n=0; for(const f of files){ const p=parseChain(f.name); if(!p.inst||!p.date||p.kind!=='chain')continue; const txt=await f.text(); const S=(STORE[p.inst]=STORE[p.inst]||{}); const old=S[p.date]; S[p.date]={csv:txt,anchor:(old&&old.anchor)??null,locked:(old&&old.locked)||false,fn:f.name,series:_sb}; if(p.series!==_sb)_mism++; _n++; ups.add(p.inst); }
    ups.forEach(persistInst); $('cp_gFn').textContent=files.length+' file(s)'; refresh(); autorun();
    setStatus('chain \u00b7 '+_n+'/'+files.length+' \u2192 '+({weekly:'Daily',eom:'EOM',quarterly:'Quarterly'}[_sb]||_sb)+' bucket'+(_mism?(' \u00b7 \u26a0 '+_mism+' filename(s) suggest a different series'):''),(_mism?'err':'ok')); };
+
+// ---------- shared top-level upload hooks (mirrors __polarLoadChain/__strikeLoadChain) ----------
+window.__compassLoadChain=function(text,name){ const p=parseChain(name); if(!p.inst||!p.date||p.kind!=='chain')return;
+  const S=(STORE[p.inst]=STORE[p.inst]||{}); const old=S[p.date];
+  S[p.date]={csv:text,anchor:(old&&old.anchor)??null,locked:(old&&old.locked)||false,fn:name,series:_series(old)};
+  persistInst(p.inst); inst=p.inst; if($('cp_inst'))$('cp_inst').value=inst;
+  $('cp_gFn').textContent=name.slice(0,16); refresh(); autorun(); };
+window.__compassClear=function(){};   // Compass keeps per-date history rather than one active buffer; nothing to clear on an empty shared-upload
+window.__compassSetAnchor=function(v){ const cd=$('cp_day')&&$('cp_day').value; if(!inst||!cd)return;
+  const S=(STORE[inst]=STORE[inst]||{}); const e=(S[cd]=S[cd]||{csv:null,anchor:null,locked:false});
+  e.anchor=(v==null||v===''?null:+v); persistInst(inst); loadAnchor(); autorun(); };
 
 function refresh(){ const dates=weeklyDates(); const day=$('cp_day');   // session navigation = weekly chains only; EOM/quarterly are horizons, not sessions
   if(dates.length && !dates.includes(day.value)) day.value=dates[dates.length-1];
@@ -144,6 +178,7 @@ $('cp_day').onchange=()=>{loadAnchor();refreshUpUI();autorun();};
 $('cp_anc').onchange=()=>{ const cd=$('cp_day').value; if(!inst||!cd)return; const S=(STORE[inst]=STORE[inst]||{}); const e=(S[cd]=S[cd]||{csv:null,anchor:null,locked:false}); e.anchor=($('cp_anc').value===''?null:+$('cp_anc').value); persistInst(inst); autorun(); };
 $('cp_lock').onclick=()=>{ const cd=$('cp_day').value; if(!inst||!cd)return; const S=(STORE[inst]=STORE[inst]||{}); const e=(S[cd]=S[cd]||{csv:null,anchor:null,locked:false}); e.locked=!e.locked; applyLockUI(e.locked); persistInst(inst); };
 $('cp_upKind').onchange=()=>{ refreshUpUI(); };
+$('cp_pullPrice').onclick=pullLivePrice;
 $('cp_clrPrice').onclick=()=>{ if(!inst){return;} const cd=$('cp_day')&&$('cp_day').value; const P=PRICE[inst];
   if(P&&P.sessions){ if(cd&&(P.sessions[cd]||(P.closeBy&&cd in P.closeBy))){ delete P.sessions[cd]; if(P.closeBy) delete P.closeBy[cd]; }
     else { PRICE[inst]={sessions:{},closeBy:{}}; } }
@@ -366,7 +401,7 @@ function readouts(){const d=DATA;if(!d){$('cp_readR').innerHTML='<span class="di
    ((d.price_cur&&d.price_cur.length)?'<span class="dim">price overlay on \u00b7 compare ZC to turns</span>':'<span class="dim">no price for this session</span>');
   }
 
-function applyView(){const vis={cRipn:view==='all'||view==='compass',cFold:view==='all'||view==='fold',cSop:view==='all'||view==='sop',cTermseg:view==='termseg'};
+function applyView(){const vis={cp_cRipn:view==='all'||view==='compass',cp_cFold:view==='all'||view==='fold',cp_cSop:view==='all'||view==='sop',cp_cTermseg:view==='termseg'};
   Object.keys(vis).forEach(id=>$(id).style.display=vis[id]?'block':'none');
   $('cp_readR').style.display=(vis.cRipn||vis.cFold)?'flex':'none';$('cp_readS').style.display=vis.cSop?'flex':'none';{const rt=$('cp_readT');if(rt)rt.style.display=vis.cTermseg?'flex':'none';}
   const hm=$('cp_heatMount'); if(hm)hm.style.display=(view==='heat')?'block':'none'; const hpb=$('cp_heatProbeBar'); if(hpb)hpb.style.display=(view==='heat'&&SHOW_PROBE)?'flex':'none'; if(view==='heat'){ bootHeat(); if(SHOW_PROBE)initProbeUI(); feedHeat(); if(_heatReady)setTimeout(injectHeatToggle,60); }
@@ -447,6 +482,10 @@ function drawPlayMark(ctx,f,xA){ if(!PLAY||!PLAY.on||!PLAY.frames.length)return;
 
 $('cp_view').onchange=e=>{view=e.target.value;applyView();};
 $('cp_cwExpand').onchange=e=>{const m=e.target.value; if(m==='settled'){CW_LO=-1;CW_HI=0;} else if(m==='pred'){CW_LO=0;CW_HI=1;} else {CW_LO=-1;CW_HI=1;} render();};
+// ---- zoom + drag-pan on the CW x-domain, shared by the ripple and SOP canvases (both already keyed off CW_LO/CW_HI) ----
+if(window.__wireZoomPan){ ['cp_cRipn','cp_cSop'].forEach(id=>{ const cv=$(id); if(!cv)return;
+  window.__wireZoomPan(cv,{ getViewLo:()=>CW_LO, setViewLo:v=>CW_LO=v, getViewHi:()=>CW_HI, setViewHi:v=>CW_HI=v,
+    invX:px=>{ const r=cv.getBoundingClientRect(); return CW_LO+(px/r.width)*(CW_HI-CW_LO); } }, render, {domainLo:-1, domainHi:1}); }); }
 // ---- dropdown popovers (Overlays / SOP layers) ----
 function _ddCount(panel){ if(!panel)return ''; const cks=panel.querySelectorAll('input[type=checkbox]'); let n=0; cks.forEach(c=>{if(c.checked)n++;}); return n+'/'+cks.length; }
 function _ddSync(){ const ov=$('cp_ddOverlays'), ly=$('cp_ddLayers'); if(ov&&$('cp_ddOverlaysCnt'))$('cp_ddOverlaysCnt').textContent=_ddCount(ov.nextElementSibling); if(ly&&$('cp_ddLayersCnt'))$('cp_ddLayersCnt').textContent=_ddCount(ly.nextElementSibling); }
@@ -671,7 +710,8 @@ $('cp_gk').onchange=e=>{showGk=e.target.checked;render();};
 document.querySelectorAll('[data-l]').forEach(c=>c.onchange=()=>{layers[c.dataset.l]=c.checked;render();});
 const _etFmt=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour12:false,weekday:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'});
 function sessionT(){ const P={}; for(const p of _etFmt.formatToParts(new Date())) P[p.type]=p.value;
-  let h=+P.hour; if(h>=24)h-=24; const sod=h*3600+(+P.minute)*60+(+P.second); let el=(h>=18)?(sod-64800):(sod+21600); let pt=el/82800; return pt<0?0:(pt>1?1:pt); }
+  let h=+P.hour; if(h>=24)h-=24; const sod=h*3600+(+P.minute)*60+(+P.second); let el=(h>=18)?(sod-64800):(sod+21600); let pt=el/82800; pt=pt<0?0:(pt>1?1:pt);
+  return window.__sessFrac?window.__sessFrac(pt,sessLabel(Date.now()/1000)):pt; }
 function marketClosed(){ const P={}; for(const p of _etFmt.formatToParts(new Date())) P[p.type]=p.value; let h=+P.hour; if(h>=24)h-=24; const d=P.weekday;
   return d==='Sat' || (d==='Fri'&&h>=17) || (d==='Sun'&&h<18); }
 function tickT(){ const s=$('cp_sessT'); if(marketClosed()){ s.textContent='CLOSED'; s.style.color='#e85c5c'; } else { s.style.color='#7fd1e0'; s.textContent=sessionT().toFixed(4); } if(DATA&&(view==='all'||view==='compass'))drawRipn();
