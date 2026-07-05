@@ -4,7 +4,7 @@
   --ink:#d2d2d2; --mut:#8a8a8a; --dim:#616161;
   --accent:#e8e8e8; --cyan:#b0b0b0; --ok:#909090; --warn:#ffffff;
   --mono:ui-monospace,'SF Mono','JetBrains Mono',Menlo,Consolas,monospace;
-  --sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display',system-ui,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
 }
 :host([data-theme="light"]){
   --bg:#ffffff; --panel:#eeeeee; --panel2:#e4e4e4; --line:#cfcfcf; --line2:#bfbfbf;
@@ -25,7 +25,7 @@ header{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
 .lede b{color:var(--ink);font-weight:500}
 
 /* anchor */
-.anchor{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:24px}
+.anchor{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:24px}
 .anchor label{font-weight:500;white-space:nowrap}
 .anchor .hint{color:var(--mut);font-size:12px}
 .anchor input{flex:0 0 180px;background:#111111;border:1px solid var(--line2);border-radius:6px;color:var(--ink);font-family:var(--mono);font-size:15px;padding:9px 11px;outline:none}
@@ -43,7 +43,7 @@ header{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
 .rail .ln{flex:1;height:1px;background:var(--line)}
 .routes{display:grid;grid-template-columns:1fr;gap:12px}
 @media(max-width:760px){.routes{grid-template-columns:1fr}}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:15px 15px 16px;display:flex;flex-direction:column;gap:11px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 15px 16px;display:flex;flex-direction:column;gap:11px}
 .card.front{border-color:#424242}
 .eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
 .card.front .eyebrow{color:var(--cyan)}
@@ -70,7 +70,7 @@ button.go:hover{filter:brightness(1.07)} button.go:disabled{opacity:.5;cursor:de
 #err{color:var(--warn);font-size:12.5px;font-family:var(--mono)}
 
 /* outputs */
-.out{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.out{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .out h4{margin:0;padding:12px 15px;border-bottom:1px solid var(--line);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:10px}
 .out h4 .dest{font-family:var(--mono);font-size:11px;color:var(--mut);font-weight:400}
 .out .body{padding:13px 15px}
