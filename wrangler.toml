@@ -1,0 +1,21 @@
+# Cloudflare Pages config for The Qu'an.
+#
+# The whole repo is a static site (no build step); the `functions/` directory is
+# picked up automatically as Pages Functions (our Stripe + subscription API).
+#
+# Recommended deploy path is Git integration (Cloudflare dashboard → Pages →
+# connect this GitHub repo). That respects .gitignore, so the large *.backup-*.html
+# files and golden_reference.xlsx are never uploaded. See CLOUDFLARE_SETUP.md.
+#
+# For a manual one-off you can also run:  npx wrangler pages deploy .
+name = "quan"
+compatibility_date = "2024-11-01"
+pages_build_output_dir = "."
+
+# Secrets/vars are set in the dashboard (Settings → Environment variables), not
+# committed here. Required keys are listed in functions/api/_shared.js and
+# documented in STRIPE_SETUP.md:
+#   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
+#   STRIPE_PRICE_OPERATOR_MONTHLY/ANNUAL, STRIPE_PRICE_DESK_MONTHLY/ANNUAL,
+#   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+#   (optional) APP_BASE_URL

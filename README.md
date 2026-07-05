@@ -4,7 +4,12 @@ An options/futures dealer-positioning terminal: chain-derived structural levels,
 
 ## Structure
 
-- `index.html` — the app shell (DOM + stylesheet/script references)
+- `index.html` — the public **landing / marketing page** (hero, features, pricing, FAQ)
+- `app.html` — the terminal app shell (DOM + stylesheet/script references); served at `/app`
+- `css/landing.css` — landing-page styles (self-contained; reuses the app's palette)
+- `js/pricing.js` — pricing cards, billing toggle, Stripe checkout hand-off
+- `js/subscription-gate.js` — in-app subscription state, upgrade bar, checkout/portal
+- `functions/api/*` — Cloudflare **Pages Functions**: Stripe checkout, webhook, portal, subscription status
 - `heatmap.html` — the Heat Map tab, a standalone document loaded in an iframe
 - `css/theme.css` — global theme (monochrome by default, with a light-mode variant)
 - `js/` — one file per feature area (Detector, SOP Field, Strike Field, Breach chart, Report, Account Sim, Chart tab, theme toggle, live anchor, etc.)
@@ -34,4 +39,10 @@ it listens on `localhost:8791` — then temporarily swap `PROXY_BASE` in `js/cha
 
 ## Deployment
 
-Pushing to `main` deploys the repo root to GitHub Pages via `.github/workflows/pages.yml` (no build step).
+Deployed to **Cloudflare Pages** (static site + `functions/` as Pages Functions,
+no build step). Connect the repo in the Cloudflare dashboard; every push to `main`
+redeploys. See [`CLOUDFLARE_SETUP.md`](CLOUDFLARE_SETUP.md) for the full setup and
+[`STRIPE_SETUP.md`](STRIPE_SETUP.md) for wiring subscriptions.
+
+> Local `python -m http.server` still serves the landing + app; only the `/api/*`
+> functions need the Workers runtime (`npx wrangler pages dev .`).

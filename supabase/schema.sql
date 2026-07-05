@@ -65,3 +65,34 @@ create policy "teams by membership" on public.teams for select
 drop policy if exists "teams owner manage" on public.teams;
 create policy "teams owner manage" on public.teams for all
   using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+
+-- 4. Stripe subscriptions ------------------------------------------------------
+-- One row per user, mirroring their Stripe subscription. Written ONLY by the
+-- server (Cloudflare Pages Function /api/webhook) using the service-role key,
+-- which bypasses RLS. The app reads state through /api/subscription (also
+-- service-role), but we still enable RLS + a self-read policy so the anon key
+-- can never read someone else's billing row directly.
+create table if not exists public.subscriptions (
+  id                     uuid primary key default gen_random_uuid(),
+  user_id                uuid unique references auth.users(id) on delete cascade,
+  email                  text,
+  stripe_customer_id     text unique,
+  stripe_subscription_id text,
+  status                 text not null default 'none',   -- trialing|active|past_due|canceled|incomplete|none
+  plan                   text,                            -- 'operator' | 'desk'
+  price_id               text,
+  current_period_end     timestamptz,
+  cancel_at_period_end   boolean not null default false,
+  created_at             timestamptz not null default now(),
+  updated_at             timestamptz not null default now()
+);
+
+create index if not exists subscriptions_customer_idx on public.subscriptions (stripe_customer_id);
+
+alter table public.subscriptions enable row level security;
+
+-- a user may read only their own subscription row; nobody may write via the
+-- anon/authenticated keys (all writes go through the service role).
+drop policy if exists "subscriptions self read" on public.subscriptions;
+create policy "subscriptions self read" on public.subscriptions
+  for select using (auth.uid() = user_id);
