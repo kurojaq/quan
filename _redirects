@@ -1,0 +1,8 @@
+# Serve the terminal directly at the root while it's the focus. This is a
+# rewrite (status 200), not a redirect -- the browser URL stays "/", the
+# content served is app.html. /app still independently works too (nothing
+# else changes), so no existing links (Stripe success_url, subscription-gate,
+# pricing.js) need touching. index.html/css/landing.css/js/pricing.js are
+# untouched and simply unreferenced by this rule -- easy to revert by
+# deleting this file whenever the landing page comes back into play.
+/  /app.html  200
