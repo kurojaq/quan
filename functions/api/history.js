@@ -14,16 +14,33 @@ export async function onRequestGet({ request, env }) {
   const range = url.searchParams.get('range') || '5d';
   const interval = url.searchParams.get('interval') || '5m';
 
-  const ident = await resolveIdentity(env, request);
-  if (!ident) return dataJson(401, { error: 'authentication required' });
-
-  const rl = await checkRateLimit(env, ident.id, ident.tier);
+  let ident, rl;
+  try {
+    ident = await resolveIdentity(env, request);
+    if (!ident) return dataJson(401, { error: 'authentication required' });
+    rl = await checkRateLimit(env, ident.id, ident.tier);
+  } catch (e) {
+    return dataJson(500, { error: 'identity/rate-limit check failed: ' + String((e && e.message) || e) });
+  }
   if (!rl.ok) return dataJson(429, { error: 'rate limit exceeded — slow down' }, { 'Retry-After': '60' });
 
   const cache = caches.default;
   const cacheKey = new Request(`${url.origin}/__cache/history?s=${encodeURIComponent(symbol)}&r=${range}&i=${interval}`);
   const hit = await cache.match(cacheKey);
   if (hit) return hit;
+
+  // warm layer: the cron Worker (workers/cron-warm.js) pre-fetches common combos
+  // into KV so the first load of the day is instant instead of a cold Yahoo hit.
+  if (env.QUAN_PUBLISH) {
+    try {
+      const warm = await env.QUAN_PUBLISH.get(`warm:hist:${symbol}:${range}:${interval}`);
+      if (warm) {
+        const resp = dataJson(200, JSON.parse(warm), { 'Cache-Control': `public, max-age=${HISTORY_TTL}` });
+        await cache.put(cacheKey, resp.clone());
+        return resp;
+      }
+    } catch (_) { /* fall through to a live fetch */ }
+  }
 
   try {
     const result = await fetchYahooChart(symbol, range, interval);

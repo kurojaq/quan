@@ -14,10 +14,14 @@ export async function onRequestGet({ request, env }) {
   const symbol = url.searchParams.get('symbol') || '';
   if (!symbol) return dataJson(400, { error: 'missing ?symbol=' });
 
-  const ident = await resolveIdentity(env, request);
-  if (!ident) return dataJson(401, { error: 'authentication required' });
-
-  const rl = await checkRateLimit(env, ident.id, ident.tier);
+  let ident, rl;
+  try {
+    ident = await resolveIdentity(env, request);
+    if (!ident) return dataJson(401, { error: 'authentication required' });
+    rl = await checkRateLimit(env, ident.id, ident.tier);
+  } catch (e) {
+    return dataJson(500, { error: 'identity/rate-limit check failed: ' + String((e && e.message) || e) });
+  }
   if (!rl.ok) return dataJson(429, { error: 'rate limit exceeded — slow down' }, { 'Retry-After': '60' });
 
   const ttl = QUOTE_TTL[ident.tier] || 15;

@@ -115,12 +115,15 @@ export async function getUserFromRequest(env, request) {
   const auth = request.headers.get('Authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
   if (!token) return null;
-  const res = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
-    headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` }
-  });
-  if (!res.ok) return null;
-  const user = await res.json().catch(() => null);
-  return user && user.id ? user : null;
+  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return null;   // misconfigured env -> treat as signed-out, don't crash the caller
+  try {
+    const res = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) return null;
+    const user = await res.json().catch(() => null);
+    return user && user.id ? user : null;
+  } catch (_e) { return null; }
 }
 
 // ---- gate the publish / client-link endpoints to the app owner only -----
