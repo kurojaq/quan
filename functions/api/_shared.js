@@ -256,3 +256,27 @@ export function dataJson(status, payload, extraHeaders = {}) {
     status, headers: { 'Content-Type': 'application/json', ...dataCors, ...extraHeaders }
   });
 }
+
+// raw bearer token from the request (for calling Supabase as the user)
+export function bearerToken(request) {
+  const auth = request.headers.get('Authorization') || '';
+  return auth.startsWith('Bearer ') ? auth.slice(7) : null;
+}
+
+// Supabase REST as the CALLING USER — RLS (auth.uid() = user_id) does the
+// isolation, so no service-role key is involved. Used by /api/state.
+export async function supaAsUser(env, token, path, { method = 'GET', body, headers = {} } = {}) {
+  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
+    method,
+    headers: {
+      apikey: env.SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...headers
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error((data && data.message) || `Supabase ${res.status}`);
+  return data;
+}

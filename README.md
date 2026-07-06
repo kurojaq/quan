@@ -9,7 +9,8 @@ An options/futures dealer-positioning terminal: chain-derived structural levels,
 - `css/landing.css` — landing-page styles (self-contained; reuses the app's palette)
 - `js/pricing.js` — pricing cards, billing toggle, Stripe checkout hand-off
 - `js/subscription-gate.js` — in-app subscription state, upgrade bar, checkout/portal
-- `functions/api/*` — Cloudflare **Pages Functions**: Stripe (checkout, webhook, portal, subscription), client-view publishing (publish, view, client-tokens), and the **gated market-data plane** (`quote`, `history`)
+- `functions/api/*` — Cloudflare **Pages Functions**: Stripe (checkout, webhook, portal, subscription), client-view publishing (publish, view, client-tokens), the **gated market-data plane** (`quote`, `history`), and **roaming workspace state** (`state` — Supabase + R2)
+- `js/cloud-storage.js` — cloud-backed `window.storage`: mirrors the terminal's localStorage keyspace to `/api/state` so a workspace (chains, greeks, layout, theme) follows the user across devices
 - `heatmap.html` — the Heat Map tab, a standalone document loaded in an iframe
 - `css/theme.css` — global theme (monochrome by default, with a light-mode variant)
 - `js/` — one file per feature area (Detector, SOP Field, Strike Field, Breach chart, Report, Account Sim, Chart tab, theme toggle, live anchor, etc.)

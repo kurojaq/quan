@@ -20,6 +20,15 @@ pages_build_output_dir = "."
 binding = "QUAN_PUBLISH"
 id = "88472c90139149dea44668ce0c0a7d8a"
 
+# Roaming workspace state (Phase 2). Large values (option-chain CSVs) written by
+# /api/state go here; small values stay inline in Supabase user_state. OPTIONAL —
+# if this bucket/binding is absent, /api/state stores everything inline in Supabase
+# (subject to an 8 MB per-value cap). Like the KV binding, add it by hand too:
+# Pages → Settings → Functions → R2 bucket bindings → variable QUAN_STATE → bucket quan-state.
+[[r2_buckets]]
+binding = "QUAN_STATE"
+bucket_name = "quan-state"
+
 # Secrets/vars are set in the dashboard (Settings → Environment variables), not
 # committed here. Required keys are listed in functions/api/_shared.js and
 # documented in STRIPE_SETUP.md:

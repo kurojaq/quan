@@ -96,3 +96,30 @@ alter table public.subscriptions enable row level security;
 drop policy if exists "subscriptions self read" on public.subscriptions;
 create policy "subscriptions self read" on public.subscriptions
   for select using (auth.uid() = user_id);
+
+-- 5. Roaming user state (Phase 2 — stateful workspaces) ------------------------
+-- Per-user key/value store that mirrors the terminal's client-side state so a
+-- workspace (uploaded chains, greeks warehouse, compass state, layout, theme,
+-- selected instrument/date) follows the user across devices.
+--
+-- Written/read by the app through /api/state using the USER's own token, so RLS
+-- (auth.uid() = user_id) is the isolation — no service role involved. Small
+-- values live inline in `value`; large ones (option-chain CSVs) go to R2 and
+-- `in_r2` is set, with `value` left null. `updated_at` drives last-write-wins
+-- across devices.
+create table if not exists public.user_state (
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  key        text not null,
+  value      text,                              -- inline value (small); null when in_r2
+  in_r2      boolean not null default false,    -- true => body is in the QUAN_STATE R2 bucket
+  size       integer not null default 0,        -- byte length of the value
+  updated_at timestamptz not null default now(),
+  primary key (user_id, key)
+);
+
+alter table public.user_state enable row level security;
+
+-- a user may fully manage only their own state rows
+drop policy if exists "user_state self" on public.user_state;
+create policy "user_state self" on public.user_state
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

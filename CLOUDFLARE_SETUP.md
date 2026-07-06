@@ -72,8 +72,10 @@ put it in client code.
 ## 3. Database
 
 Run [`supabase/schema.sql`](supabase/schema.sql) once in the Supabase SQL editor.
-It adds the `subscriptions` table and its RLS policy on top of the existing
-profiles/teams tables.
+It adds the `subscriptions` table **and** the `user_state` table (roaming
+workspaces, Phase 2) with their RLS policies, on top of the existing
+profiles/teams tables. Re-running it is safe (everything is `if not exists` /
+`drop policy … create policy`).
 
 ---
 
@@ -87,6 +89,25 @@ add the same binding by hand once:
 
 **Pages project → Settings → Functions → KV namespace bindings → Add binding.**
 Variable name: `QUAN_PUBLISH`. KV namespace: `QUAN_PUBLISH`.
+
+---
+
+## 3c. R2 bucket (roaming workspaces — optional but recommended)
+
+`/api/state` stores each user's workspace so it follows them across devices.
+Small values live inline in the Supabase `user_state` table; **large** ones
+(option-chain CSVs) go to an R2 bucket named `quan-state`.
+
+This is **optional** — with no bucket bound, `/api/state` stores everything inline
+in Supabase (capped at 8 MB per value). To enable R2 (cheaper for big blobs, keeps
+the DB lean):
+
+1. **R2 → Create bucket** → name it `quan-state`.
+2. **Pages project → Settings → Functions → R2 bucket bindings → Add binding.**
+   Variable name: `QUAN_STATE`. Bucket: `quan-state`.
+
+(`wrangler.toml` already declares the `[[r2_buckets]]` binding; as with KV, the
+dashboard binding is what actually applies to Git-integration deploys.)
 
 ---
 
