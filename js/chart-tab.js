@@ -1,7 +1,9 @@
 (function(){
-  // ---- price chart tab: lightweight-charts candles + structural-level overlay, fed by the same yahoo proxy ----
-  var PROXY_BASE='https://quanyahoo.jqnboggan.workers.dev';
-  var chart=null, series=null, priceLines=[], sessionLines=[], levelVals=[], container=null, curSym=null, curRange='5d', curInterval='5m', booted=false;
+  // ---- price chart tab: lightweight-charts candles + structural-level overlay, fed by the gated /api/history function ----
+  // Same-origin Pages Function (edge-cached, auth-gated, rate-limited). The old
+  // open Worker (quanyahoo.jqnboggan.workers.dev) is superseded.
+  var PROXY_BASE='/api';
+  var chart=null, series=null, priceLines=[], sessionLines=[], dayRangeLines=[], levelVals=[], container=null, curSym=null, curRange='5d', curInterval='5m', booted=false;
   var titleEl, statusEl;
 
   // FX (and other fine-tick) instruments need more than 2 decimals on the price axis.
@@ -83,6 +85,27 @@
     if(series&&priceLines.length) series.applyOptions({});
   }
 
+  // ---- current day's high/low, drawn like the other structural levels but sourced straight from the already-fetched bars ----
+  var dayRangeVals=[];
+  function clearDayRangeLines(){
+    dayRangeLines.forEach(function(pl){ try{ series.removePriceLine(pl); }catch(_){} }); dayRangeLines=[];
+    dayRangeVals.forEach(function(v){ var i=levelVals.indexOf(v); if(i>=0) levelVals.splice(i,1); }); dayRangeVals=[];
+  }
+  function drawDayRange(bars,dateStr){
+    clearDayRangeLines(); if(!series||!bars||!bars.length||!dateStr) return;
+    var fmt=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+    function etDate(t){ var p={}; fmt.formatToParts(new Date(t*1000)).forEach(function(x){p[x.type]=x.value;}); return p.year+'-'+p.month+'-'+p.day; }
+    var day=bars.filter(function(b){ return etDate(b.time)===dateStr; });
+    if(!day.length) return;
+    var hi=Math.max.apply(null,day.map(function(b){return b.high;})), lo=Math.min.apply(null,day.map(function(b){return b.low;}));
+    if(!isFinite(hi)||!isFinite(lo)) return;
+    var LS=LightweightCharts.LineStyle;
+    levelVals.push(hi,lo); dayRangeVals.push(hi,lo);
+    dayRangeLines.push(series.createPriceLine({price:hi,color:'#3fae63',lineWidth:1,lineStyle:LS.Dashed,axisLabelVisible:true,title:'Day High'}));
+    dayRangeLines.push(series.createPriceLine({price:lo,color:'#c14e4e',lineWidth:1,lineStyle:LS.Dashed,axisLabelVisible:true,title:'Day Low'}));
+    if(series) series.applyOptions({});
+  }
+
   function refreshLevels(){
     if(!series) return;
     var inst=(document.getElementById('instA')||{}).value||'', date=(document.getElementById('dayDate')||{}).value||'';
@@ -150,6 +173,7 @@
     if(titleEl) titleEl.textContent=sym+' · '+curRange+'/'+curInterval;
     statusEl.textContent='loading '+sym+'…';
     var _h={}; var _t=window.__authToken&&window.__authToken(); if(_t) _h['Authorization']='Bearer '+_t;
+    if(window.__viewToken) _h['X-Quan-Token']=window.__viewToken;   // client view (view.html) has no login, carries a publish token
     fetch(PROXY_BASE+'/history?symbol='+encodeURIComponent(sym)+'&range='+curRange+'&interval='+curInterval,{headers:_h})
       .then(function(r){ return r.json(); }).then(function(d){
         if(!d||!d.bars||!d.bars.length){ statusEl.textContent=(d&&d.error)?('error: '+d.error):'no bars returned'; return; }
@@ -161,6 +185,7 @@
         drawSessionMarkers(d.bars);
         statusEl.textContent=sym+' · '+d.bars.length+' bars · '+new Date().toLocaleTimeString();
         refreshLevels();
+        drawDayRange(d.bars,(document.getElementById('dayDate')||{}).value||'');
       }).catch(function(){ statusEl.textContent='proxy unreachable — check your connection'; });
   }
 

@@ -11,7 +11,7 @@
     LE:'LE=F',GF:'GF=F',HE:'HE=F',DC:'DC=F',
     BTC:'BTC=F',MBT:'MBT=F',ETH:'ETH=F'
   });
-  var PROXY_BASE='https://quanyahoo.jqnboggan.workers.dev';
+  var PROXY_BASE='/api';   // gated, edge-cached Pages Function (was the open quanyahoo Worker)
   var POLL_MS=10000;
   var btn=document.getElementById('liveAnchorBtn'), note=document.getElementById('liveAnchorNote');
   if(!btn||!note) return;
@@ -21,6 +21,7 @@
     var inst=(document.getElementById('instA')||{}).value||'?', sym=currentSymbol();
     if(!sym){ note.textContent='no Yahoo symbol mapped for '+inst; return; }
     var _h={}; var _t=window.__authToken&&window.__authToken(); if(_t) _h['Authorization']='Bearer '+_t;
+    if(window.__viewToken) _h['X-Quan-Token']=window.__viewToken;
     fetch(PROXY_BASE+'/quote?symbol='+encodeURIComponent(sym),{headers:_h}).then(function(r){ return r.json(); }).then(function(d){
       if(d && typeof d.price==='number'){
         if(window.__qSetAnchor) window.__qSetAnchor(d.price);

@@ -70,6 +70,10 @@ tr.pdsl td.stk::after{content:attr(data-imp);font-size:7.5px;color:var(--gold);m
 tr.spotline td{border-top:1.5px dashed var(--spot);}
 tr.anchorline td{border-top:1.5px solid var(--cream);}
 tr.spotline.anchorline td{border-top:1.5px solid var(--gold);}
+tr.dayhigh td{border-top:1.5px dashed #3fae63;}
+tr.daylow td{border-top:1.5px dashed #c14e4e;}
+tr.dayhigh td.stk::before{content:'\25B2 ';font-size:8px;color:#3fae63;margin-right:3px;}
+tr.daylow td.stk::before{content:'\25BC ';font-size:8px;color:#c14e4e;margin-right:3px;}
 #cellPopup{position:fixed;z-index:50;display:none;max-width:300px;background:var(--glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:.5px solid var(--glass-line);border-radius:var(--radius-md);padding:12px 14px;box-shadow:var(--shadow);font-size:11px;}
 #cellPopup.on{display:block;}
 #cellPopup .cpHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
@@ -275,12 +279,13 @@ function render(){
  const pdslCls={},pdslEff={};allLv.forEach(l=>{const im=implication(l.d,spot);pdslImp[l.k]=(im.cls==='resistance'?'\u25B2 ':im.cls==='support'?'\u25BC ':'\u25C6 ')+im.txt.split(' \u00b7')[0];pdslCls[l.k]=im.cls;pdslEff[l.k]=l.eff;});
  const cols=order.filter(id=>on.has(id)&&scale[id]).map(id=>MET[id]);
  const disp=[...ROWS].reverse(); let spotIdx=disp.findIndex(r=>r.k<=spot); let anchorIdx=(M.anchor!=null)?disp.findIndex(r=>r.k<=M.anchor):-1;
+ let dayHighIdx=(M.dayHigh!=null)?disp.findIndex(r=>r.k<=M.dayHigh):-1; let dayLowIdx=(M.dayLow!=null)?disp.findIndex(r=>r.k<=M.dayLow):-1;
  let h='<thead><tr><th class="stk">Strike</th><th class="obh">Order book &nbsp;C&nbsp;|&nbsp;P</th>';
  for(const [id,label] of cols) h+=`<th class="metric" draggable="true" data-id="${id}" title="${label} — drag to reorder">${ABBR[id]||label}</th>`;
  h+='</tr></thead><tbody>';
  disp.forEach((r,i)=>{
   const ispd=pdslSet.has(r.k);
-  const cls=[i===spotIdx?'spotline':'',r.k===M.atm?'atm':'',i===anchorIdx?'anchorline':'',ispd?'pdsl':'',ispd?('imp-'+pdslCls[r.k]):''].filter(Boolean).join(' ');
+  const cls=[i===spotIdx?'spotline':'',r.k===M.atm?'atm':'',i===anchorIdx?'anchorline':'',i===dayHighIdx?'dayhigh':'',i===dayLowIdx?'daylow':'',ispd?'pdsl':'',ispd?('imp-'+pdslCls[r.k]):''].filter(Boolean).join(' ');
   const imp=ispd?` data-imp="${pdslImp[r.k]}"`:'';
   const ist=ispd?` style="--impa:${(0.14+0.5*Math.min(1,pdslEff[r.k]||0)).toFixed(3)}"`:'';
   h+=`<tr class="${cls}"${ist} data-strike="${r.k}"><td class="stk"${imp}>${r.k}</td>`;
@@ -664,7 +669,26 @@ function mergeEngine(inst,date){const s=__qStore[inst]&&__qStore[inst][date];if(
     return;}
   const res=window.__engRun(s.chainRaw,M.anchor);if(!res||!res.rows)return;
   s.eng=res.rows;s.engKey=s.chainRaw;applyEngRows(res.rows);}
+// ---- current day's high/low, sourced from the parent window's auth (this file always runs inside an iframe — app.html or view.html) ----
+let _dayRangeKey=null;
+async function fetchDayRange(inst,date){
+  const key=inst+'|'+date; if(_dayRangeKey===key)return; _dayRangeKey=key; M.dayHigh=null; M.dayLow=null;
+  var syms=(window.parent&&window.parent.__YF_SYMS)||{}; var sym=syms[inst];
+  if(!sym||!date)return;
+  try{
+    var _h={}; var _t=window.parent&&window.parent.__authToken&&window.parent.__authToken(); if(_t)_h['Authorization']='Bearer '+_t;
+    var _vt=window.parent&&window.parent.__viewToken; if(_vt)_h['X-Quan-Token']=_vt;
+    const r=await fetch('/api/history?symbol='+encodeURIComponent(sym)+'&range=5d&interval=5m',{headers:_h});
+    const d=await r.json();
+    const fmt=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+    const etDate=t=>{ const p={}; fmt.formatToParts(new Date(t*1000)).forEach(x=>p[x.type]=x.value); return p.year+'-'+p.month+'-'+p.day; };
+    const day=(d&&d.bars||[]).filter(b=>etDate(b.time)===date);
+    if(day.length){ M.dayHigh=Math.max.apply(null,day.map(b=>b.high)); M.dayLow=Math.min.apply(null,day.map(b=>b.low)); }
+  }catch(_e){}
+  if(instSel.value===inst&&activeDate()===date){ render(); if(typeof drawProfiles==='function'&&profPanel&&profPanel.style.display!=='none') drawProfiles(); }
+}
 function loadDate(){const inst=instSel.value,date=activeDate();
+  fetchDayRange(inst,date);
   syncFileLabels(inst,date);
   if(inst===BAKED_META.inst&&date===BAKED_DATE){restoreBaked();return;}
   applyAnchorState(inst,date);
@@ -1057,6 +1081,14 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&gw.classList.contai
     });
     if(tips.length>1){ var d='M'+tips.map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1);}).join(' L');
       svg.push('<path d="'+d+'" fill="none" stroke="var(--cream)" stroke-width="1" stroke-dasharray="1 3" opacity="0.45"/>'); }
+    // anchor + current day's high/low — this panel previously had no anchor annotation at all
+    function nearestRowIdx(val){ if(val==null||!isFinite(val))return -1; var bi=-1,bd=Infinity; rows.forEach(function(r,i){ var d2=Math.abs(r.k-val); if(d2<bd){bd=d2;bi=i;} }); return bi; }
+    function refLine(val,col,label){ var i=nearestRowIdx(val); if(i<0)return; var y=22+i*rowH+Math.max(2,rowH-2)/2;
+      svg.push('<line x1="'+padL+'" y1="'+y.toFixed(1)+'" x2="'+(W-18)+'" y2="'+y.toFixed(1)+'" stroke="'+col+'" stroke-width="1" stroke-dasharray="4 3" opacity="0.65"/>');
+      svg.push('<text x="'+(W-18)+'" y="'+(y-2).toFixed(1)+'" text-anchor="end" fill="'+col+'" opacity="0.9" font-size="8">'+label+'</text>'); }
+    refLine(M.anchor,'var(--cream)','anchor '+(M.anchor!=null?M.anchor.toFixed(0):''));
+    refLine(M.dayHigh,'#3fae63','▲ High '+(M.dayHigh!=null?M.dayHigh.toFixed(0):''));
+    refLine(M.dayLow,'#c14e4e','▼ Low '+(M.dayLow!=null?M.dayLow.toFixed(0):''));
     svg.push('<text x="'+padL+'" y="12" fill="var(--dim)" opacity="0.85" style="letter-spacing:.1em">'+((ABBR[id]||id))+'</text>');
     svg.push('</svg>'); host.innerHTML=svg.join('');
   }

@@ -98,11 +98,33 @@ to that domain so Stripe success/cancel URLs are absolute and correct.
 
 ---
 
-## 5. The Yahoo quote proxy
+## 5. Market data plane (`/api/quote`, `/api/history`)
 
-`workers/yahoo-proxy.js` remains a **standalone Worker** (`quanyahoo.jqnboggan.workers.dev`)
-and is unaffected by this migration. If you'd rather fold it into this Pages
-project later, it can become another Pages Function under `functions/`.
+The live quote / chart history feed is now a pair of **Pages Functions**
+(`functions/api/quote.js`, `functions/api/history.js`) that replace the old open
+`quanyahoo.jqnboggan.workers.dev` Worker. They add three things the open proxy
+lacked:
+
+- **Access control.** Every request must come from either a signed-in Supabase
+  user *or* a valid client-view publish token (`X-Quan-Token`, set automatically
+  by `view.html`). Anonymous requests get `401` — the proxy is no longer open.
+- **Edge caching** via `caches.default`: quotes cache 8–30 s (fresher for paid
+  tiers), history 60 s. Fewer Yahoo hits, faster loads, resilience to throttling.
+- **Per-tier rate limiting** (requests/minute): Desk 240, Operator/trial 120,
+  Scout 20, client-view 40. Over-limit returns `429`. The app owner
+  (`OPERATOR_EMAIL`) is treated as Desk.
+
+**No new bindings needed** — the limiter and a short-lived plan cache reuse the
+existing `QUAN_PUBLISH` KV namespace (prefixes `rl:` and `plan:`). Yahoo fetches
+fail over from `query1` to `query2`.
+
+> **Turn down the old Worker.** Nothing references
+> `quanyahoo.jqnboggan.workers.dev` anymore. In the Cloudflare dashboard either
+> **delete that Worker** or set its `AUTH_REQUIRED=1` env var, so the open proxy
+> stops being an abuse surface.
+
+Tiers/limits are edited in one place: the `RATE_LIMITS` / `QUOTE_TTL` /
+`HISTORY_TTL` maps in [`functions/api/_shared.js`](functions/api/_shared.js).
 
 ---
 
@@ -116,5 +138,7 @@ npx wrangler pages dev .
 ```
 
 Plain `python -m http.server` still serves the static landing/app, but `/api/*`
-calls will 404 — the client is written to degrade gracefully (paid checkout falls
-back to `/app`).
+calls will 404 — the client degrades gracefully (paid checkout falls back to
+`/app`; the Chart / Live anchor show "proxy unreachable" since quotes now route
+through `/api/quote` and `/api/history` instead of the old public Worker). Use
+`wrangler pages dev .` when you need live data locally.

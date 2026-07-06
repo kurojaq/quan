@@ -116,11 +116,12 @@ function parsePrice(text){ const lines=text.trim().split(/\r?\n/); const hdr=lin
 }
 function addDays(d,n){const x=new Date(d+'T00:00:00Z');x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10);}
 
-// ---------- live intraday price (same Yahoo Finance Worker the Chart tab uses) ----------
-const PROXY_BASE='https://quanyahoo.jqnboggan.workers.dev';
+// ---------- live intraday price (same gated /api/history the Chart tab uses) ----------
+const PROXY_BASE='/api';   // same-origin Pages Function (was the open quanyahoo Worker)
 async function fetchLivePrice(pi){
   const sym=(window.__YF_SYMS||{})[pi]; if(!sym) return null;
-  const r=await fetch(PROXY_BASE+'/history?symbol='+encodeURIComponent(sym)+'&range=5d&interval=5m');
+  const _h={}; const _t=window.__authToken&&window.__authToken(); if(_t) _h['Authorization']='Bearer '+_t;
+  const r=await fetch(PROXY_BASE+'/history?symbol='+encodeURIComponent(sym)+'&range=5d&interval=5m',{headers:_h});
   const d=await r.json(); if(!d||!d.bars||!d.bars.length) return null;
   return rowsToPriceSessions(d.bars.map(b=>[b.time,b.close]));
 }
@@ -134,6 +135,23 @@ async function pullLivePrice(){
   setStatus('live price pulled · '+pi+' · '+Object.keys(np.sessions).length+' sess','ok');
 }
 window.__compassPullPrice=pullLivePrice;
+
+// ---- current day's high/low, drawn on the ripple/SOP price overlay alongside the anchor line ----
+let DAY_HI=null, DAY_LO=null, _dayRangeKey=null;
+async function fetchDayRange(pi,cd){
+  const key=pi+'|'+cd; if(_dayRangeKey===key) return; _dayRangeKey=key; DAY_HI=null; DAY_LO=null;
+  const sym=(window.__YF_SYMS||{})[pi]; if(!sym||!cd) return;
+  try{
+    const _h={}; const _t=window.__authToken&&window.__authToken(); if(_t) _h['Authorization']='Bearer '+_t;
+    const r=await fetch(PROXY_BASE+'/history?symbol='+encodeURIComponent(sym)+'&range=5d&interval=5m',{headers:_h});
+    const d=await r.json();
+    const fmt=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+    const etDate=t=>{ const p={}; fmt.formatToParts(new Date(t*1000)).forEach(x=>p[x.type]=x.value); return p.year+'-'+p.month+'-'+p.day; };
+    const day=(d&&d.bars||[]).filter(b=>etDate(b.time)===cd);
+    if(day.length){ DAY_HI=Math.max.apply(null,day.map(b=>b.high)); DAY_LO=Math.min.apply(null,day.map(b=>b.low)); }
+  }catch(_e){}
+  render();
+}
 
 // ---------- upload handlers ----------
 $('cp_gFile').onchange=async e=>{ const kind=$('cp_upKind').value; const files=[...e.target.files]; if(!files.length)return;
@@ -173,8 +191,8 @@ function loadAnchor(){ if(!inst||!STORE[inst]){$('cp_anc').value='';applyLockUI(
   if(e){ if(!e.locked && P){ const labs=Object.keys(P.closeBy).filter(L=>L<cd).sort(); if(labs.length) e.anchor=P.closeBy[labs[labs.length-1]]; }
     $('cp_anc').value=(e.anchor==null?'':e.anchor); applyLockUI(!!e.locked); } else { $('cp_anc').value=''; applyLockUI(false); } }
 
-$('cp_inst').onchange=e=>{inst=e.target.value;refresh();autorun();};
-$('cp_day').onchange=()=>{loadAnchor();refreshUpUI();autorun();};
+$('cp_inst').onchange=e=>{inst=e.target.value;refresh();autorun();fetchDayRange(inst,$('cp_day').value);};
+$('cp_day').onchange=()=>{loadAnchor();refreshUpUI();autorun();fetchDayRange(inst,$('cp_day').value);};
 $('cp_anc').onchange=()=>{ const cd=$('cp_day').value; if(!inst||!cd)return; const S=(STORE[inst]=STORE[inst]||{}); const e=(S[cd]=S[cd]||{csv:null,anchor:null,locked:false}); e.anchor=($('cp_anc').value===''?null:+$('cp_anc').value); persistInst(inst); autorun(); };
 $('cp_lock').onclick=()=>{ const cd=$('cp_day').value; if(!inst||!cd)return; const S=(STORE[inst]=STORE[inst]||{}); const e=(S[cd]=S[cd]||{csv:null,anchor:null,locked:false}); e.locked=!e.locked; applyLockUI(e.locked); persistInst(inst); };
 $('cp_upKind').onchange=()=>{ refreshUpUI(); };
@@ -262,8 +280,10 @@ function priceRange(d){ const pp=fdom(d.price_prev), pc=fdom(d.price_cur); const
   return {plo,phi,anchor:anc,w}; }
 function priceOverlay(ctx,f,d,xA,dim){ if(!showPx)return; const pp=fdom(d.price_prev), pc=fdom(d.price_cur); if(!pp.length&&!pc.length)return;
   const R=priceRange(d); const plo=R.plo,phi=R.phi;const yP=v=>f.y1-(v-plo)/(phi-plo)*(f.y1-f.y0);
-  if(!dim && R.w && R.anchor>0){ const A=R.anchor,w=R.w; const hl=(v,col,dash,lab)=>{ if(v<plo||v>phi)return; const Y=yP(v); ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=.8; if(dash)ctx.setLineDash(dash); ctx.beginPath();ctx.moveTo(f.x0,Y);ctx.lineTo(f.x1,Y);ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle=col; ctx.font='9px monospace'; ctx.textAlign='left'; ctx.fillText(lab,f.x0+3,Y-2); ctx.restore(); };
+  const hl=(v,col,dash,lab)=>{ if(v==null||!isFinite(v)||v<plo||v>phi)return; const Y=yP(v); ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=.8; if(dash)ctx.setLineDash(dash); ctx.beginPath();ctx.moveTo(f.x0,Y);ctx.lineTo(f.x1,Y);ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle=col; ctx.font='9px monospace'; ctx.textAlign='left'; ctx.fillText(lab,f.x0+3,Y-2); ctx.restore(); };
+  if(!dim && R.w && R.anchor>0){ const A=R.anchor,w=R.w;
     hl(A,'rgba(232,227,214,.35)',null,'anchor '+A.toFixed(0)); hl(A*Math.exp(D_THR*w),'rgba(214,170,162,.55)',[5,4],'d+0.5'); hl(A*Math.exp(-D_THR*w),'rgba(214,170,162,.55)',[5,4],'d\u22120.5'); hl(A*Math.exp(w),'rgba(127,209,224,.3)',[2,4],'1\u03c3'); hl(A*Math.exp(-w),'rgba(127,209,224,.3)',[2,4],'\u22121\u03c3'); }
+  if(!dim){ hl(DAY_HI,'rgba(63,174,99,.6)',[4,3],'\u25b2 High '+(DAY_HI!=null?DAY_HI.toFixed(0):'')); hl(DAY_LO,'rgba(193,78,78,.6)',[4,3],'\u25bc Low '+(DAY_LO!=null?DAY_LO.toFixed(0):'')); }
   if(pp.length){ctx.strokeStyle=dim?'rgba(111,168,199,.5)':COL.set;ctx.lineWidth=dim?1.3:1.6;ctx.beginPath();pp.forEach((p,i)=>{const X=xA(p[0]),Y=yP(p[1]);i?ctx.lineTo(X,Y):ctx.moveTo(X,Y);});ctx.stroke();}
   if(pc.length){ctx.strokeStyle=dim?'rgba(217,180,74,.6)':COL.pred;ctx.lineWidth=dim?1.5:1.9;ctx.beginPath();pc.forEach((p,i)=>{const X=xA(p[0]),Y=yP(p[1]);i?ctx.lineTo(X,Y):ctx.moveTo(X,Y);});ctx.stroke();}
   yaxis(ctx,f,plo,phi,COL.pred,true);}

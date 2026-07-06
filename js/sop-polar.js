@@ -422,7 +422,7 @@
     if(!pts.length&&!statePts.length&&!pgMode){ ctx.fillStyle='#8f8c82'; ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.font='12px -apple-system,Segoe UI,sans-serif';
       ctx.fillText('load a strike-field CSV \u2014 first column is Strike (x), pick any other column',PAD_L+pW/2,PAD_T+pH/2);
-      drawGreekBars(mapX,pW,pH); drawAnchor(mapX,pW,pH); drawLegend(); return; }
+      drawGreekBars(mapX,pW,pH); drawAnchor(mapX,pW,pH); drawDayRange(mapX,pW,pH); drawLegend(); return; }
 
     ctx.save(); ctx.beginPath(); ctx.rect(PAD_L,PAD_T,pW,pH); ctx.clip();
     if(isState){
@@ -452,7 +452,7 @@
     }
     ctx.restore();
 
-    drawGreekBars(mapX,pW,pH); drawAnchor(mapX,pW,pH);
+    drawGreekBars(mapX,pW,pH); drawAnchor(mapX,pW,pH); drawDayRange(mapX,pW,pH);
 
     if(cursor&&!tool){ let mx=cursor.x; if(mx>=PAD_L&&mx<=PAD_L+pW){ let xv=invX(mx);
       // lock onto the nearest column (strike) in bar / PG views
@@ -600,6 +600,35 @@
     ctx.save(); ctx.strokeStyle=ANCHC; ctx.lineWidth=1.5; ctx.beginPath();ctx.moveTo(ax,PAD_T);ctx.lineTo(ax,PAD_T+pH);ctx.stroke();
     ctx.fillStyle=ANCHC; ctx.font='9px SF Mono,Menlo,monospace'; ctx.textAlign='left'; ctx.textBaseline='top';
     const lx=Math.min(ax+4,PAD_L+pW-58); ctx.fillText('\u2693 '+fmtX(anchorVal),lx,PAD_T+2); ctx.restore(); }
+
+  // ---- current day's high/low, mirroring drawAnchor's vertical-line style with its own colors ----
+  let dayHigh=null, dayLow=null;
+  const DHIC='#3fae63', DLOC='#c14e4e';
+  function drawDayLine(mapX,pW,pH,val,col,label){ if(!isFinite(val))return; const ax=mapX(val);
+    if(ax<PAD_L-1||ax>PAD_L+pW+1)return;
+    ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=1.2; ctx.setLineDash([4,3]); ctx.beginPath();ctx.moveTo(ax,PAD_T);ctx.lineTo(ax,PAD_T+pH);ctx.stroke();
+    ctx.setLineDash([]); ctx.fillStyle=col; ctx.font='9px SF Mono,Menlo,monospace'; ctx.textAlign='left'; ctx.textBaseline='bottom';
+    const lx=Math.min(ax+4,PAD_L+pW-58); ctx.fillText(label+' '+fmtX(val),lx,PAD_T+pH-2); ctx.restore(); }
+  function drawDayRange(mapX,pW,pH){ drawDayLine(mapX,pW,pH,dayHigh,DHIC,'\u25b2 High'); drawDayLine(mapX,pW,pH,dayLow,DLOC,'\u25bc Low'); }
+  async function fetchDayRange(){
+    const inst=(document.getElementById('instA')||{}).value||'', date=(document.getElementById('dayDate')||{}).value||'';
+    const sym=(window.__YF_SYMS||{})[inst];
+    if(!sym||!date){ dayHigh=null; dayLow=null; draw(); return; }
+    try{
+      const _h={}; const _t=window.__authToken&&window.__authToken(); if(_t) _h['Authorization']='Bearer '+_t;
+      if(window.__viewToken) _h['X-Quan-Token']=window.__viewToken;
+      const r=await fetch('/api/history?symbol='+encodeURIComponent(sym)+'&range=5d&interval=5m',{headers:_h});
+      const d=await r.json();
+      const fmt=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+      const etDate=t=>{ const p={}; fmt.formatToParts(new Date(t*1000)).forEach(x=>p[x.type]=x.value); return p.year+'-'+p.month+'-'+p.day; };
+      const day=(d&&d.bars||[]).filter(b=>etDate(b.time)===date);
+      dayHigh=day.length?Math.max.apply(null,day.map(b=>b.high)):null;
+      dayLow=day.length?Math.min.apply(null,day.map(b=>b.low)):null;
+    }catch(_e){ dayHigh=null; dayLow=null; }
+    draw();
+  }
+  window.addEventListener('quan:instr',fetchDayRange);
+  window.addEventListener('quan:date',fetchDayRange);
 
   // ---- Greeks: parse a Barchart volatility-greeks export, derive convention-free key strikes ----
   const GBARC={wall:'#ff79c6', atm:'#79e0ff', gex:'#f5d76e', charm:'#6ee7c0'};

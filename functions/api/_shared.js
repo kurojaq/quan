@@ -156,3 +156,103 @@ export async function supaAdmin(env, path, { method = 'GET', body, headers = {} 
 export function siteOrigin(env, request) {
   return env.APP_BASE_URL || new URL(request.url).origin;
 }
+
+/* ==========================================================================
+   Data plane (Phase 1): identity, per-tier rate limiting, and the upstream
+   quote/history fetch shared by /api/quote and /api/history.
+
+   Two identities are legitimate callers of the market-data endpoints:
+     • a signed-in Supabase user  → tier from their subscription plan
+     • a client-view publish token → tier 'client'
+   Everything else is anonymous and rejected (this closes the old open proxy).
+
+   Rate-limit + plan-cache counters reuse the existing QUAN_PUBLISH KV namespace
+   (prefixes rl: and plan:) so no new binding is required. KV is only coarsely
+   consistent — good enough for per-minute throttling; a Durable Object is the
+   precise upgrade (Phase 4). If KV isn't bound the limiter fails open.
+   ========================================================================== */
+
+// requests/minute per tier. trialing == an Operator trial.
+export const RATE_LIMITS = { desk: 240, operator: 120, trialing: 120, scout: 20, client: 40 };
+// edge-cache TTL (seconds) for /quote per tier — paid tiers get fresher data.
+export const QUOTE_TTL = { desk: 8, operator: 8, trialing: 8, scout: 30, client: 20 };
+export const HISTORY_TTL = 60; // history is far less latency-sensitive
+
+const ACTIVE_STATUS = new Set(['active', 'trialing']);
+
+// look up a user's plan ('operator' | 'desk' | 'scout'), cached ~60s in KV.
+async function planForUser(env, userId) {
+  try { const c = env.QUAN_PUBLISH && await env.QUAN_PUBLISH.get(`plan:${userId}`); if (c) return c; } catch (_) {}
+  let plan = 'scout';
+  try {
+    const rows = await supaAdmin(env, `subscriptions?user_id=eq.${userId}&select=plan,status&limit=1`);
+    const s = Array.isArray(rows) && rows[0];
+    if (s && ACTIVE_STATUS.has(s.status) && s.plan) plan = s.plan;
+  } catch (_) { /* Supabase hiccup → treat as scout, don't hard-fail data */ }
+  try { if (env.QUAN_PUBLISH) await env.QUAN_PUBLISH.put(`plan:${userId}`, plan, { expirationTtl: 60 }); } catch (_) {}
+  return plan;
+}
+
+// Returns { id, tier, userId } for a legitimate caller, or null for anonymous.
+export async function resolveIdentity(env, request) {
+  // 1) Supabase-authenticated user (the full terminal)
+  const user = await getUserFromRequest(env, request);
+  if (user) {
+    let tier;
+    if (env.OPERATOR_EMAIL && user.email === env.OPERATOR_EMAIL) tier = 'desk'; // app owner: unthrottled tier
+    else tier = await planForUser(env, user.id);
+    return { id: `u:${user.id}`, tier, userId: user.id };
+  }
+  // 2) client-view publish token (view.html) — the token itself is the secret
+  const url = new URL(request.url);
+  const ptoken = request.headers.get('X-Quan-Token') || url.searchParams.get('ptoken');
+  if (ptoken && env.QUAN_PUBLISH) {
+    try { if (await env.QUAN_PUBLISH.get(`token:${ptoken}`)) return { id: `c:${ptoken}`, tier: 'client', userId: null }; } catch (_) {}
+  }
+  return null;
+}
+
+// Fixed-window (per calendar minute) KV counter. Fails open if KV is absent.
+export async function checkRateLimit(env, id, tier) {
+  const limit = RATE_LIMITS[tier] || RATE_LIMITS.scout;
+  if (!env.QUAN_PUBLISH) return { ok: true, limit, remaining: limit };
+  const key = `rl:${id}:${Math.floor(Date.now() / 60000)}`;
+  let n = 0;
+  try { n = parseInt((await env.QUAN_PUBLISH.get(key)) || '0', 10) || 0; } catch (_) {}
+  if (n >= limit) return { ok: false, limit, remaining: 0 };
+  try { await env.QUAN_PUBLISH.put(key, String(n + 1), { expirationTtl: 120 }); } catch (_) {}
+  return { ok: true, limit, remaining: limit - n - 1 };
+}
+
+// Yahoo chart fetch with query1 → query2 host fallback. Returns result[0] or throws.
+const YAHOO_HOSTS = ['https://query1.finance.yahoo.com', 'https://query2.finance.yahoo.com'];
+const YAHOO_HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' };
+export async function fetchYahooChart(symbol, range, interval) {
+  let lastErr;
+  for (const host of YAHOO_HOSTS) {
+    try {
+      const u = new URL(`${host}/v8/finance/chart/${encodeURIComponent(symbol)}`);
+      if (range) u.searchParams.set('range', range);
+      if (interval) u.searchParams.set('interval', interval);
+      const r = await fetch(u.toString(), { headers: YAHOO_HEADERS });
+      const data = await r.json().catch(() => ({}));
+      const result = data.chart && data.chart.result;
+      if (result && result.length) return result[0];
+      lastErr = new Error((data.chart && data.chart.error && JSON.stringify(data.chart.error)) || `no data for ${symbol}`);
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error(`no data for ${symbol}`);
+}
+
+// CORS + JSON helpers for the market-data endpoints (they set their own
+// Cache-Control, so they don't use json()'s no-store default).
+export const dataCors = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Authorization, X-Quan-Token, Content-Type'
+};
+export function dataJson(status, payload, extraHeaders = {}) {
+  return new Response(JSON.stringify(payload), {
+    status, headers: { 'Content-Type': 'application/json', ...dataCors, ...extraHeaders }
+  });
+}

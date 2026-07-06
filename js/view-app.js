@@ -1,6 +1,7 @@
 (function(){
   // ---- client-facing limited terminal: Heat Map + Chart + Report, fed entirely by /api/view (no chain upload, no Pyodide for Report/Heat Map) ----
   var token=new URLSearchParams(location.search).get('token');
+  window.__viewToken=token;   // chart-tab.js sends this as X-Quan-Token so /api/history authorizes the tokenless client view
   var labelEl=document.getElementById('vLabel'), errEl=document.getElementById('vError'),
       instSel=document.getElementById('vInst'), dateWrap=document.getElementById('vDates'),
       instA=document.getElementById('instA'), dayDate=document.getElementById('dayDate'),
