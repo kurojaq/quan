@@ -6,7 +6,8 @@
 #   npx wrangler deploy   -c workers/wrangler-barchart.toml
 #   npx wrangler secret put BARCHART_USER -c workers/wrangler-barchart.toml
 #   npx wrangler secret put BARCHART_PASS -c workers/wrangler-barchart.toml
-#   npx wrangler secret put AUTOPULL_KEY  -c workers/wrangler-barchart.toml  # on-demand "Pull today"
+#   # AUTOPULL_KEY is OPTIONAL — only needed if this Worker keeps a public route.
+#   # With the Service binding below (no route), you can skip it.
 #
 # Then do ONE watched calibration run to confirm Barchart's selectors:
 #   npx wrangler browser view -c workers/wrangler-barchart.toml
@@ -36,7 +37,14 @@ bucket_name = "quan-state"
 [triggers]
 crons = ["15 22 * * 1-5"]
 
-# BARCHART_USER / BARCHART_PASS / AUTOPULL_KEY are set as secrets (commands
-# above), not here. AUTOPULL_KEY must MATCH the value set on the Pages project
-# (Settings → Variables) so /api/autopull's "Pull today" action can authenticate
-# to this Worker; also set BARCHART_WORKER_URL on Pages to this Worker's URL.
+# INTEGRATION — bind this Worker to the terminal's Pages project as a Service
+# binding so /api/autopull calls it privately (no public URL, never over the
+# Internet):
+#   Pages project → Settings → Bindings → Add → Service binding
+#     Variable name: BARCHART   Service: quan-barchart-fetch
+# Then the on-demand "Pull today" needs NO BARCHART_WORKER_URL and NO AUTOPULL_KEY.
+# This Worker has no `routes` here, so it's reachable only via the binding + its
+# own cron trigger — keep it that way (route-less) and the key stays unnecessary.
+#
+# BARCHART_USER / BARCHART_PASS (and AUTOPULL_KEY, only if you add a public route)
+# are set as secrets with the commands above, not committed here.

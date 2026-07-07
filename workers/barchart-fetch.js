@@ -469,12 +469,17 @@ export default {
   //        without ever exposing this Worker's URL/secret to the browser.
   async fetch(request, env) {
     if (request.method === 'POST') {
-      const key = request.headers.get('X-Autopull-Key') || '';
-      if (!env.AUTOPULL_KEY || key !== env.AUTOPULL_KEY) {
-        return new Response(JSON.stringify({ error: 'unauthorized' }), {
-          status: 401,
-          headers: { 'Content-Type': 'application/json' },
-        });
+      // Auth: if AUTOPULL_KEY is set, require it. If it's unset, allow — this is
+      // the Service-binding setup, where the Worker has NO public route and is
+      // only reachable through the bound Pages project (deploy it route-less).
+      if (env.AUTOPULL_KEY) {
+        const key = request.headers.get('X-Autopull-Key') || '';
+        if (key !== env.AUTOPULL_KEY) {
+          return new Response(JSON.stringify({ error: 'unauthorized' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
       }
       const body = await request.json().catch(() => ({}));
       const jobs = Array.isArray(body.jobs) ? body.jobs : null;

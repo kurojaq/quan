@@ -302,14 +302,27 @@ browser console), append `?debug=1` to the Worker's GET URL, or set the
 back and the `openTrigger`/`clickOption` text-matching can be pinned to real
 selectors. (Watching live with `wrangler browser view` still works too.)
 
-This path routes through the operator-gated `/api/autopull` (POST `action:"pull"`),
-which calls the Worker with a shared key so the browser never holds the Worker's
-URL or secret. It needs two more vars on the **Pages** project (Settings →
-Variables), in addition to the Worker secrets above:
+This path routes through the operator-gated `/api/autopull` (POST `action:"pull"`).
 
-- `BARCHART_WORKER_URL` — this Worker's URL (e.g. `https://quan-barchart-fetch.<sub>.workers.dev`).
-- `AUTOPULL_KEY` — a shared secret; set the **same** value here and as a Worker
-  secret (`wrangler secret put AUTOPULL_KEY -c workers/wrangler-barchart.toml`).
+### Wiring the Worker into the terminal (Service binding)
+
+The browser automation can't live in a Pages Function (Pages Functions don't
+support a Browser Rendering binding, and Pages can't cron), so it stays a Worker —
+but bind it to the Pages project so the terminal calls it **privately**, with no
+public URL and nothing over the Internet:
+
+1. Deploy the Worker (`npx wrangler deploy -c workers/wrangler-barchart.toml`).
+   It has no `routes`, so it's reachable only via the binding + its cron trigger.
+2. **Pages** project → Settings → **Bindings** → Add → **Service binding**:
+   Variable name `BARCHART`, Service `quan-barchart-fetch`. Redeploy Pages.
+
+That's it — `/api/autopull` prefers `env.BARCHART.fetch()` and needs **no
+`BARCHART_WORKER_URL` and no `AUTOPULL_KEY`**. (Because the Worker is route-less,
+it's only callable through the binding.) If you instead keep a public route on the
+Worker, set `AUTOPULL_KEY` as both a Worker secret and a Pages var so the call is
+authenticated; the code sends the key only when it's set. The legacy
+`BARCHART_WORKER_URL` + `AUTOPULL_KEY` public-URL path still works as a fallback
+when the binding is absent.
 
 ---
 

@@ -12,7 +12,9 @@
      PUT  /api/autopull   body { selection:[{symbol,expiry,kind,url,on}] }
      POST /api/autopull   body { action:"pull", jobs:[{symbol,expiry,kind,url}] }
                           -> triggers an on-demand pull of exactly those jobs on
-                             the Browser Rendering Worker; returns its run status.
+                             the Browser Rendering Worker via the internal BARCHART
+                             Service binding (falls back to BARCHART_WORKER_URL if
+                             unbound); returns its run status.
      GET  /api/autopull?file=KEY   -> streams the stored CSV (text/csv) for ingest
 
    Storage: selection/status/index are JSON in the shared QUAN_PUBLISH KV under
@@ -68,8 +70,11 @@ export async function onRequestPost({ request, env }) {
     const body = await request.json().catch(() => ({}));
     if (body.action !== 'pull') return badRequest('unknown action');
     if (!Array.isArray(body.jobs) || !body.jobs.length) return badRequest('jobs[] required');
-    if (!env.BARCHART_WORKER_URL || !env.AUTOPULL_KEY) {
-      return serverError('on-demand pull not configured (set BARCHART_WORKER_URL + AUTOPULL_KEY)');
+    // Prefer the internal Service binding (env.BARCHART); fall back to the legacy
+    // public-URL proxy only if the binding isn't configured.
+    const hasBinding = env.BARCHART && typeof env.BARCHART.fetch === 'function';
+    if (!hasBinding && !(env.BARCHART_WORKER_URL && env.AUTOPULL_KEY)) {
+      return serverError('on-demand pull not configured (bind the BARCHART service, or set BARCHART_WORKER_URL + AUTOPULL_KEY)');
     }
     // Normalize + validate. A job lands on its expiry page one of two ways:
     //   • a fixed url, or
@@ -95,12 +100,15 @@ export async function onRequestPost({ request, env }) {
     );
     if (bad) return badRequest('each job needs symbol + expiry MM_DD_YY, and either a url or future+date+tab');
 
-    // The Worker's URL + shared key live server-side only — the browser never sees them.
-    const wr = await fetch(env.BARCHART_WORKER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Autopull-Key': env.AUTOPULL_KEY },
-      body: JSON.stringify({ jobs, debug: !!body.debug }),
-    });
+    // Via the Service binding the request goes straight to the Worker inside
+    // Cloudflare — no public URL, never over the Internet. The shared key is only
+    // sent if set (defense-in-depth if the Worker still has a public route).
+    const payload = JSON.stringify({ jobs, debug: !!body.debug });
+    const headers = { 'Content-Type': 'application/json' };
+    if (env.AUTOPULL_KEY) headers['X-Autopull-Key'] = env.AUTOPULL_KEY;
+    const wr = hasBinding
+      ? await env.BARCHART.fetch('https://autopull.internal/pull', { method: 'POST', headers, body: payload })
+      : await fetch(env.BARCHART_WORKER_URL, { method: 'POST', headers, body: payload });
     const status = await wr.json().catch(() => ({ error: `worker ${wr.status}` }));
     return json({ ok: wr.ok, status }, wr.ok ? 200 : 502);
   } catch (err) {
