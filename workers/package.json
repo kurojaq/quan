@@ -1,0 +1,13 @@
+{
+  "name": "quan-barchart-fetch",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Build dependencies for the Barchart auto-pull Worker, deployed via Cloudflare Workers Builds. Kept in workers/ (not the repo root) so the static Pages build never sees it. `latest` is used so the cloud build always gets a mutually-compatible wrangler + puppeteer; pin these once a known-good pair is confirmed.",
+  "scripts": {
+    "deploy": "wrangler deploy -c wrangler-barchart.toml"
+  },
+  "devDependencies": {
+    "@cloudflare/puppeteer": "latest",
+    "wrangler": "latest"
+  }
+}

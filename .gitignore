@@ -6,3 +6,7 @@ yahoo_proxy.backup-*.py
 .claude/
 THREESESSION_COMPASS_ENGINE_1_16.html
 *.backup-*
+
+# Node tooling for the Workers build (installed in CI / locally, never committed)
+node_modules/
+package-lock.json

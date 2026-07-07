@@ -231,7 +231,28 @@ caches the session cookie in KV after a successful login and reuses it, only
 re-logging in when the session is dead. This keeps Barchart's bot-protection from
 seeing a fresh login every run — the one thing datacenter IPs get challenged on.
 
-Browser Rendering needs a build + a browser binding (no dashboard paste), so:
+Browser Rendering needs a build (it bundles `@cloudflare/puppeteer`) + a browser
+binding, so it can't be pasted in the dashboard. Deploy it one of two ways.
+
+**Option A — Cloudflare Workers Builds (no local tooling; matches the Pages
+git-push flow).** Cloudflare builds and deploys the Worker from this repo. The
+build manifest lives at [`workers/package.json`](workers/package.json) (kept in
+`workers/`, not the repo root, so the static Pages build never sees it). In the
+dashboard:
+
+1. **Workers & Pages → Create → Workers → Import a repository** → pick
+   `kurojaq/quan`.
+2. Build settings:
+   - **Root directory:** `workers`
+   - **Deploy command:** `npx wrangler deploy -c wrangler-barchart.toml`
+   - **Branch:** `main` · (optional) **Build watch paths:** `workers/*` so only
+     Worker changes trigger a build.
+3. **Save and Deploy** — the first build creates the `quan-barchart-fetch` Worker
+   with its KV/R2 bindings and cron.
+4. Add the login secrets: the Worker → **Settings → Variables and Secrets** → add
+   `BARCHART_USER` and `BARCHART_PASS` as **Secrets**, then re-run the build.
+
+**Option B — local wrangler** (needs Node installed):
 
 ```
 npm i -D wrangler @cloudflare/puppeteer
@@ -240,10 +261,10 @@ npx wrangler secret put BARCHART_USER -c workers/wrangler-barchart.toml
 npx wrangler secret put BARCHART_PASS -c workers/wrangler-barchart.toml
 ```
 
-- In [`workers/wrangler-barchart.toml`](workers/wrangler-barchart.toml), set the
-  `QUAN_PUBLISH` KV `id` to the **same** namespace the Pages project uses (§3b)
-  and confirm the `QUAN_STATE` R2 `bucket_name` matches §3c — the terminal reads
-  `autopull:selection` / `:status` / `:index` from that KV and the CSVs from that bucket.
+- [`workers/wrangler-barchart.toml`](workers/wrangler-barchart.toml) already has
+  the `QUAN_PUBLISH` KV `id` and `QUAN_STATE` R2 `bucket_name` for this account —
+  the terminal reads `autopull:selection` / `:status` / `:index` from that KV and
+  the CSVs from that bucket.
 - The cron default is `15 22 * * 1-5` (≈ after the US cash close). Adjust to your
   settlement time (Settings → Triggers, or the toml).
 - **Quota:** Barchart caps CSV downloads per day (~5 free, ~100 Premier). The
