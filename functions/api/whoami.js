@@ -9,7 +9,13 @@ import { json } from './_shared.js';
 export async function onRequestGet({ request, env }) {
   const auth = request.headers.get('Authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  // every env var NAME Cloudflare actually injected into this Function (not values -- just
+  // names, so a typo'd/misnamed variable shows up immediately instead of guessing blind)
+  var envKeys = [];
+  try { envKeys = Object.keys(env).filter(function(k){ return typeof env[k] === 'string'; }).sort(); } catch (_e) {}
+
   return json({
+    envKeys: envKeys,
     hasToken: !!token,
     hasSupabaseUrl: !!env.SUPABASE_URL,
     hasAnonKey: !!env.SUPABASE_ANON_KEY,
