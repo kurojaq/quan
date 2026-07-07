@@ -236,17 +236,17 @@ binding, so it can't be pasted in the dashboard. Deploy it one of two ways.
 
 **Option A — Cloudflare Workers Builds (no local tooling; matches the Pages
 git-push flow).** Cloudflare builds and deploys the Worker from this repo. The
-build manifest lives at [`workers/package.json`](workers/package.json) (kept in
-`workers/`, not the repo root, so the static Pages build never sees it). In the
-dashboard:
+build manifest is the repo-root [`package.json`](package.json) (Workers Builds
+runs `npm install` from the repo root; the Pages project has no build command, so
+it ignores this file). In the dashboard:
 
 1. **Workers & Pages → Create → Workers → Import a repository** → pick
    `kurojaq/quan`.
-2. Build settings:
-   - **Root directory:** `workers`
-   - **Deploy command:** `npx wrangler deploy -c wrangler-barchart.toml`
-   - **Branch:** `main` · (optional) **Build watch paths:** `workers/*` so only
-     Worker changes trigger a build.
+2. Build settings (leave **Root directory** empty = repo root):
+   - **Build command:** `npm install`
+   - **Deploy command:** `npx wrangler deploy -c workers/wrangler-barchart.toml`
+   - **Branch:** `main` · (optional) **Build watch paths:** `workers/*` +
+     `package.json` so only Worker changes trigger a build.
 3. **Save and Deploy** — the first build creates the `quan-barchart-fetch` Worker
    with its KV/R2 bindings and cron.
 4. Add the login secrets: the Worker → **Settings → Variables and Secrets** → add

@@ -1,0 +1,13 @@
+{
+  "name": "quan",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static site (Cloudflare Pages, no build step). This package.json exists only so Cloudflare Workers Builds can install @cloudflare/puppeteer + wrangler to bundle and deploy the Barchart auto-pull Worker (workers/barchart-fetch.js). The Pages project has no build command, so it ignores this. `latest` keeps the wrangler + puppeteer pair mutually compatible; pin once a known-good pair is confirmed.",
+  "scripts": {
+    "deploy:barchart": "wrangler deploy -c workers/wrangler-barchart.toml"
+  },
+  "devDependencies": {
+    "@cloudflare/puppeteer": "latest",
+    "wrangler": "latest"
+  }
+}
