@@ -86,6 +86,25 @@
     border:none;border-radius:var(--radius-sm);padding:6px 13px;}
   .sessbar .k{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--label);}
   .sessbar .v{font-family:var(--font-mono);font-size:13px;font-variant-numeric:tabular-nums;line-height:1;color:var(--cream);}
+
+  /* ---- global header controls (instrument/date/session/anchor/live/theme/publish/etc): no
+     pill fill, just bold equal-weight text -- scoped to .tabbar .gctrls so every other tab's
+     own local header controls (Compass, Chart tools, etc.) keep their existing look ---- */
+  .tabbar .instrbar,
+  .tabbar .datebar,
+  .tabbar .gctrls .slot,
+  .tabbar .gctrls .upload{background:transparent;}
+  .tabbar .instrbar .k,
+  .tabbar .datebar .k,
+  .tabbar .instrbar select,
+  .tabbar .datebar input[type=date],
+  .tabbar .gctrls .slot .tag,
+  .tabbar .gctrls .slot .field,
+  .tabbar .gctrls .upload{font-weight:700;}
+  .tabbar .gctrls .slot .field{background:transparent;}
+  .tabbar .gctrls .ctool{background:transparent;filter:none;font-weight:700;}
+  .tabbar .gctrls .ctool:hover{background:transparent;}
+  .tabbar .gctrls .ctool.on{background:transparent;color:var(--gold);}
   .tabbtn{background:transparent;border:none;border-radius:999px;color:var(--cream-dim);
     font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;padding:8px 15px;cursor:pointer;font-family:inherit;
     transition:background .22s var(--ease),color .22s var(--ease),transform .12s var(--ease);}
