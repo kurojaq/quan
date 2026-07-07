@@ -22,10 +22,10 @@ browser = { binding = "BROWSER" }
 
 # Reuse the SAME KV namespace the Pages site + cron-warm Worker use, so the
 # terminal can read autopull:selection / :status / :index that this Worker writes.
-# Replace the id with your QUAN_PUBLISH namespace id (Workers & Pages → KV).
+# id = the QUAN_PUBLISH namespace (Workers & Pages → KV) for this account.
 [[kv_namespaces]]
 binding = "QUAN_PUBLISH"
-id = "REPLACE_WITH_QUAN_PUBLISH_KV_ID"
+id = "88472c90139149dea44668ce0c0a7d8a"
 
 # Reuse the SAME R2 bucket bound to the Pages project (state/brief live here too).
 # Downloaded CSVs are written under the autopull/ prefix.
