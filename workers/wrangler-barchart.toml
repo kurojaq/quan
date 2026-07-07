@@ -1,0 +1,42 @@
+# Deploy config for the Barchart auto-download Worker (Phase 5).
+# Browser Rendering needs a build (it bundles @cloudflare/puppeteer) and a
+# browser binding, neither of which the dashboard paste-flow supports, so:
+#
+#   npm i -D wrangler @cloudflare/puppeteer
+#   npx wrangler deploy   -c workers/wrangler-barchart.toml
+#   npx wrangler secret put BARCHART_USER -c workers/wrangler-barchart.toml
+#   npx wrangler secret put BARCHART_PASS -c workers/wrangler-barchart.toml
+#   npx wrangler secret put AUTOPULL_KEY  -c workers/wrangler-barchart.toml  # on-demand "Pull today"
+#
+# Then do ONE watched calibration run to confirm Barchart's selectors:
+#   npx wrangler browser view -c workers/wrangler-barchart.toml
+# (see the header of barchart-fetch.js and CLOUDFLARE_SETUP.md §9).
+name = "quan-barchart-fetch"
+main = "barchart-fetch.js"            # relative to this file (workers/)
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]   # required by @cloudflare/puppeteer
+
+# Headless browser on Cloudflare's network.
+browser = { binding = "BROWSER" }
+
+# Reuse the SAME KV namespace the Pages site + cron-warm Worker use, so the
+# terminal can read autopull:selection / :status / :index that this Worker writes.
+# Replace the id with your QUAN_PUBLISH namespace id (Workers & Pages → KV).
+[[kv_namespaces]]
+binding = "QUAN_PUBLISH"
+id = "REPLACE_WITH_QUAN_PUBLISH_KV_ID"
+
+# Reuse the SAME R2 bucket bound to the Pages project (state/brief live here too).
+# Downloaded CSVs are written under the autopull/ prefix.
+[[r2_buckets]]
+binding = "QUAN_STATE"
+bucket_name = "quan-state"
+
+# EOD, weekdays. 22:15 UTC ≈ after the US cash close; adjust to your settlement.
+[triggers]
+crons = ["15 22 * * 1-5"]
+
+# BARCHART_USER / BARCHART_PASS / AUTOPULL_KEY are set as secrets (commands
+# above), not here. AUTOPULL_KEY must MATCH the value set on the Pages project
+# (Settings → Variables) so /api/autopull's "Pull today" action can authenticate
+# to this Worker; also set BARCHART_WORKER_URL on Pages to this Worker's URL.

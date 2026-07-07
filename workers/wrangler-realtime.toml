@@ -1,0 +1,23 @@
+# Deploy config for the realtime Durable Objects Worker (Phase 4).
+# Durable Objects need migrations, which the dashboard paste-flow can't do, so:
+#   npx wrangler deploy -c workers/wrangler-realtime.toml
+#   npx wrangler secret put SUPABASE_JWT_SECRET -c workers/wrangler-realtime.toml
+# Then copy the deployed wss:// URL into js/realtime-config.js.
+name = "quan-realtime"
+main = "realtime.js"                 # relative to this file (workers/)
+compatibility_date = "2024-11-01"
+
+[[durable_objects.bindings]]
+name = "PRICE_ROOM"
+class_name = "PriceRoom"
+
+[[durable_objects.bindings]]
+name = "DESK_ROOM"
+class_name = "DeskRoom"
+
+# First-deploy migration that registers the two DO classes.
+[[migrations]]
+tag = "v1"
+new_classes = ["PriceRoom", "DeskRoom"]
+
+# SUPABASE_JWT_SECRET is set as a secret (command above), not committed here.

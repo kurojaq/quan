@@ -15,7 +15,7 @@
   var POLL_MS=10000;
   var btn=document.getElementById('liveAnchorBtn'), note=document.getElementById('liveAnchorNote');
   if(!btn||!note) return;
-  var timer=null, on=false;
+  var timer=null, on=false, rt=null;
   function currentSymbol(){ var inst=(document.getElementById('instA')||{}).value||''; return YF_SYMS[inst]||null; }
   function tick(){
     var inst=(document.getElementById('instA')||{}).value||'?', sym=currentSymbol();
@@ -32,10 +32,29 @@
       }
     }).catch(function(){ note.textContent='proxy unreachable — check your connection'; });
   }
+  function stopFeeds(){ if(timer){ clearInterval(timer); timer=null; } if(rt){ rt.close(); rt=null; } }
+  function startFeeds(){
+    var sym=currentSymbol();
+    if(!sym){ var inst=(document.getElementById('instA')||{}).value||'?'; note.textContent='no Yahoo symbol mapped for '+inst; return; }
+    stopFeeds();
+    // Prefer the realtime WebSocket fan-out when configured (one upstream fetch for
+    // all seats, sub-second push); otherwise fall back to per-client polling.
+    if(window.__quanRealtime && window.__quanRealtime.enabled){
+      rt=window.__quanRealtime.connectPrice(sym, function(price){
+        if(window.__qSetAnchor) window.__qSetAnchor(price);
+        if(window.__chartOnLiveTick) window.__chartOnLiveTick(sym,price);
+        note.textContent=sym+' '+price+' · '+new Date().toLocaleTimeString();
+      }, function(st){ if(st==='reconnecting') note.textContent=sym+' · reconnecting…'; });
+      if(rt){ note.textContent=sym+' · live (realtime)…'; return; }
+    }
+    tick(); timer=setInterval(tick,POLL_MS);
+  }
   btn.addEventListener('click',function(){
-    on=!on;
-    btn.classList.toggle('on',on);
-    if(on){ note.textContent='starting…'; tick(); timer=setInterval(tick,POLL_MS); }
-    else{ if(timer) clearInterval(timer); timer=null; note.textContent='off'; }
+    on=!on; btn.classList.toggle('on',on);
+    if(on){ note.textContent='starting…'; startFeeds(); }
+    else{ stopFeeds(); note.textContent='off'; }
   });
+  // re-point the feed at the new symbol if the instrument changes while Live is on
+  var instSel=document.getElementById('instA');
+  if(instSel) instSel.addEventListener('change',function(){ if(on) startFeeds(); });
 })();

@@ -18,10 +18,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#090909" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#050506" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <title>The Qu'an — Intermarket Breach Detector + Polar Disk</title>
 <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/theme.css">
 </head>
 <body>
@@ -68,27 +71,31 @@
       <div class="slot"><button class="ctool" id="themeToggleBtn" type="button" title="Switch between dark and light theme">&#9680; Dark</button></div>
       <div class="slot" id="publishSlot" style="position:relative;">
         <button class="ctool" id="publishBtn" type="button" title="Publish the current Report + Heat Map to client links">&#128228; Publish</button>
-        <div id="publishPanel" style="display:none;position:absolute;top:100%;right:0;z-index:9997;width:280px;padding:12px;margin-top:6px;background:#141414;border:0.5px solid #3a3a3a;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,0.5);font-size:12px;color:#e6e6e6;">
+        <div id="publishPanel" style="display:none;position:absolute;top:100%;right:0;z-index:9997;width:280px;padding:14px;margin-top:8px;background:var(--glass-strong);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:0.5px solid var(--glass-line);border-radius:var(--radius-md);box-shadow:var(--shadow);font-size:12px;color:var(--cream);">
           <div style="font-weight:600;margin-bottom:6px;">Publish current view</div>
-          <div id="publishCur" style="color:#9a9a9a;margin-bottom:8px;">— · —</div>
+          <div id="publishCur" style="color:var(--cream-dim);margin-bottom:8px;">— · —</div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
             <button id="publishNowBtn" class="ctool" type="button">Publish Now</button>
-            <span id="publishStatus" style="color:#9a9a9a;"></span>
+            <span id="publishStatus" style="color:var(--cream-dim);"></span>
           </div>
-          <div style="border-top:0.5px solid #3a3a3a;margin-bottom:10px;"></div>
+          <div style="border-top:0.5px solid var(--glass-line);margin-bottom:10px;"></div>
           <div style="font-weight:600;margin-bottom:6px;">Client links</div>
           <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">
-            <input type="text" id="pubLabel" placeholder="Client label" style="background:#1e1e1e;border:0.5px solid #3a3a3a;border-radius:6px;color:#e6e6e6;padding:5px 7px;">
-            <select id="pubInstruments" multiple size="4" style="background:#1e1e1e;border:0.5px solid #3a3a3a;border-radius:6px;color:#e6e6e6;"></select>
+            <input type="text" id="pubLabel" placeholder="Client label" style="background:var(--fill);border:none;outline:none;border-radius:8px;color:var(--cream);padding:6px 8px;">
+            <select id="pubInstruments" multiple size="4" style="background:var(--fill);border:none;outline:none;border-radius:8px;color:var(--cream);padding:4px;"></select>
             <button id="pubCreateBtn" class="ctool" type="button">Create link</button>
           </div>
           <div id="pubLinkList" style="display:flex;flex-direction:column;gap:8px;max-height:220px;overflow:auto;"></div>
         </div>
       </div>
+      <div class="slot" id="autopullSlot" style="position:relative;display:none;">
+        <button class="ctool" id="autopullBtn" type="button" title="Choose which Barchart contracts the cloud Worker auto-downloads each day">&#128472; Auto-pull</button>
+        <div id="autopullPanel" style="display:none;position:absolute;top:100%;right:0;z-index:9997;width:340px;padding:14px;margin-top:8px;background:var(--glass-strong);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:0.5px solid var(--glass-line);border-radius:var(--radius-md);box-shadow:var(--shadow);font-size:12px;color:var(--cream);"></div>
+      </div>
       <div class="slot"><span class="tag">Exp</span><div class="expsel" id="expSel"><button class="expbtn" id="exp_Daily" data-exp="Daily" type="button"><span class="expdot">&#9675;</span>Daily<span class="expoi"></span></button><button class="expbtn" id="exp_EOM" data-exp="EOM" type="button"><span class="expdot">&#9675;</span>EOM<span class="expoi"></span></button></div><span class="expnote" id="expNote"></span></div>
       <div class="slot"><select class="field" id="upKind" style="padding:5px 6px;font-size:10px;letter-spacing:.06em;"><option value="chain">Chain</option><option value="greeks">Greeks</option></select><label class="upload">CSV<span class="fn" id="gFn">none</span><input type="file" id="gFile" accept=".csv"></label></div>
     </div>
-    <div class="sessbar"><span class="k">Session t</span><span class="v" id="sessT" style="color:#7fd1e0">0.0000</span></div>
+    <div class="sessbar"><span class="k">Session t</span><span class="v" id="sessT">0.0000</span></div>
   </nav>
   <div class="splitBar" id="splitBar">
     <span class="sb-k">Layout</span>
@@ -141,8 +148,8 @@
         <label class="upload">CSV<span class="fn" id="fnB">none</span><input type="file" id="fileB" accept=".csv"></label>
       </div>
       <label class="toggle"><input type="checkbox" id="priceToggle">Price</label>
-      <label class="toggle" id="fitToggleWrap"><input type="checkbox" id="fitToggle" style="accent-color:#e8e3d6">Fit</label>
-      <label class="toggle" id="fitOrderWrap" title="polynomial orders to overlay (1\u20139)">P&le;<input type="range" id="fitOrder" min="1" max="9" value="6" style="width:80px;vertical-align:middle;accent-color:#e8e3d6;margin:0 5px"><span class="v" id="fitOrderV">6</span></label>
+      <label class="toggle" id="fitToggleWrap"><input type="checkbox" id="fitToggle" style="accent-color:var(--cream)">Fit</label>
+      <label class="toggle" id="fitOrderWrap" title="polynomial orders to overlay (1\u20139)">P&le;<input type="range" id="fitOrder" min="1" max="9" value="6" style="width:80px;vertical-align:middle;accent-color:var(--cream);margin:0 5px"><span class="v" id="fitOrderV">6</span></label>
       <div class="stat"><span class="k">Aligned</span><span class="v" id="alignCount">&mdash;</span></div>
     </div>
   </header>
@@ -218,29 +225,29 @@
     <div class="polar-panel" id="polarPanel">
       <button class="ctool fullscreen-btn" id="polarFullBtn" type="button" title="Fullscreen">&#9974;</button>
       <div id="pAnchorPrompt" style="display:none;position:absolute;inset:0;z-index:4;pointer-events:none;align-items:center;justify-content:center;text-align:center;">
-        <div style="background:#2a2a30ee;border:1px solid #5a5a64;border-radius:10px;padding:16px 22px;max-width:78%;box-shadow:0 6px 24px #0008;">
+        <div style="background:var(--glass-strong);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:0.5px solid var(--glass-line);border-radius:var(--radius-md);padding:16px 22px;max-width:78%;box-shadow:var(--shadow);">
           <div style="font-size:22px;line-height:1;margin-bottom:7px;color:var(--cream)">&#9888;</div>
           <div id="pAnchorPromptMsg" style="font-size:13px;font-weight:600;color:var(--cream);letter-spacing:.2px">Enter the session-open anchor price</div>
           <div style="font-size:11px;color:var(--cream-dim);margin-top:5px">chain loaded · SOP renders once the engine has a chain + anchor</div>
         </div>
       </div>
-      <div id="ripnPanel" style="display:none;position:absolute;top:8px;left:8px;z-index:6;width:286px;max-height:calc(100% - 16px);background:#23232aef;border:0.5px solid #54545e;border-radius:8px;box-shadow:0 6px 24px #0009;flex-direction:column;font-size:11px;backdrop-filter:blur(3px)">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 9px;border-bottom:0.5px solid #44444c">
+      <div id="ripnPanel" style="display:none;position:absolute;top:8px;left:8px;z-index:6;width:286px;max-height:calc(100% - 16px);background:var(--glass-strong);border:0.5px solid var(--glass-line);border-radius:var(--radius-md);box-shadow:var(--shadow);flex-direction:column;font-size:11px;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:0.5px solid var(--glass-line)">
           <div style="font-weight:600;letter-spacing:.4px;color:var(--cream)">RIPN handshake</div>
           <div style="display:flex;gap:6px;align-items:center">
             <button id="ripnAutoBtn" class="ctool" title="Reset to the auto-suggested anchor" style="font-size:10px;padding:2px 7px">auto</button>
             <button id="ripnClose" class="ctool" title="Hide" style="font-size:12px;padding:1px 7px">&times;</button>
           </div>
         </div>
-        <div id="ripnHead" style="padding:5px 9px;border-bottom:0.5px solid #3a3a42;color:var(--cream-dim);font-size:10px;line-height:1.5"></div>
+        <div id="ripnHead" style="padding:5px 10px;border-bottom:0.5px solid var(--glass-line);color:var(--cream-dim);font-size:10px;line-height:1.5"></div>
         <div id="ripnTblWrap" style="overflow:auto;flex:1 1 auto;min-height:0;max-height:340px">
           <table id="ripnTbl" style="width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums"></table>
         </div>
-        <div style="padding:5px 9px;border-top:0.5px solid #3a3a42;color:var(--cream-dim);font-size:9.5px;display:flex;gap:7px;align-items:center">
-          <span>row</span><input id="ripnIdxInput" inputmode="numeric" style="width:52px;background:#1a1a1f;border:0.5px solid #4a4a52;border-radius:4px;color:var(--cream);padding:2px 5px;font-size:10px" placeholder="#"><button id="ripnGo" class="ctool" style="font-size:10px;padding:2px 7px">go</button>
+        <div style="padding:5px 10px;border-top:0.5px solid var(--glass-line);color:var(--cream-dim);font-size:9.5px;display:flex;gap:7px;align-items:center">
+          <span>row</span><input id="ripnIdxInput" inputmode="numeric" style="width:52px;background:var(--fill);border:none;outline:none;border-radius:6px;color:var(--cream);padding:3px 6px;font-size:10px" placeholder="#"><button id="ripnGo" class="ctool" style="font-size:10px;padding:2px 7px">go</button>
           <span style="margin-left:auto;opacity:.7">click a row to re-anchor</span>
         </div>
-        <div id="ripnTuneSec" style="padding:7px 9px;border-top:0.5px solid #3a3a42;color:var(--cream-dim);font-size:9.5px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-weight:600;color:var(--cream)">global RIPN tuning</span><span style="opacity:.6">applies to all views</span></div><div style="display:flex;flex-direction:column;gap:5px"><label style="display:flex;align-items:center;gap:7px">responsiveness<input id="ripnTune_responsiveness" type="range" min="0" max="2" step="0.05" value="1.00" style="flex:1"><span id="ripnTune_responsiveness_v" style="width:30px;text-align:right;color:#6fd3ff">1.00</span></label><label style="display:flex;align-items:center;gap:7px">sensitivity<input id="ripnTune_sensitivity" type="range" min="0" max="1" step="0.01" value="0.00" style="flex:1"><span id="ripnTune_sensitivity_v" style="width:30px;text-align:right;color:#6fd3ff">0.00</span></label><label style="display:flex;align-items:center;gap:7px">smoothing<input id="ripnTune_smoothing" type="range" min="0" max="0.95" step="0.05" value="0.20" style="flex:1"><span id="ripnTune_smoothing_v" style="width:30px;text-align:right;color:#6fd3ff">0.20</span></label><label style="display:flex;align-items:center;gap:7px">weighting<input id="ripnTune_weighting" type="range" min="0" max="1" step="0.05" value="1.00" style="flex:1"><span id="ripnTune_weighting_v" style="width:30px;text-align:right;color:#6fd3ff">1.00</span></label></div></div>
+        <div id="ripnTuneSec" style="padding:8px 10px;border-top:0.5px solid var(--glass-line);color:var(--cream-dim);font-size:9.5px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-weight:600;color:var(--cream)">global RIPN tuning</span><span style="opacity:.6">applies to all views</span></div><div style="display:flex;flex-direction:column;gap:5px"><label style="display:flex;align-items:center;gap:7px">responsiveness<input id="ripnTune_responsiveness" type="range" min="0" max="2" step="0.05" value="1.00" style="flex:1"><span id="ripnTune_responsiveness_v" style="width:30px;text-align:right;color:var(--cream)">1.00</span></label><label style="display:flex;align-items:center;gap:7px">sensitivity<input id="ripnTune_sensitivity" type="range" min="0" max="1" step="0.01" value="0.00" style="flex:1"><span id="ripnTune_sensitivity_v" style="width:30px;text-align:right;color:var(--cream)">0.00</span></label><label style="display:flex;align-items:center;gap:7px">smoothing<input id="ripnTune_smoothing" type="range" min="0" max="0.95" step="0.05" value="0.20" style="flex:1"><span id="ripnTune_smoothing_v" style="width:30px;text-align:right;color:var(--cream)">0.20</span></label><label style="display:flex;align-items:center;gap:7px">weighting<input id="ripnTune_weighting" type="range" min="0" max="1" step="0.05" value="1.00" style="flex:1"><span id="ripnTune_weighting_v" style="width:30px;text-align:right;color:var(--cream)">1.00</span></label></div></div>
       </div>
       <div id="pHeadView" style="display:none">
         <div class="sopcard"><canvas id="sopHead"></canvas></div>
@@ -270,8 +277,8 @@
       <div class="slot" style="display:none"><span class="tag">Anchor</span><input type="number" step="any" id="skAnchor" class="panchor" style="width:90px" placeholder="strike"><button class="ctool" id="skLock" title="Lock anchor for the session">&#128275;</button></div>
       <div class="slot" style="display:none"><span class="tag">Chain</span><label class="upload">CSV<span class="fn" id="skFn">none</span><input type="file" id="skFile" accept=".csv"></label></div>
       <div class="slot" style="display:none"><span class="tag">Greeks</span><label class="upload">CSV<span class="fn" id="skGFn">none</span><input type="file" id="skGFile" accept=".csv"></label></div>
-      <label class="toggle"><input type="checkbox" id="skGreeks" checked style="accent-color:#e8e3d6">&Gamma; bars</label>
-      <label class="toggle"><input type="checkbox" id="skRaw" checked style="accent-color:#e8e3d6">Raw</label>
+      <label class="toggle"><input type="checkbox" id="skGreeks" checked style="accent-color:var(--cream)">&Gamma; bars</label>
+      <label class="toggle"><input type="checkbox" id="skRaw" checked style="accent-color:var(--cream)">Raw</label>
       <div class="slot"><span class="tag">Orders &le;</span><input type="range" id="skOrder" min="1" max="9" value="6"><span class="v" id="skOrderV" style="min-width:12px">6</span></div>
       <div class="stat"><span class="k">Points</span><span class="v" id="skN">&mdash;</span></div>
     </div>
@@ -305,8 +312,8 @@
     <div class="legend" id="skLegend"></div>
   </footer>
   </section>
-  <section class="tabsec" id="tabHeat"><div id="heatMount" style="flex:1 1 auto;min-height:0;display:flex;width:100%;background:#1a1a1e;"></div></section>
-  <section class="tabsec" id="tabHeatB"><div id="heatMountB" style="flex:1 1 auto;min-height:0;display:flex;width:100%;background:#1a1a1e;"></div></section>
+  <section class="tabsec" id="tabHeat"><div id="heatMount" style="flex:1 1 auto;min-height:0;display:flex;width:100%;background:var(--bg);border-radius:var(--radius-lg);overflow:hidden;"></div></section>
+  <section class="tabsec" id="tabHeatB"><div id="heatMountB" style="flex:1 1 auto;min-height:0;display:flex;width:100%;background:var(--bg);border-radius:var(--radius-lg);overflow:hidden;"></div></section>
   <section class="tabsec" id="tabChart">
   <header>
     <div class="brand">
@@ -454,6 +461,9 @@
 <script src="js/sop-polar.js" defer></script>
 <script src="js/tabs.js" defer></script>
 <script src="js/chart-controls.js" defer></script>
+<script src="js/realtime-config.js" defer></script>
+<script src="js/realtime.js" defer></script>
+<script src="js/desk-session.js" defer></script>
 <script src="js/live-anchor.js" defer></script>
 <script src="js/chart-tab.js" defer></script>
 <script src="js/compass.js" defer></script>
@@ -502,7 +512,10 @@
 
 <script src="js/heatmap-loader.js" defer></script>
 <script src="js/report.js" defer></script>
+<script src="js/view-report.js" defer></script>
+<script src="js/brief-archive.js" defer></script>
 <script src="js/publish-panel.js" defer></script>
+<script src="js/auto-pull.js" defer></script>
 <div id="rptPrintDoc"></div>
 <script src="js/account-sim.js" defer></script>
 </body>

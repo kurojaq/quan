@@ -72,10 +72,13 @@ put it in client code.
 ## 3. Database
 
 Run [`supabase/schema.sql`](supabase/schema.sql) once in the Supabase SQL editor.
-It adds the `subscriptions` table **and** the `user_state` table (roaming
-workspaces, Phase 2) with their RLS policies, on top of the existing
-profiles/teams tables. Re-running it is safe (everything is `if not exists` /
-`drop policy … create policy`).
+It adds the `subscriptions` table, the `user_state` table (roaming workspaces,
+Phase 2) **and** the `brief_history` table (brief archive, Phase 3) with their RLS
+policies, on top of the existing profiles/teams tables. Re-running it is safe
+(everything is `if not exists` / `drop policy … create policy`).
+
+> The `brief_history` snapshot payloads reuse the same `QUAN_STATE` R2 bucket as
+> Phase 2 (under a `brief/` prefix), so no extra bucket is needed — just §3c.
 
 ---
 
@@ -146,6 +149,167 @@ fail over from `query1` to `query2`.
 
 Tiers/limits are edited in one place: the `RATE_LIMITS` / `QUOTE_TTL` /
 `HISTORY_TTL` maps in [`functions/api/_shared.js`](functions/api/_shared.js).
+
+---
+
+## 6. Brief history / archive (`/api/archive`)
+
+`/api/archive` durably stores one Report snapshot per user/instrument/trading-date
+so past field reads can be browsed (the **🕘 History** button on the Report tab)
+and re-published. It reuses the `QUAN_STATE` R2 bucket (`brief/` prefix) for the
+full payload and the `brief_history` Supabase table for the listing metadata — so
+**no new binding beyond §3c**. The client half (`js/brief-archive.js`) auto-saves
+each computed brief in the background; nothing to configure.
+
+---
+
+## 7. EOD warm cron (optional — instant first load)
+
+Pages projects can't run scheduled functions, so the end-of-day price warmer is a
+**separate Worker**, [`workers/cron-warm.js`](workers/cron-warm.js). It pre-fetches
+common chart/compass timeframes for a configured instrument set into the shared
+`QUAN_PUBLISH` KV (`warm:hist:*`); `/api/history` reads that warm layer before
+hitting Yahoo, so the first chart load of the day is instant.
+
+Deploy (dashboard, no build — same flow as the old proxy Worker):
+1. **Workers & Pages → Create → Worker → Quick edit** → paste `workers/cron-warm.js` → Deploy.
+2. **Settings → Variables → KV Namespace Bindings** → add `QUAN_PUBLISH` (the same namespace the Pages project uses).
+3. *(optional)* **Settings → Variables** → `WARM_SYMBOLS` = comma-separated Yahoo symbols (defaults to a core futures set).
+4. **Settings → Triggers → Cron Triggers** → add e.g. `0 22 * * 1-5` (weekdays, 22:00 UTC).
+
+A plain `GET` to the Worker runs the warm pass on demand for testing. Skip this
+section entirely and everything still works — it's a latency optimization only.
+
+---
+
+## 8. Realtime (WebSockets via Durable Objects — optional)
+
+Real-time replaces the Live-anchor polling with a **WebSocket price fan-out**
+(one upstream fetch per symbol serves every seat, sub-second push) and enables
+**Desk shared sessions** (a Desk-tier team watches the same instrument/date/anchor).
+Durable Objects can't live in a Pages project, so this is a separate Worker,
+[`workers/realtime.js`](workers/realtime.js), and — like auth — the client stays
+**inert until you point it at the Worker**, so shipping it changes nothing until
+you opt in.
+
+DO migrations mean this one is deployed with **wrangler**, not dashboard paste:
+
+```
+npx wrangler deploy -c workers/wrangler-realtime.toml
+npx wrangler secret put SUPABASE_JWT_SECRET -c workers/wrangler-realtime.toml
+```
+
+- `SUPABASE_JWT_SECRET` = Supabase → Settings → API → **JWT Secret**. The Worker
+  verifies the Supabase token (passed as `?token=` since browsers can't set
+  WebSocket headers). With it unset, every connection is rejected — closed by default.
+- Then set the deployed URL in [`js/realtime-config.js`](js/realtime-config.js):
+  `base: 'wss://quan-realtime.<your-subdomain>.workers.dev'`. Empty = disabled
+  (Live anchor keeps polling `/api/quote`; no Desk sessions).
+
+Behavior once configured:
+- **Live anchor** ([`js/live-anchor.js`](js/live-anchor.js)) prefers the WebSocket
+  feed and falls back to polling automatically if the socket can't connect.
+- **Desk sessions** ([`js/desk-session.js`](js/desk-session.js)) show a **⇄ Desk**
+  control **only** for Desk-plan users; joining a room name relays selections to
+  the other seats. The room name is the shared secret (like a client-view token).
+
+---
+
+## 9. Barchart auto-pull (daily option-chain downloads — optional)
+
+Automates the manual Barchart CSV downloads. A scheduled Worker,
+[`workers/barchart-fetch.js`](workers/barchart-fetch.js), logs into barchart.com
+on Cloudflare's **Browser Rendering** platform, downloads a CSV for every
+contract you've toggled ON in the terminal's **⛃ Auto-pull** panel, stores each
+in R2 under `autopull/`, and records a run status. The terminal
+([`js/auto-pull.js`](js/auto-pull.js)) ingests new files on load through the same
+hooks a manual upload uses — no upload step. The panel is **operator-only**
+(`/api/autopull` is gated by `requireOperator`), so it stays hidden for everyone else.
+
+**Auth model — full cloud login.** Credentials live as Worker secrets; the Worker
+caches the session cookie in KV after a successful login and reuses it, only
+re-logging in when the session is dead. This keeps Barchart's bot-protection from
+seeing a fresh login every run — the one thing datacenter IPs get challenged on.
+
+Browser Rendering needs a build + a browser binding (no dashboard paste), so:
+
+```
+npm i -D wrangler @cloudflare/puppeteer
+npx wrangler deploy   -c workers/wrangler-barchart.toml
+npx wrangler secret put BARCHART_USER -c workers/wrangler-barchart.toml
+npx wrangler secret put BARCHART_PASS -c workers/wrangler-barchart.toml
+```
+
+- In [`workers/wrangler-barchart.toml`](workers/wrangler-barchart.toml), set the
+  `QUAN_PUBLISH` KV `id` to the **same** namespace the Pages project uses (§3b)
+  and confirm the `QUAN_STATE` R2 `bucket_name` matches §3c — the terminal reads
+  `autopull:selection` / `:status` / `:index` from that KV and the CSVs from that bucket.
+- The cron default is `15 22 * * 1-5` (≈ after the US cash close). Adjust to your
+  settlement time (Settings → Triggers, or the toml).
+- **Quota:** Barchart caps CSV downloads per day (~5 free, ~100 Premier). The
+  per-contract toggle is also your quota guard — only toggle on what you need.
+
+**One-time calibration (required).** Barchart's DOM/URLs drift and the login form,
+download button, and CSV response can't be verified from the repo. They're isolated
+in the `BC` config block at the top of `barchart-fetch.js`. After the first deploy,
+do one watched run to confirm them, then adjust `BC.*` and redeploy:
+
+```
+npx wrangler browser create --keepAlive 600 -c workers/wrangler-barchart.toml
+npx wrangler browser view    # watch the login + a download live
+```
+
+Trigger a pass on demand any time by opening the Worker's URL (GET runs one pass
+and returns the JSON status). If a run shows `login submitted but session not
+established`, Barchart challenged the datacenter IP or wants 2FA — see the header
+of `barchart-fetch.js` for the fallback (seed a cookie from a real login).
+
+**Adding contracts.** In the terminal's **⛃ Auto-pull** panel, add a row per
+contract: the Barchart **symbol** (e.g. `ESM25` — it becomes the downloaded
+filename's prefix, which is how `parseChain()` recovers the instrument), the
+**expiry** as `MM_DD_YY`, **Chain** or **Greeks**, and the contract's Barchart
+options-page **URL**. Toggle rows on/off and **Save selection**.
+
+### One-click "Pull today" (day-of-week resolver)
+
+The panel's **➓ Pull today** button skips the saved list and pulls exactly two
+contracts, computed from the calendar for the **active instrument**:
+
+- **Chain** → *today's* session date, from Barchart's **Options & Prices** tab.
+- **Greeks** → the *next trading day* (weekends/holidays skipped via the
+  terminal's own calendar, `js/detector.js`), from the **Vol & Greeks** tab.
+
+So a Monday click grabs Monday's chain and Tuesday's greeks, then ingests both
+on the spot. The client sends only the **future** (e.g. `ZNU26`, taken from the
+loaded chain's filename or computed as the front quarterly month H/M/U/Z) plus
+the **target date** and tab. On Barchart's page the expiry is driven by two
+dropdowns — **Options Type** (which *is* the day-of-week: "Monday Weekly Options")
+and **Week N**. These are Barchart's **custom (non-`<select>`) widgets**, so
+`resolveExpiryPage()` in [`workers/barchart-fetch.js`](workers/barchart-fetch.js)
+drives them by clicking the trigger open and clicking the option row (located by
+visible text, no fixed class names), then confirms the page's printed "expiration
+on MM/DD/YY" matches the target (stepping the Week dropdown if the date rolls into
+a later week). The opaque per-expiry symbol (e.g. `BG6N26`) is never computed and
+the button survives weekly/monthly rolls. `openTrigger`/`clickOption`/`setWeekByIndex`
+are the calibration surface if Barchart restructures those widgets.
+
+**Debug mode (no interactive session needed).** To see the exact dropdown markup
+after a failed pull, run in debug: it dumps the toolbar HTML into the failed job's
+status (`jobs[].toolbarHtml`). Turn it on any of three ways — tick **debug** next
+to *Pull today* in the panel (the captured markup appears in a box there and in the
+browser console), append `?debug=1` to the Worker's GET URL, or set the
+`AUTOPULL_DEBUG=1` var on the Worker to make every run capture. Paste that markup
+back and the `openTrigger`/`clickOption` text-matching can be pinned to real
+selectors. (Watching live with `wrangler browser view` still works too.)
+
+This path routes through the operator-gated `/api/autopull` (POST `action:"pull"`),
+which calls the Worker with a shared key so the browser never holds the Worker's
+URL or secret. It needs two more vars on the **Pages** project (Settings →
+Variables), in addition to the Worker secrets above:
+
+- `BARCHART_WORKER_URL` — this Worker's URL (e.g. `https://quan-barchart-fetch.<sub>.workers.dev`).
+- `AUTOPULL_KEY` — a shared secret; set the **same** value here and as a Worker
+  secret (`wrangler secret put AUTOPULL_KEY -c workers/wrangler-barchart.toml`).
 
 ---
 

@@ -123,3 +123,31 @@ alter table public.user_state enable row level security;
 drop policy if exists "user_state self" on public.user_state;
 create policy "user_state self" on public.user_state
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- 6. Brief history / archive (Phase 3 — snapshots over time) -------------------
+-- One durable row per user/instrument/trading-date, capturing the computed
+-- Report (and optionally the Heat Map grid) so past field reads can be browsed
+-- and re-published. Written/read via /api/archive with the user's own token
+-- (RLS-enforced). Listing columns (classification, summary) are inline for cheap
+-- lists; the full snapshot payload lives in the QUAN_STATE R2 bucket under
+-- brief/<user_id>/<inst>/<date>.json, or inline in `payload` when R2 isn't bound.
+create table if not exists public.brief_history (
+  user_id        uuid not null references auth.users(id) on delete cascade,
+  inst           text not null,
+  date           text not null,                 -- trading date the brief is for (YYYY-MM-DD)
+  classification text,                           -- e.g. field type — shown in the list
+  summary        text,                           -- short sub-line
+  in_r2          boolean not null default false, -- true => payload is in R2, `payload` is null
+  payload        text,                           -- inline {report,heatmap} JSON when not in R2
+  has_heatmap    boolean not null default false,
+  updated_at     timestamptz not null default now(),
+  primary key (user_id, inst, date)
+);
+
+create index if not exists brief_history_user_date_idx on public.brief_history (user_id, date desc);
+
+alter table public.brief_history enable row level security;
+
+drop policy if exists "brief_history self" on public.brief_history;
+create policy "brief_history self" on public.brief_history
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
