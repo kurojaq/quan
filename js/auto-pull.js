@@ -255,6 +255,15 @@
       '<div id="apStatus" style="margin-bottom:10px;">' + statusLine() + '</div>' +
       '<div id="apRows" style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto;margin-bottom:10px;">' + rows + '</div>' +
       '<div style="border-top:0.5px solid var(--glass-line);margin:8px 0;"></div>' +
+      '<div style="font-weight:600;margin-bottom:2px;">Session cookie</div>' +
+      '<div style="color:var(--cream-dim);font-size:11px;margin-bottom:6px;">Log into barchart.com, export its cookies (Cookie-Editor → Export → JSON), and paste here. The Worker reuses this instead of logging in.</div>' +
+      '<textarea id="apCookies" placeholder="[ { &quot;name&quot;:&quot;...&quot;, &quot;value&quot;:&quot;...&quot;, &quot;domain&quot;:&quot;.barchart.com&quot; }, ... ]" style="width:100%;height:80px;background:var(--fill);border:none;outline:none;border-radius:8px;color:var(--cream);font-size:10px;font-family:monospace;padding:6px;margin-bottom:6px;"></textarea>' +
+      '<div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;">' +
+      '<button id="apSeed" class="ctool" type="button">Seed cookie</button>' +
+      '<button id="apClearCk" class="ctool" type="button">Clear</button>' +
+      '<span id="apSeedMsg" style="color:var(--cream-dim);"></span>' +
+      '</div>' +
+      '<div style="border-top:0.5px solid var(--glass-line);margin:8px 0;"></div>' +
       '<div style="font-weight:600;margin-bottom:6px;">Add contract</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">' +
       '<input id="apSym" placeholder="Symbol (ESM25)" style="background:var(--fill);border:none;outline:none;border-radius:8px;color:var(--cream);padding:6px 8px;">' +
@@ -290,6 +299,28 @@
         if (del) del.addEventListener('click', function () { selection.splice(i, 1); render(); });
       });
     }
+    var seed = panel.querySelector('#apSeed');
+    if (seed) seed.addEventListener('click', async function () {
+      var msg = panel.querySelector('#apSeedMsg');
+      var ta = panel.querySelector('#apCookies');
+      var raw = (ta && ta.value || '').trim();
+      if (!raw) { if (msg) msg.textContent = 'paste exported cookies first'; return; }
+      if (msg) msg.textContent = 'seeding…';
+      try {
+        var r = await fetch('/api/autopull', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'seed-cookies', cookies: raw }) });
+        var d = await r.json().catch(function () { return {}; });
+        if (msg) msg.textContent = r.ok ? ('seeded ' + (d.count != null ? d.count : '?') + ' cookies ✓') : ('error: ' + (d.error || r.status));
+        if (r.ok && ta) ta.value = '';
+      } catch (e) { if (msg) msg.textContent = 'error: ' + e.message; }
+    });
+    var clearCk = panel.querySelector('#apClearCk');
+    if (clearCk) clearCk.addEventListener('click', async function () {
+      var msg = panel.querySelector('#apSeedMsg');
+      try {
+        var r = await fetch('/api/autopull', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'clear-cookies' }) });
+        if (msg) msg.textContent = r.ok ? 'cleared' : 'error';
+      } catch (e) { if (msg) msg.textContent = 'error: ' + e.message; }
+    });
     var add = panel.querySelector('#apAdd');
     if (add) add.addEventListener('click', function () {
       var sym = (panel.querySelector('#apSym').value || '').trim().toUpperCase();

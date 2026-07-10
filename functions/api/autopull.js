@@ -68,6 +68,32 @@ export async function onRequestPost({ request, env }) {
   if (gate instanceof Response) return gate;
   try {
     const body = await request.json().catch(() => ({}));
+
+    // Seed / clear the Barchart session cookie the Worker reuses (avoids the
+    // datacenter-IP login that Barchart bot-challenges). Written to the same KV
+    // (autopull:cookies) the Worker reads.
+    if (body.action === 'seed-cookies') {
+      if (!env.QUAN_PUBLISH) return serverError('KV not bound');
+      let cookies = body.cookies;
+      if (typeof cookies === 'string') { try { cookies = JSON.parse(cookies); } catch (_) { return badRequest('cookies must be JSON'); } }
+      if (!Array.isArray(cookies)) return badRequest('cookies[] required (exported JSON array)');
+      const clean = cookies
+        .filter((c) => c && c.name && c.value != null)
+        .map((c) => ({
+          name: String(c.name), value: String(c.value),
+          domain: c.domain, path: c.path,
+          expires: c.expires != null ? c.expires : c.expirationDate,
+          httpOnly: c.httpOnly, secure: c.secure, sameSite: c.sameSite,
+        }));
+      if (!clean.length) return badRequest('no valid {name,value} cookies found');
+      await env.QUAN_PUBLISH.put('autopull:cookies', JSON.stringify(clean));
+      return json({ ok: true, count: clean.length });
+    }
+    if (body.action === 'clear-cookies') {
+      if (env.QUAN_PUBLISH) await env.QUAN_PUBLISH.delete('autopull:cookies');
+      return json({ ok: true });
+    }
+
     if (body.action !== 'pull') return badRequest('unknown action');
     if (!Array.isArray(body.jobs) || !body.jobs.length) return badRequest('jobs[] required');
     // Prefer the internal Service binding (env.BARCHART); fall back to the legacy

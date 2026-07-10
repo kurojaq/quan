@@ -112,23 +112,49 @@ async function writeJSON(env, key, val, ttlSec) {
   } catch (_) {}
 }
 
-/* ── Auth: reuse cached cookies, log in only when the session is dead ──────── */
+/* ── Auth: reuse a seeded/cached session cookie; only log in if it's dead ────
+   The primary path is a SEEDED cookie (you export your logged-in Barchart
+   session from your own browser via /api/autopull seed-cookies). That avoids a
+   datacenter-IP login, which Barchart bot-challenges. login() is the fallback. */
+
+// Normalize a cookie from Puppeteer (page.cookies) OR a browser extension export
+// (Cookie-Editor etc.: expirationDate, no_restriction sameSite) into setCookie form.
+function normCookie(c) {
+  const out = { name: String(c.name), value: String(c.value == null ? '' : c.value) };
+  if (c.domain) out.domain = c.domain;
+  if (c.path) out.path = c.path;
+  const exp = c.expires != null ? c.expires : c.expirationDate;
+  if (typeof exp === 'number' && exp > 0) out.expires = Math.floor(exp);
+  if (typeof c.httpOnly === 'boolean') out.httpOnly = c.httpOnly;
+  if (typeof c.secure === 'boolean') out.secure = c.secure;
+  const ss = String(c.sameSite || '').toLowerCase();
+  if (ss === 'strict') out.sameSite = 'Strict';
+  else if (ss === 'lax') out.sameSite = 'Lax';
+  else if (ss === 'none' || ss === 'no_restriction') out.sameSite = out.secure ? 'None' : undefined;
+  if (out.sameSite === undefined) delete out.sameSite;
+  return out;
+}
 
 async function applyCachedCookies(page, env) {
   const cookies = await readJSON(env, K.cookies, null);
-  if (Array.isArray(cookies) && cookies.length) {
-    try {
-      await page.setCookie(...cookies);
-      return true;
-    } catch (_) {}
+  if (!Array.isArray(cookies) || !cookies.length) return false;
+  let applied = 0;
+  // One at a time so a single malformed cookie can't reject the whole batch.
+  for (const c of cookies) {
+    if (!c || !c.name) continue;
+    try { await page.setCookie(normCookie(c)); applied++; } catch (_) {}
   }
-  return false;
+  return applied > 0;
 }
 
+// Logged-in test that doesn't depend on a fragile marker selector: if visiting a
+// members page bounces us to /login we're out; otherwise we're in (marker is a bonus).
 async function isLoggedIn(page) {
   try {
     await page.goto(BC.sessionProbeUrl, { waitUntil: 'domcontentloaded', timeout: BC.navTimeoutMs });
-    return (await page.$(BC.sel.loggedInMarker)) !== null;
+    if (/\/login\b/i.test(page.url())) return false;
+    if (await page.$(BC.sel.loggedInMarker)) return true;
+    return !/\/login\b/i.test(page.url());
   } catch (_) {
     return false;
   }
@@ -157,7 +183,12 @@ async function login(page, env) {
 
 async function ensureSession(page, env) {
   await applyCachedCookies(page, env);
-  if (await isLoggedIn(page)) return 'reused';
+  if (await isLoggedIn(page)) {
+    // Re-save the (possibly refreshed) cookies so a seeded session stays alive as
+    // long as it's used before Barchart expires it.
+    try { await writeJSON(env, K.cookies, await page.cookies()); } catch (_) {}
+    return 'reused';
+  }
   await login(page, env);
   return 'login';
 }
