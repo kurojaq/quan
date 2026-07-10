@@ -374,6 +374,35 @@ async function captureToolbarHtml(page) {
   }
 }
 
+// Debug aid for a login failure: tells us whether our form selectors matched,
+// whether the page looks like a bot-challenge/2FA, and where we ended up — so we
+// can distinguish "selectors wrong" (fixable) from "datacenter IP challenged".
+async function captureLoginDebug(page) {
+  try {
+    return await page.evaluate((sel) => {
+      const has = (s) => { try { return !!document.querySelector(s); } catch (_) { return false; } };
+      const text = (document.body.innerText || '').replace(/\s+/g, ' ').trim();
+      const hints = [
+        'captcha', 'recaptcha', 'hcaptcha', 'press & hold', 'are you a robot', 'are you human',
+        'unusual activity', 'verify', 'verification code', 'two-factor', '2fa', 'one-time',
+        'cloudflare', 'access denied', 'blocked', 'suspicious',
+      ].filter((h) => text.toLowerCase().includes(h));
+      return {
+        url: location.href,
+        title: document.title,
+        hasEmailField: has(sel.email),
+        hasPasswordField: has(sel.password),
+        hasSubmitButton: has(sel.submit),
+        hasLoggedInMarker: has(sel.loggedInMarker),
+        challengeHints: hints,
+        bodySnippet: text.slice(0, 1500),
+      };
+    }, BC.sel);
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
 async function downloadCsv(page, job) {
   // Two ways to land on the target expiry page:
   //   • job.url            → a fixed page URL (saved-selection rows)
@@ -412,8 +441,9 @@ async function run(env, jobsOverride, opts = {}) {
 
   const index = await readJSON(env, K.index, {});
   const browser = await puppeteer.launch(env.BROWSER);
+  let page = null;
   try {
-    const page = await browser.newPage();
+    page = await browser.newPage();
     await page.setUserAgent(BC.userAgent);
     await page.setViewport({ width: 1440, height: 900 });
 
@@ -447,6 +477,7 @@ async function run(env, jobsOverride, opts = {}) {
     }
   } catch (err) {
     status.error = err.message; // session-level failure (e.g. login/bot-challenge)
+    if (debug && page) status.loginDebug = await captureLoginDebug(page);
   } finally {
     try {
       await browser.close();

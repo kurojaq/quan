@@ -187,8 +187,13 @@
       var got = await ingestNew();
       var s = d.status || {};
       if (msgEl) msgEl.textContent = 'pulled ' + (s.ok || 0) + ' / failed ' + (s.fail || 0) + ' · ingested ' + got;
-      // Surface captured toolbar markup (debug runs) into the panel + console.
-      var mk = debugMarkup(s);
+      // Surface captured debug (login diagnostics + toolbar markup) into the panel + console.
+      var parts = [];
+      if (s.loginDebug) parts.push('LOGIN DEBUG:\n' + JSON.stringify(s.loginDebug, null, 2));
+      if (s.error) parts.push('SESSION ERROR: ' + s.error);
+      var tm = debugMarkup(s);
+      if (tm) parts.push(tm);
+      var mk = parts.join('\n\n=====\n\n');
       var dbgEl = panel.querySelector('#apDebug');
       if (dbgEl) {
         if (mk) { dbgEl.style.display = 'block'; dbgEl.querySelector('textarea').value = mk; try { console.log('[auto-pull] captured toolbar markup:\n' + mk); } catch (_) {} }
