@@ -37,6 +37,16 @@ bucket_name = "quan-state"
 binding = "BARCHART"
 service = "quan-barchart-fetch"
 
+# Service binding to the EXECUTION runtime Worker (Tradovate). Lets /api/execution
+# reach it privately (env.EXECUTION.fetch) with no public URL. The Worker is
+# deployed separately (workers/wrangler-execution.toml) and holds the broker
+# credentials + access token; the terminal only ever calls /api/execution.
+# Add this binding by hand too: Pages → Settings → Bindings → Service binding →
+# variable EXECUTION → service quan-execution.
+[[services]]
+binding = "EXECUTION"
+service = "quan-execution"
+
 # Secrets/vars are set in the dashboard (Settings → Environment variables), not
 # committed here. Required keys are listed in functions/api/_shared.js and
 # documented in STRIPE_SETUP.md:

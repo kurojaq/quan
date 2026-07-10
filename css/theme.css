@@ -745,3 +745,69 @@
 #tabCompass .foot{color:var(--label);font-size:11px;margin:12px;border-top:0.5px solid var(--line);padding-top:9px;}
 #tabCompass code{background:var(--fill);border:none;border-radius:5px;padding:1px 5px;color:var(--cream);font-family:var(--font-mono);}
 #tabCompass .SessT{color:var(--cream);font:600 12px var(--font-mono);font-variant-numeric:tabular-nums;}
+
+/* ===========================================================================
+   EXECUTION module — mission-control cockpit (js/execution.js).
+   Theme-aware (all colors via vars, so light/dark just work). Dense, minimal,
+   no retail-trading chrome — native to the Qu'an surface.
+   =========================================================================== */
+  .exbadge{font:600 10px var(--font-mono);letter-spacing:.08em;padding:3px 9px;border-radius:999px;text-transform:uppercase;}
+  .exbadge-idle{background:var(--fill);color:var(--cream-dim);}
+  .exbadge-demo{background:rgba(120,170,255,0.16);color:var(--cream);box-shadow:inset 0 0 0 .5px rgba(120,170,255,0.4);}
+  .exbadge-live{background:rgba(255,120,120,0.18);color:var(--cream);box-shadow:inset 0 0 0 .5px rgba(255,120,120,0.55);}
+  .exBody{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:12px;}
+  .exStatusBar{font:11.5px/1.4 var(--font-mono);color:var(--cream-dim);background:var(--panel);border-radius:var(--radius-sm);padding:9px 13px;}
+  .exStatusBar.err{color:var(--cream);box-shadow:inset 0 0 0 .5px rgba(255,120,120,0.5);}
+  .exStatusBar.ok{color:var(--cream);}
+  .exGrid{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:minmax(300px,1.1fr) minmax(280px,1fr) minmax(220px,0.8fr);gap:12px;}
+  @media (max-width:1100px){ .exGrid{grid-template-columns:1fr 1fr;} .exPanel-risk{grid-column:1 / -1;} }
+  @media (max-width:720px){ .exGrid{grid-template-columns:1fr;} }
+  .exPanel{background:var(--panel);border-radius:var(--radius-md);padding:13px 14px;display:flex;flex-direction:column;gap:11px;min-height:0;overflow:auto;}
+  .exPanelHdr{font-size:12px;font-weight:600;letter-spacing:.02em;color:var(--cream);display:flex;align-items:baseline;justify-content:space-between;gap:8px;border-bottom:0.5px solid var(--line);padding-bottom:8px;}
+  .exPanelSub{font:10px var(--font-mono);color:var(--label);letter-spacing:.06em;text-transform:uppercase;}
+  .exForm{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+  .exField{display:flex;flex-direction:column;gap:4px;font-size:10px;color:var(--cream-dim);letter-spacing:.04em;}
+  .exField>span{text-transform:uppercase;font-size:9.5px;color:var(--label);letter-spacing:.07em;}
+  .exField input,.exField select{background:var(--fill);border:none;outline:none;border-radius:var(--radius-sm);color:var(--cream);padding:7px 9px;font-size:12px;font-variant-numeric:tabular-nums;}
+  .exField input:focus,.exField select:focus{background:var(--fill-2);}
+  .exField-sm{flex:1;}
+  .exBracketRow{display:flex;align-items:flex-end;gap:9px;flex-wrap:wrap;}
+  .exChk{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--cream-dim);white-space:nowrap;padding-bottom:7px;}
+  .exFormFoot{display:flex;align-items:center;gap:9px;flex-wrap:wrap;}
+  .exFormMsg{font:10.5px var(--font-mono);color:var(--cream-dim);flex:1;min-width:80px;}
+  .exFormMsg.err{color:#ff9a9a;} .exFormMsg.ok{color:var(--cream);}
+  .exQueue{display:flex;flex-direction:column;gap:7px;border-top:0.5px solid var(--line);padding-top:10px;}
+  .exEmpty{font:11px var(--font-mono);color:var(--label);padding:4px 0;}
+  .exOrder,.exRow{display:flex;align-items:center;gap:9px;background:var(--fill);border-radius:var(--radius-sm);padding:8px 10px;font:11px var(--font-mono);color:var(--cream);font-variant-numeric:tabular-nums;}
+  .exRow{flex-wrap:wrap;}
+  .exOrderSide{font-weight:700;letter-spacing:.04em;}
+  .exOrderSide.buy{color:#7fd3a0;} .exOrderSide.sell{color:#ff9a9a;}
+  .exOrderMeta{color:var(--cream-dim);flex:1;min-width:60px;}
+  .exOrderState{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:var(--fill-2);color:var(--cream-dim);}
+  .exOrderState.working{color:var(--cream);} .exOrderState.filled{color:#7fd3a0;} .exOrderState.rejected{color:#ff9a9a;}
+  .exMini{background:var(--fill);border:none;border-radius:8px;color:var(--cream-dim);font-size:10px;padding:4px 8px;cursor:pointer;}
+  .exMini:hover{background:var(--fill-2);color:var(--cream);}
+  .exMonSection{display:flex;flex-direction:column;gap:6px;}
+  .exMonTitle{font:9.5px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--label);}
+  .exMonList{display:flex;flex-direction:column;gap:6px;}
+  .exRiskGrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+  .exRiskCard{background:var(--fill);border-radius:var(--radius-sm);padding:10px 11px;display:flex;flex-direction:column;gap:5px;}
+  .exRiskK{font:9.5px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--label);}
+  .exRiskV{font:600 16px var(--font-mono);color:var(--cream);font-variant-numeric:tabular-nums;}
+  .exRiskV.pos{color:#7fd3a0;} .exRiskV.neg{color:#ff9a9a;}
+  .exRiskNote{font:10.5px/1.5 var(--font-mono);color:var(--label);}
+  /* Connect popover — self-service Tradovate sign-in from the terminal. */
+  .exLoginPanel{display:none;position:absolute;top:calc(100% + 8px);right:0;z-index:9997;width:288px;padding:14px;
+    background:var(--glass-strong);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+    border:0.5px solid var(--glass-line);border-radius:var(--radius-md);box-shadow:var(--shadow);
+    flex-direction:column;gap:9px;text-align:left;}
+  .exLoginPanel.on{display:flex;}
+  .exLoginTitle{font-size:12px;font-weight:600;color:var(--cream);letter-spacing:.01em;}
+  .exLoginAdv{font-size:10px;color:var(--cream-dim);}
+  .exLoginAdv>summary{cursor:pointer;color:var(--label);letter-spacing:.05em;text-transform:uppercase;font:9.5px var(--font-mono);padding:2px 0;list-style:none;}
+  .exLoginAdv>summary::-webkit-details-marker{display:none;}
+  .exLoginAdv[open]{display:flex;flex-direction:column;gap:9px;margin-top:2px;}
+  .exLoginAdv>summary::before{content:'▸ ';} .exLoginAdv[open]>summary::before{content:'▾ ';}
+  .exLoginFoot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .exLoginNote{font:10px/1.5 var(--font-mono);color:var(--label);}
+  .exLoginPanel .exField input,.exLoginPanel .exField select{width:100%;box-sizing:border-box;}

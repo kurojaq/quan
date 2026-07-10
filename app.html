@@ -58,6 +58,7 @@
     <button class="tabbtn" data-tab="chart">Chart</button>
     <button class="tabbtn" data-tab="compass">Compass</button>
     <button class="tabbtn" data-tab="sim">Account Sim</button>
+    <button class="tabbtn" data-tab="exec">Execution</button>
     <button class="tabbtn splitplus" data-tab="split" id="splitTab" title="Split view — show two tabs at once">+</button>
     <div class="gctrls">
       <div class="instrbar"><select class="field" id="instA"></select></div>
@@ -104,10 +105,10 @@
     <button class="sb-lay" id="spLayV">▤ Stacked</button>
     <span class="sb-k" style="margin-left:6px">Left / Top</span>
     <select class="field" id="spInstA"></select>
-    <select class="field" id="spPaneA"><option value="report">Report</option><option value="detector">Detector</option><option value="polar">Field Study</option><option value="strike">Strike Field</option><option value="heat">Heat Map</option><option value="chart">Chart</option><option value="compass">Compass</option><option value="sim">Account Sim</option></select>
+    <select class="field" id="spPaneA"><option value="report">Report</option><option value="detector">Detector</option><option value="polar">Field Study</option><option value="strike">Strike Field</option><option value="heat">Heat Map</option><option value="chart">Chart</option><option value="compass">Compass</option><option value="sim">Account Sim</option><option value="exec">Execution</option></select>
     <span class="sb-k">Right / Bottom</span>
     <select class="field" id="spInstB"></select>
-    <select class="field" id="spPaneB"><option value="report">Report</option><option value="detector">Detector</option><option value="polar">Field Study</option><option value="strike">Strike Field</option><option value="heat" selected>Heat Map</option><option value="chart">Chart</option><option value="compass">Compass</option><option value="sim">Account Sim</option></select>
+    <select class="field" id="spPaneB"><option value="report">Report</option><option value="detector">Detector</option><option value="polar">Field Study</option><option value="strike">Strike Field</option><option value="heat" selected>Heat Map</option><option value="chart">Chart</option><option value="compass">Compass</option><option value="sim">Account Sim</option><option value="exec">Execution</option></select>
     <span class="sb-sess" id="splitSess"><span class="sb-k">Session t</span><span class="v" id="splitSessT">0.0000</span></span>
     <button class="sb-x" id="splitExit">✕ Exit split</button>
   </div>
@@ -315,6 +316,13 @@
       <span class="sub">Price Chart</span>
     </div>
     <div class="hdr-right">
+      <div class="slot" title="Chart view — plain price, or the heat map blended behind price (Bookmap-style)">
+        <div class="expsel">
+          <button class="expbtn chart-view on" data-chartview="price" type="button">Price</button>
+          <button class="expbtn chart-view" data-chartview="bookmap" type="button">Bookmap</button>
+        </div>
+        <select class="field" id="chartHeatMetric" title="Heat metric" style="display:none"></select>
+      </div>
       <div class="slot" id="chartTfRow">
         <button class="ctool chart-tf" data-range="5d" data-interval="1m" type="button">1m</button>
         <button class="ctool chart-tf on" data-range="5d" data-interval="5m" type="button">5m</button>
@@ -444,6 +452,87 @@
     <div class="rptBody" id="simBody"></div>
   </div>
   </section>
+  <section class="tabsec" id="tabExec">
+  <header>
+    <div class="brand">
+      <span class="inf">&#8734;</span>
+      <span class="name">The Qu'an</span>
+      <span class="sub">Execution Engine</span>
+    </div>
+    <div class="hdr-right">
+      <div class="slot"><span class="tag">Runtime</span><span class="exbadge exbadge-idle" id="exEnvBadge">OFFLINE</span></div>
+      <div class="slot"><span class="tag">Account</span><select class="field" id="exAcct"><option value="">— connect —</option></select></div>
+      <div class="slot"><span class="tag">Balance</span><span class="v" id="exBalance" style="font-family:var(--font-mono);font-variant-numeric:tabular-nums">—</span></div>
+      <div class="slot" id="exConnWrap" style="position:relative">
+        <button class="ctool" id="exConnectBtn" type="button" title="Connect to Tradovate">&#9679; Connect</button>
+        <div id="exLoginPanel" class="exLoginPanel" aria-hidden="true">
+          <div class="exLoginTitle">Connect to Tradovate</div>
+          <label class="exField"><span>Environment</span><select id="exLoginEnv"><option value="demo">Demo (paper)</option><option value="live">Live · real money</option></select></label>
+          <label class="exField"><span>Username</span><input id="exLoginUser" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="Tradovate username"></label>
+          <label class="exField"><span>Password</span><input id="exLoginPass" type="password" autocomplete="current-password" placeholder="••••••••"></label>
+          <details class="exLoginAdv"><summary>API key &amp; app (optional)</summary>
+            <label class="exField"><span>App name</span><input id="exLoginApp" type="text" spellcheck="false" value="The Qu'an"></label>
+            <label class="exField"><span>API key cid</span><input id="exLoginCid" type="text" inputmode="numeric" spellcheck="false" placeholder="raises rate limits"></label>
+            <label class="exField"><span>API key sec</span><input id="exLoginSec" type="password" spellcheck="false" placeholder="API secret"></label>
+          </details>
+          <div class="exLoginFoot">
+            <button class="rptbtn rptbtn-on" id="exLoginGo" type="button">Connect</button>
+            <button class="rptbtn" id="exLoginCancel" type="button">Cancel</button>
+            <span class="exFormMsg" id="exLoginMsg"></span>
+          </div>
+          <div class="exLoginNote">Sent once over HTTPS to your own runtime, exchanged for a session token, and never stored. Sign in once — the session persists.</div>
+        </div>
+      </div>
+      <button class="ctool" id="exRefreshBtn" type="button" title="Refresh the live book (orders · positions · fills)">&#8635;</button>
+    </div>
+  </header>
+  <div class="exBody">
+    <div class="exStatusBar" id="exStatus">Idle — the Execution Engine materializes analytical intent under bounded risk. Connect to route.</div>
+    <div class="exGrid">
+      <section class="exPanel exPanel-injector">
+        <div class="exPanelHdr">Pending Order Injector <span class="exPanelSub">stage &rarr; activate &rarr; route</span></div>
+        <div class="exForm">
+          <label class="exField"><span>Symbol</span><input type="text" id="exSym" placeholder="ESZ4" autocomplete="off" spellcheck="false"></label>
+          <label class="exField"><span>Side</span><select id="exSide"><option value="Buy">Buy</option><option value="Sell">Sell</option></select></label>
+          <label class="exField"><span>Qty</span><input type="number" id="exQty" min="1" step="1" value="1"></label>
+          <label class="exField"><span>Type</span><select id="exType"><option value="Limit">Limit</option><option value="Market">Market</option><option value="Stop">Stop</option><option value="StopLimit">Stop-Limit</option></select></label>
+          <label class="exField" id="exPriceWrap"><span>Limit px</span><input type="number" id="exPrice" step="any" placeholder="—"></label>
+          <label class="exField" id="exStopWrap" style="display:none"><span>Stop px</span><input type="number" id="exStopPrice" step="any" placeholder="—"></label>
+          <label class="exField"><span>TIF</span><select id="exTif"><option value="Day">Day</option><option value="GTC">GTC</option><option value="IOC">IOC</option><option value="FOK">FOK</option></select></label>
+        </div>
+        <div class="exBracketRow">
+          <label class="exChk"><input type="checkbox" id="exBracket"> Bracket (OSO)</label>
+          <label class="exField exField-sm"><span>Stop-loss</span><input type="number" id="exSL" step="any" placeholder="—" disabled></label>
+          <label class="exField exField-sm"><span>Take-profit</span><input type="number" id="exTP" step="any" placeholder="—" disabled></label>
+        </div>
+        <div class="exFormFoot">
+          <button class="rptbtn" id="exStageBtn" type="button" title="Stage this order in the pending queue (dormant until you route it)">Stage &#8595;</button>
+          <button class="rptbtn rptbtn-on" id="exRouteBtn" type="button" title="Route this ticket to the broker now">Route now</button>
+          <span class="exFormMsg" id="exFormMsg"></span>
+        </div>
+        <div class="exQueue" id="exQueue"><div class="exEmpty">No pending orders staged.</div></div>
+      </section>
+
+      <section class="exPanel exPanel-monitor">
+        <div class="exPanelHdr">Live Execution Monitor <span class="exPanelSub" id="exMonSub">&mdash;</span></div>
+        <div class="exMonSection"><div class="exMonTitle">Working orders</div><div class="exMonList" id="exOrders"><div class="exEmpty">&mdash;</div></div></div>
+        <div class="exMonSection"><div class="exMonTitle">Positions</div><div class="exMonList" id="exPositions"><div class="exEmpty">&mdash;</div></div></div>
+        <div class="exMonSection"><div class="exMonTitle">Recent fills</div><div class="exMonList" id="exFills"><div class="exEmpty">&mdash;</div></div></div>
+      </section>
+
+      <section class="exPanel exPanel-risk">
+        <div class="exPanelHdr">Risk Field <span class="exPanelSub">continuous</span></div>
+        <div class="exRiskGrid" id="exRiskGrid">
+          <div class="exRiskCard"><div class="exRiskK">Open positions</div><div class="exRiskV" id="exRkPos">&mdash;</div></div>
+          <div class="exRiskCard"><div class="exRiskK">Working orders</div><div class="exRiskV" id="exRkOrd">&mdash;</div></div>
+          <div class="exRiskCard"><div class="exRiskK">Open P/L</div><div class="exRiskV" id="exRkOpl">&mdash;</div></div>
+          <div class="exRiskCard"><div class="exRiskK">Net position</div><div class="exRiskV" id="exRkNet">&mdash;</div></div>
+        </div>
+        <div class="exRiskNote">Risk exists as a living field, not static limits. Phase 3b wires the continuous chronometric/field-instability metrics from the analysis engine into this panel.</div>
+      </section>
+    </div>
+  </div>
+  </section>
   <div class="splitDiv" id="splitDiv"></div>
   </div>
 </div>
@@ -459,6 +548,7 @@
 <script src="js/desk-session.js" defer></script>
 <script src="js/live-anchor.js" defer></script>
 <script src="js/chart-tab.js" defer></script>
+<script src="js/chart-heat.js" defer></script>
 <script src="js/compass.js" defer></script>
 <script src="js/theme-toggle.js" defer></script>
 <script src="js/split-view.js" defer></script>
@@ -511,5 +601,6 @@
 <script src="js/auto-pull.js" defer></script>
 <div id="rptPrintDoc"></div>
 <script src="js/account-sim.js" defer></script>
+<script src="js/execution.js" defer></script>
 </body>
 </html>

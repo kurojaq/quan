@@ -86,6 +86,11 @@
   <div class="vpane" id="vPaneChart">
     <div class="vchartbar">
       <span class="fn" id="chartPriceTitle">&mdash;</span>
+      <div class="expsel">
+        <button class="expbtn chart-view on" data-chartview="price" type="button">Price</button>
+        <button class="expbtn chart-view" data-chartview="bookmap" type="button">Bookmap</button>
+      </div>
+      <select class="field" id="chartHeatMetric" title="Heat metric" style="display:none"></select>
       <button class="ctool chart-tf on" data-range="5d" data-interval="5m" type="button">5D / 5m</button>
       <button class="ctool chart-tf" data-range="1mo" data-interval="15m" type="button">1M / 15m</button>
       <button class="ctool chart-tf" data-range="6mo" data-interval="1d" type="button">6M / 1D</button>
@@ -108,6 +113,7 @@
 <script src="js/live-anchor.js" defer></script>
 <script src="js/session-calendar.js" defer></script>
 <script src="js/chart-tab.js" defer></script>
+<script src="js/chart-heat.js" defer></script>
 <script src="js/view-report.js" defer></script>
 <script src="js/view-app.js" defer></script>
 </body>

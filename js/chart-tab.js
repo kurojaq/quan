@@ -178,6 +178,8 @@
       .then(function(r){ return r.json(); }).then(function(d){
         if(!d||!d.bars||!d.bars.length){ statusEl.textContent=(d&&d.error)?('error: '+d.error):'no bars returned'; return; }
         series.setData(d.bars.map(function(b){ return {time:b.time,open:b.open,high:b.high,low:b.low,close:b.close}; }));
+        window.__chartBars=d.bars; // chart-heat.js reads these for the volume-bubble layer
+        try{ window.dispatchEvent(new CustomEvent('quan:bars')); }catch(_){}
         var last=d.bars[d.bars.length-1].close;
         var p=precFor(inst,last);
         series.applyOptions({priceFormat:{type:'price',precision:p,minMove:Math.pow(10,-p)}});
@@ -188,6 +190,9 @@
         drawDayRange(d.bars,(document.getElementById('dayDate')||{}).value||'');
       }).catch(function(){ statusEl.textContent='proxy unreachable — check your connection'; });
   }
+
+  // js/chart-heat.js (Bookmap-style heat blend) needs the live chart + series to attach its pane primitive
+  window.__chartApi=function(){ return {chart:chart,series:series,container:container}; };
 
   window.__chartOnLiveTick=function(sym,price){
     if(!series||sym!==curSym) return;

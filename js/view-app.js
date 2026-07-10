@@ -20,6 +20,13 @@
   // chart-tab.js and view-report.js both call this exactly like the main terminal's report.js does —
   // here it's just a lookup into the already-published snapshot instead of a live engine call.
   window.__reportData=function(inst,date){ var s=snapshotFor(inst,date); return s?s.report:null; };
+  // chart-heat.js (Bookmap blend on the Price tab) reads published heat grids from here instead of an engine iframe.
+  // Plural hook feeds ALL published dates so the heat field is segmented over time.
+  window.__getHeatSnapshot=function(){ var s=snapshotFor(curInst,curDate); return (s&&s.heatmap)||null; };
+  window.__getHeatSnapshots=function(){
+    var arr=(VIEW&&VIEW.snapshots&&VIEW.snapshots[curInst])||[];
+    return arr.filter(function(s){ return s&&s.heatmap; }).map(function(s){ return {date:s.date,heatmap:s.heatmap}; });
+  };
 
   function feedHeatmap(){
     if(!heatFrame||!heatFrame.contentWindow) return;

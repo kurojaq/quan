@@ -47,12 +47,12 @@ async function fetchYahooChart(symbol, range, interval) {
 function toHistory(symbol, result) {
   const ts = result.timestamp || [];
   const q = ((result.indicators && result.indicators.quote) || [{}])[0] || {};
-  const o = q.open || [], h = q.high || [], l = q.low || [], c = q.close || [];
+  const o = q.open || [], h = q.high || [], l = q.low || [], c = q.close || [], v = q.volume || [];
   const bars = [];
   for (let i = 0; i < ts.length; i++) {
     if (i >= o.length || i >= h.length || i >= l.length || i >= c.length) break;
     if (o[i] == null || h[i] == null || l[i] == null || c[i] == null) continue;
-    bars.push({ time: Math.floor(ts[i]), open: o[i], high: h[i], low: l[i], close: c[i] });
+    bars.push({ time: Math.floor(ts[i]), open: o[i], high: h[i], low: l[i], close: c[i], volume: v[i] == null ? null : v[i] });
   }
   const meta = result.meta || {};
   return { symbol, bars, currency: meta.currency ?? null, exchangeName: meta.exchangeName ?? null };
