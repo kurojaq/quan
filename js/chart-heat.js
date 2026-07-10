@@ -292,9 +292,15 @@
         if(t>=allBars[allBars.length-1].time) return paneW;
         var lo=0,hi=allBars.length-1;
         while(hi-lo>1){ var mid=(lo+hi)>>1; if(allBars[mid].time<=t) lo=mid; else hi=mid; }
-        var frac=(t-allBars[lo].time)/((allBars[hi].time-allBars[lo].time)||1);
-        var xc=ts.logicalToCoordinate(lo+frac);
-        return xc==null?null:xc;
+        // interpolate between the surrounding bars' own coordinates — exact bar
+        // times are the only inputs timeToCoordinate resolves reliably
+        var xa=ts.timeToCoordinate(allBars[lo].time), xb=ts.timeToCoordinate(allBars[hi].time);
+        if(xa!=null&&xb!=null){
+          var frac=(t-allBars[lo].time)/((allBars[hi].time-allBars[lo].time)||1);
+          return xa+(xb-xa)*frac;
+        }
+        if(xa!=null) return xa;
+        if(xb!=null) return xb;
       }
       return null;
     }
