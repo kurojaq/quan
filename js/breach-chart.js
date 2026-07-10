@@ -5,7 +5,7 @@
   var boctx=ov.getContext('2d');
   var NS='http://www.w3.org/2000/svg';
   var ML=52,MR=20,MT=20,MB=34,W=900,H=480;
-  var st={ten:'CL',inst:'both',poly:true,slope:false,pts:true,A:true,B:true,C:true,panx:0,pany:0,zoom:1};
+  var st={ten:'CL',poly:true,slope:false,pts:true,B:true,C:true,panx:0,pany:0,zoom:1};
   function median(a){var b=a.slice().sort(function(x,y){return x-y;});var n=b.length;return n%2?b[(n-1)/2]:(b[n/2-1]+b[n/2])/2;}
   function clipArr(y){var m=median(y);var ad=y.map(function(v){return Math.abs(v-m);});var mad=median(ad);var s=3*1.4826*mad;if(!(s>0)){s=Math.max.apply(null,ad)||1;}var lo=m-s,hi=m+s;return y.map(function(v){return v<lo?lo:(v>hi?hi:v);});}
   function polyfit(x,y,deg){var n=x.length,m=deg+1,i,j,k;var V=[];for(i=0;i<n;i++){var row=[],p=1;for(j=0;j<m;j++){row.push(p);p*=x[i];}V.push(row);}
@@ -20,19 +20,18 @@
   function render(){
     while(svg.firstChild)svg.removeChild(svg.firstChild);
     var d=(window.__breachData?window.__breachData():null);
-    var rowsA=(d&&d.rowsA)||[],rowsB=(d&&d.rowsB)||[],inst=(d&&d.inst)||'NQ';
-    if(title)title.textContent='Breach \u00b7 '+inst+' / ZN \u00b7 '+st.ten;
+    var rowsA=(d&&d.rowsA)||[],inst=(d&&d.inst)||'NQ';
+    if(title)title.textContent='Breach \u00b7 '+inst+' \u00b7 '+st.ten;
     var col=st.ten==='CL'?1:2;
     function series(rows){if(!rows||!rows.length)return null;var x=[],y=[];for(var i=0;i<rows.length;i++){var cx=rows[i][0],cy=rows[i][col];if(cx==null||cy==null||isNaN(cx)||isNaN(cy))continue;x.push(+cx);y.push(+cy);}if(x.length<3)return null;return {x:x,y:y};}
-    var showNQ=(st.inst==='both'||st.inst==='NQ'),showZN=(st.inst==='both'||st.inst==='ZN');
-    var sA=showNQ?series(rowsA):null,sB=showZN?series(rowsB):null;
-    if(!sA&&!sB){read.innerHTML='<span class="empty">&mdash; load Chain + ZN to compute breaches</span>';return;}
+    var sA=series(rowsA);
+    if(!sA){read.innerHTML='<span class="empty">&mdash; load a chain to compute breaches</span>';return;}
     function fit(s){if(!s)return null;var yc=clipArr(s.y);return {x:s.x,y:s.y,yc:yc,c:polyfit(s.x,yc,9)};}
-    var fA=fit(sA),fB=fit(sB);
+    var fA=fit(sA);
     var N=400,X=[];for(var i=0;i<N;i++)X.push(-1+2*i/(N-1));
     function dense(f){if(!f)return null;var P=X.map(function(xx){return polyval(f.c,xx);});var S=X.map(function(xx,ix){var x0=Math.max(0,ix-1),x1=Math.min(N-1,ix+1);return (polyval(f.c,X[x1])-polyval(f.c,X[x0]))/(X[x1]-X[x0]);});return {P:P,S:S};}
-    var dA=dense(fA),dB=dense(fB);
-    var ys=[];if(dA)ys=ys.concat(dA.P);if(dB)ys=ys.concat(dB.P);if(fA)ys=ys.concat(fA.yc);if(fB)ys=ys.concat(fB.yc);if(st.slope){if(dA)ys=ys.concat(dA.S);if(dB)ys=ys.concat(dB.S);}
+    var dA=dense(fA);
+    var ys=[];if(dA)ys=ys.concat(dA.P);if(fA)ys=ys.concat(fA.yc);if(st.slope){if(dA)ys=ys.concat(dA.S);}
     var ymin=Math.min.apply(null,ys),ymax=Math.max.apply(null,ys);if(ymin===ymax){ymin-=1;ymax+=1;}var pad=(ymax-ymin)*0.08;ymin-=pad;ymax+=pad;
     var PW=W-ML-MR,PH=H-MT-MB;
     function sx(x){return ML+(x+1)/2*PW*st.zoom+st.panx;}
@@ -43,22 +42,19 @@
     for(var t=-1;t<=1.0001;t+=0.5){var xx=sx(t);g.appendChild(el('line',{x1:xx,y1:MT+PH,x2:xx,y2:MT+PH+4,stroke:'var(--line)'}));var tl=el('text',{x:xx,y:MT+PH+16,fill:'var(--label)','font-size':10,'text-anchor':'middle'});tl.textContent=t.toFixed(1);g.appendChild(tl);}
     function path(P,color,dash){var dd='';for(var i=0;i<N;i++){dd+=(i?'L':'M')+sx(X[i]).toFixed(1)+' '+sy(P[i]).toFixed(1);}var pe=el('path',{d:dd,fill:'none',stroke:color,'stroke-width':1.6});if(dash)pe.setAttribute('stroke-dasharray',dash);g.appendChild(pe);}
     function drawpts(s,color){for(var i=0;i<s.x.length;i++)g.appendChild(el('circle',{cx:sx(s.x[i]),cy:sy(s.yc[i]),r:2.2,fill:color,opacity:0.7}));}
-    var cNQ='var(--a2)',cZN='var(--b2)',cBR='var(--breach)',cAL='var(--align)';
-    if(fA){if(st.poly)path(dA.P,cNQ,null);if(st.slope)path(dA.S,cNQ,'5 4');if(st.pts)drawpts(fA,cNQ);}
-    if(fB){if(st.poly)path(dB.P,cZN,null);if(st.slope)path(dB.S,cZN,'5 4');if(st.pts)drawpts(fB,cZN);}
-    function diamond(x,y,c){var s=5;return el('path',{d:'M'+x+' '+(y-s)+'L'+(x+s)+' '+y+'L'+x+' '+(y+s)+'L'+(x-s)+' '+y+'Z',fill:'none',stroke:c,'stroke-width':1.6});}
+    var cA='var(--a2)',cBR='var(--breach)';
+    if(fA){if(st.poly)path(dA.P,cA,null);if(st.slope)path(dA.S,cA,'5 4');if(st.pts)drawpts(fA,cA);}
     function triangle(x,y,c){var s=5;return el('path',{d:'M'+x+' '+(y-s)+'L'+(x+s)+' '+(y+s)+'L'+(x-s)+' '+(y+s)+'Z',fill:'none',stroke:c,'stroke-width':1.6});}
     function ring(x,y,c){return el('circle',{cx:x,cy:y,r:5,fill:'none',stroke:c,'stroke-width':1.6});}
-    var nA=0,nB=0,nC=0,xDataA=[],xDataB=[],xDataC=[];
-    if(st.A&&dA&&dB){var diff=X.map(function(_,i){return dA.S[i]-dB.S[i];});crossings(X,diff).forEach(function(xr){g.appendChild(diamond(sx(xr),sy(polyval(fA.c,xr)),cAL));nA++;xDataA.push(xr);});}
-    if(st.B){[[fA,dA],[fB,dB]].forEach(function(q){var f=q[0],dn=q[1];if(!f)return;var df=X.map(function(xx,i){return dn.P[i]-dn.S[i];});crossings(X,df).forEach(function(xr){g.appendChild(triangle(sx(xr),sy(polyval(f.c,xr)),cBR));nB++;xDataB.push(xr);});});}
-    if(st.C){[fA,fB].forEach(function(f){if(!f)return;var P=X.map(function(xx){return polyval(f.c,xx);});crossings(X,P).forEach(function(xr){g.appendChild(ring(sx(xr),sy(0),cBR));nC++;xDataC.push(xr);});});}
-    read.innerHTML='<b>'+inst+'</b> vs <b>ZN</b> &middot; '+st.ten+' &middot; A(slope&times;) <b>'+nA+'</b> &middot; B(poly&cap;slope) <b>'+nB+'</b> &middot; C(zero) <b>'+nC+'</b>';
+    var nB=0,nC=0,xDataB=[],xDataC=[];
+    if(st.B&&dA){var df=X.map(function(xx,i){return dA.P[i]-dA.S[i];});crossings(X,df).forEach(function(xr){g.appendChild(triangle(sx(xr),sy(polyval(fA.c,xr)),cBR));nB++;xDataB.push(xr);});}
+    if(st.C&&fA){var P=X.map(function(xx){return polyval(fA.c,xx);});crossings(X,P).forEach(function(xr){g.appendChild(ring(sx(xr),sy(0),cBR));nC++;xDataC.push(xr);});}
+    read.innerHTML='<b>'+inst+'</b> &middot; '+st.ten+' &middot; B(poly&cap;slope) <b>'+nB+'</b> &middot; C(zero) <b>'+nC+'</b>';
     /* ---- crossing times report panel (Qu'an-annotated) ---- */
     (function(){
       var rp=document.getElementById('brcCrossReport');
       if(!rp)return;
-      if(!nA&&!nB&&!nC){rp.style.display='none';return;}
+      if(!nB&&!nC){rp.style.display='none';return;}
       rp.style.display='';
       /* τ -> ET: |τ| in [0,1] maps the CME session 18:00 ET open -> 17:00 ET close. */
       function cwET(cw){var s=Math.min(1,Math.abs(cw)),m=(1080+Math.round(s*1380))%1440,h=Math.floor(m/60),mi=m%60,ap=h>=12?'PM':'AM',h12=h%12||12;return h12+':'+(mi<10?'0':'')+mi+'\u202f'+ap;}
@@ -85,10 +81,6 @@
           /* ZC Flag: pressure field null. PG sign at crossing = SOP phase indicator */
           return sv>0?'\u25b2PG':sv<0?'\u25bcPG':'\u00b7';
         }
-        if(kind==='A'){
-          /* slope\xd7: NQ PG = ZN PG. Poly value = pressure level. PG sign relative */
-          return pv>0?'P\u207a':pv<0?'P\u207b':'\u00b7';
-        }
         if(kind==='B'){
           /* poly\u2229slope: P=S. PGPC dual-phase. PG/PC signal */
           if(Math.abs(sv)<1e-9)return '\u00b7';
@@ -100,7 +92,6 @@
       /* Arc chirality from DIPLTR proxy: crossing density asymmetry neg vs pos arc */
       var negCount=0,posCount=0;
       var all=[];
-      xDataA.forEach(function(x){all.push({k:'A',x:x,f:fA,dn:dA});if(x<0)negCount++;else posCount++;});
       xDataB.forEach(function(x){all.push({k:'B',x:x,f:fA,dn:dA});if(x<0)negCount++;else posCount++;});
       xDataC.forEach(function(x){all.push({k:'C',x:x,f:fA,dn:dA});if(x<0)negCount++;else posCount++;});
       all.sort(function(a,b){return a.x-b.x;});
@@ -138,7 +129,7 @@
       var entropyClass=totalZC<=2?'brc-e0':totalZC<=5?'brc-e1':'brc-e2';
       var zcLabel=totalZC<=2?'clean':'turbulent';
       rp.innerHTML=
-        '<div class="brc-rh">Crossing Field \u00b7 '+inst+'\u202f/\u202fZN \u00b7 '+st.ten
+        '<div class="brc-rh">Crossing Field \u00b7 '+inst+' \u00b7 '+st.ten
         +'<span class="brc-chiral '+chiralCl+'">'+chiral+'</span>'
         +'<span class="brc-zc '+entropyClass+'"> ZC\u202f'+totalZC+' \u00b7 '+zcLabel+'</span>'
         +'</div>'
@@ -202,7 +193,6 @@
   var mode=document.getElementById('brcMode');
   if(mode)mode.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
     if(b.hasAttribute('data-bt')){[].forEach.call(mode.querySelectorAll('[data-bt]'),function(c){c.classList.remove('on');});b.classList.add('on');st.ten=b.getAttribute('data-bt');}
-    else if(b.hasAttribute('data-bm')){[].forEach.call(mode.querySelectorAll('[data-bm]'),function(c){c.classList.remove('on');});b.classList.add('on');st.inst=b.getAttribute('data-bm');}
     render();});
   /* legend ltog visibility toggles (data-bk) */
   var leg=document.getElementById('brcLegend');

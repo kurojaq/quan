@@ -119,6 +119,7 @@
       <span class="sub">Daily Chronometric Field Brief</span>
     </div>
     <div class="hdr-right">
+      <div class="slot"><span class="tag">View</span><select class="field" id="rptViewSel" title="Switch between the Chronometric Field Brief and the Detector"><option value="report">Report</option><option value="detector">Detector</option></select></div>
       <button class="rptbtn" id="rptLive" title="Live intraday DTE decay — re-pulls greeks/risk/IV as the session clock advances (chain-structure metrics need fresh chain data)">⟳ Live</button><button class="rptbtn" id="rptExport" title="Print / export this brief to PDF">Export PDF</button>
     </div>
   </header>
@@ -143,24 +144,15 @@
         <span class="tag">Chain</span>
         <label class="upload">CSV<span class="fn" id="fnA">none</span><input type="file" id="fileA" accept=".csv"></label>
       </div>
-      <div class="slot">
-        <span class="tag">ZN</span>
-        <label class="upload">CSV<span class="fn" id="fnB">none</span><input type="file" id="fileB" accept=".csv"></label>
-      </div>
       <label class="toggle"><input type="checkbox" id="priceToggle">Price</label>
       <label class="toggle" id="fitToggleWrap"><input type="checkbox" id="fitToggle" style="accent-color:var(--cream)">Fit</label>
       <label class="toggle" id="fitOrderWrap" title="polynomial orders to overlay (1\u20139)">P&le;<input type="range" id="fitOrder" min="1" max="9" value="6" style="width:80px;vertical-align:middle;accent-color:var(--cream);margin:0 5px"><span class="v" id="fitOrderV">6</span></label>
-      <div class="stat"><span class="k">Aligned</span><span class="v" id="alignCount">&mdash;</span></div>
+      <div class="stat"><span class="k">Breaches</span><span class="v" id="alignCount">&mdash;</span></div>
     </div>
   </header>
   <div class="subtabbar"><button class="subtab on" data-sub="det">Detector</button><button class="subtab" data-sub="brc">Breach</button></div>
   <div class="subpanel on" id="subDet">
   <div class="chartwrap" id="detChartwrap">
-    <div class="modeToggle" id="modeToggle">
-      <button data-mode="both" class="on">Both</button>
-      <button data-mode="A" id="btnA">A</button>
-      <button data-mode="B" id="btnB">ZN</button>
-    </div>
     <span class="chart-title" id="chartTitle"></span>
     <button class="ctool fullscreen-btn" id="detFullBtn" type="button" title="Fullscreen">&#9974;</button>
     <div class="chart-tools-wrap" id="detToolsWrap">
@@ -182,12 +174,12 @@
   </div>
   <footer>
     <div class="legend" id="legend"></div>
-    <div class="breaches" id="alignList"><span class="empty">&mdash; load both CSVs to find aligned crossings</span></div>
+    <div class="breaches" id="alignList"><span class="empty">&mdash; load a chain to find breach crossings</span></div>
   </footer>
   </div>
   <div class="subpanel" id="subBrc">
   <div class="chartwrap" id="brcWrap">
-   <div class="modeToggle" id="brcMode"><button data-bt="CL" class="on">CL</button><button data-bt="CM">CM</button><span class="mt-div"></span><button data-bm="both" class="on">Both</button><button data-bm="NQ">NQ</button><button data-bm="ZN">ZN</button></div>
+   <div class="modeToggle" id="brcMode"><button data-bt="CL" class="on">CL</button><button data-bt="CM">CM</button></div>
    <span class="chart-title" id="brcTitle">Breach</span>
    <button class="ctool fullscreen-btn" id="brcFullBtn" type="button" title="Fullscreen">&#9974;</button>
    <div class="chart-tools-wrap" id="brcToolsWrap"><button class="ctool tools-trigger" id="brcToolsBtn" type="button" title="Drawing tools">&#9998; &#9662;</button><div class="chart-tools" id="brcToolsPanel"><button class="ctool" id="brcText" title="Add text box">T</button><button class="ctool" id="brcDraw" title="Freehand draw">&#9998;</button><button class="ctool" id="brcLine" title="Line">&#9585;</button><button class="ctool" id="brcArrow" title="Arrow">&#8599;</button><button class="ctool" id="brcClearD" title="Clear drawings &amp; notes">&#10006;</button><button class="ctool" id="brcResetV" title="Reset view (or double-click)">&#8635;</button></div></div>
@@ -197,8 +189,8 @@
    <canvas id="brcOverlay"></canvas>
   </div>
   <footer>
-   <div class="legend" id="brcLegend"><span class="ltog" data-bk="poly"><span class="sw" style="border-top-color:var(--cream-dim)"></span>Poly&#8313;</span><span class="ltog off" data-bk="slope"><span class="sw" style="border-top-color:var(--cream-dim)"></span>Slope</span><span class="ltog" data-bk="pts"><span class="sw" style="border-top-color:var(--cream-dim)"></span>Pts</span><span class="ltog" data-bk="A"><span class="sw" style="border-top-color:var(--align)"></span>A &#9670; slope&times;</span><span class="ltog" data-bk="B"><span class="sw" style="border-top-color:var(--breach)"></span>B &#9650; poly&cap;slope</span><span class="ltog" data-bk="C"><span class="sw" style="border-top-color:var(--breach)"></span>C &#9679; zero</span></div>
-   <div class="breaches" id="brcRead"><span class="empty">&mdash; load Chain + ZN to compute breaches</span></div>
+   <div class="legend" id="brcLegend"><span class="ltog" data-bk="poly"><span class="sw" style="border-top-color:var(--cream-dim)"></span>Poly&#8313;</span><span class="ltog off" data-bk="slope"><span class="sw" style="border-top-color:var(--cream-dim)"></span>Slope</span><span class="ltog" data-bk="pts"><span class="sw" style="border-top-color:var(--cream-dim)"></span>Pts</span><span class="ltog" data-bk="B"><span class="sw" style="border-top-color:var(--breach)"></span>B &#9650; poly&cap;slope</span><span class="ltog" data-bk="C"><span class="sw" style="border-top-color:var(--breach)"></span>C &#9679; zero</span></div>
+   <div class="breaches" id="brcRead"><span class="empty">&mdash; load a chain to compute breaches</span></div>
    <div id="brcCrossReport" style="display:none"></div>
   </footer>
  </div>

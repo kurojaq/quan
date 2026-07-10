@@ -14,9 +14,15 @@
     else if(t==='compass'){ window.__compassBoot&&window.__compassBoot(); setTimeout(function(){window.__compassResize&&window.__compassResize();},40); }
     else if(t==='sim'){ window.__simBoot&&window.__simBoot(); window.__simRender&&window.__simRender(); } }));
   // Report is reachable only as a dropdown view inside Detector now (see detViewSel below); the standalone top-level Report tab button was removed.
-  const dvs=document.getElementById('detViewSel'), tabDet=secs.detector, tabRpt=secs.report;
-  if(dvs&&tabDet&&tabRpt) dvs.addEventListener('change',()=>{
-    if(dvs.value==='report'){ tabDet.classList.remove('on'); tabRpt.classList.add('on'); window.__reportRender&&window.__reportRender(); }
+  // Both the Detector header and the Report header carry a View dropdown (detViewSel / rptViewSel);
+  // whichever is used, applyView() flips the two sections and keeps both selects in sync so the
+  // View control is always present in the visible section (fixes the "dropdown disappears" bug).
+  const dvs=document.getElementById('detViewSel'), rvs=document.getElementById('rptViewSel'), tabDet=secs.detector, tabRpt=secs.report;
+  function applyView(v){
+    if(dvs) dvs.value=v; if(rvs) rvs.value=v;
+    if(v==='report'){ tabDet.classList.remove('on'); tabRpt.classList.add('on'); window.__reportRender&&window.__reportRender(); }
     else { tabRpt.classList.remove('on'); tabDet.classList.add('on'); setTimeout(()=>{window.__detResize&&window.__detResize();},40); }
-  });
+  }
+  if(dvs&&tabDet&&tabRpt) dvs.addEventListener('change',()=>applyView(dvs.value));
+  if(rvs&&tabDet&&tabRpt) rvs.addEventListener('change',()=>applyView(rvs.value));
 })();

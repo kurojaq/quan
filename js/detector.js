@@ -82,13 +82,12 @@ const BAKED_PRICE={};  /* demo price dataset removed — back dates now show onl
   const $=id=>document.getElementById(id);
   const canvas=$('chart'), ctx=canvas.getContext('2d'), dotTip=$('dotTip');
   const overlay=$('overlay'), octx=overlay.getContext('2d');
-  const instA=$('instA'), fnA=$('fnA'), fnB=$('fnB'), priceToggle=$('priceToggle'), fitToggle=$('fitToggle'),
+  const instA=$('instA'), fnA=$('fnA'), priceToggle=$('priceToggle'), fitToggle=$('fitToggle'),
         dayDate=$('dayDate'), alignCount=$('alignCount'), alignList=$('alignList'),
         legend=$('legend'), chartTitle=$('chartTitle'), sessTEl=$('sessT');
-  const vis={A1:true,A2:true,B1:true,B2:true}, fvis={A1:true,A2:true,B1:true,B2:true};
+  const vis={A1:true,A2:true}, fvis={A1:true,A2:true};
 
   const COL_X='Chronometer Watch', COL_M='PG/PC Dual Phase Tension', COL_S='PC/PG Dual Phase Tension';
-  const TOL=0.05, ZN='ZN';
   const WH_KEY='quan_intermarket_warehouse_v2', SEL_KEY='quan_intermarket_sel_v2';
   // ---- full CME Group instrument set (CME+CBOT+NYMEX+COMEX), grouped by asset class; each symbol verified live against Yahoo Finance ----
   const INSTRUMENT_GROUPS=[
@@ -104,8 +103,8 @@ const BAKED_PRICE={};  /* demo price dataset removed — back dates now show onl
   ];
   const INSTRUMENTS=[].concat.apply([],INSTRUMENT_GROUPS.map(g=>g[1]));
 
-  let warehouse={}, date='', aInst='NQ', mode='both';
-  let A={rows:[],price:[],priorPrice:[],breaches:[]}, B={rows:[],breaches:[]}, aligned=[];
+  let warehouse={}, date='', aInst='NQ';
+  let A={rows:[],price:[],priorPrice:[],breaches:[]};
   let highlight=null, rafId=null, t0=0, screenPts=[];
   let viewLo=-1, viewHi=1, yScale=1, yPan=0, GEO=null, cursor=null, drag=null; // drag retained as no-op
 
@@ -200,10 +199,6 @@ const BAKED_PRICE={};  /* demo price dataset removed — back dates now show onl
     for(let i=0;i<rows.length-1;i++){ const [c1,m1,s1]=rows[i],[c2,m2,s2]=rows[i+1]; const d1=s1-m1,d2=s2-m2;
       if((d1<=0&&d2>0)||(d1>0&&d2<=0)){ const t=-d1/(d2-d1); out.push({cw:c1+t*(c2-c1),val:m1+t*(m2-m1)}); } }
     return out.sort((a,b)=>a.cw-b.cw); }
-  function computeAligned(){ aligned=[];
-    for(const a of A.breaches) for(const b of B.breaches) if(Math.abs(a.cw-b.cw)<=TOL) aligned.push({cw:(a.cw+b.cw)/2,a:a.cw,b:b.cw});
-    aligned.sort((x,y)=>x.cw-y.cw); }
-
   function onCSV(file, inst, fnEl){ const r=new FileReader();
     r.onload=ev=>{ const rows=parseCSV(ev.target.result); if(!rows.length) return;
       const rc=window.__qRec?window.__qRec(inst):null;
@@ -211,7 +206,6 @@ const BAKED_PRICE={};  /* demo price dataset removed — back dates now show onl
       if(window.__detHydrate){ window.__detHydrate(); } else { entry(inst,true).rows=rows; show(); } };
     r.readAsText(file); fnEl.textContent=file.name; }
   window.__engReady=window.__engReady||new Promise(function(r){window.__engReadyResolve=r;});$('fileA').addEventListener('change',e=>{ if(e.target.files[0]) onCSV(e.target.files[0],aInst,fnA); });
-  $('fileB').addEventListener('change',e=>{ if(e.target.files[0]) onCSV(e.target.files[0],ZN,fnB); });
   priceToggle.addEventListener('change',draw);
   fitToggle.addEventListener('change',()=>{ buildLegend(); draw(); });
   $('fitOrder').addEventListener('input',()=>{ $('fitOrderV').textContent=$('fitOrder').value; buildLegend(); if(fitToggle.checked)draw(); });
@@ -224,19 +218,13 @@ const BAKED_PRICE={};  /* demo price dataset removed — back dates now show onl
     legend.innerHTML=
       '<span class="ltog'+(vis.A1?'':' off')+'" data-k="A1" title="click: show/hide curve"><span class=\'sw\' style="border-top-color:var(--a1)"></span>'+aInst+' PG/PC'+' <span class="ftog '+(fvis.A1?'on':'off')+'" data-fit="A1" title="show/hide this curve\'s fit ladder">\u0192</span></span>'+
       '<span class="ltog'+(vis.A2?'':' off')+'" data-k="A2" title="click: show/hide curve"><span class=\'sw\' style="border-top-color:var(--a2)"></span>'+aInst+' PC/PG'+' <span class="ftog '+(fvis.A2?'on':'off')+'" data-fit="A2" title="show/hide this curve\'s fit ladder">\u0192</span></span>'+
-      '<span class="ltog'+(vis.B1?'':' off')+'" data-k="B1" title="click: show/hide curve"><span class=\'sw\' style="border-top-color:var(--b1);border-top-style:dashed"></span>'+'ZN PG/PC'+' <span class="ftog '+(fvis.B1?'on':'off')+'" data-fit="B1" title="show/hide this curve\'s fit ladder">\u0192</span></span>'+
-      '<span class="ltog'+(vis.B2?'':' off')+'" data-k="B2" title="click: show/hide curve"><span class=\'sw\' style="border-top-color:var(--b2);border-top-style:dashed"></span>'+'ZN PC/PG'+' <span class="ftog '+(fvis.B2?'on':'off')+'" data-fit="B2" title="show/hide this curve\'s fit ladder">\u0192</span></span>'+
       '<span><span class="dot" style="background:var(--breach)"></span>'+aInst+' breach</span>'+
-      '<span><span class="dia"></span>ZN breach</span>'+
-      '<span><span class="sw" style="border-top-color:var(--align)"></span>aligned (&plusmn;'+TOL+')</span>'+
       '<span><span class="sw" style="border-top-color:var(--price)"></span>'+aInst+' price (norm.)</span>';
     if(typeof fitToggle!=='undefined' && fitToggle.checked){ let mo=fitMaxO(),s=''; for(let d=1;d<=mo;d++) s+='<span><span class="sw" style="border-top-color:'+FITC[d]+'"></span>P'+d+'</span>'; legend.innerHTML+=s; }
   }
   legend.addEventListener('click',e=>{
     const ft=e.target.closest('.ftog'); if(ft){ const k=ft.dataset.fit; fvis[k]=!fvis[k]; buildLegend(); draw(); return; }
     const lt=e.target.closest('.ltog'); if(lt){ const k=lt.dataset.k; vis[k]=!vis[k]; buildLegend(); draw(); } });
-  $('modeToggle').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return;
-    mode=b.dataset.mode; [...$('modeToggle').children].forEach(x=>x.classList.toggle('on',x===b)); draw(); });
 
   function priorDateWithPrice(d,inst){ const ks=Object.keys(warehouse).filter(k=>k<d && warehouse[k][inst] && warehouse[k][inst].price && warehouse[k][inst].price.length).sort(); return ks.length?ks[ks.length-1]:null; }
   var __memo={}; var __initBlank=true; function __curEng(){ return window.__ENGHASH||''; }
@@ -246,14 +234,11 @@ const BAKED_PRICE={};  /* demo price dataset removed — back dates now show onl
   if(window.__engReady){ window.__engReady.then(function(){ try{ window.__qMigrate(); }catch(_e){} }); }
   function show(){
     date=(dayDate&&dayDate.value)||date;   /* key off the live picker, same date everything else uses */
-    const eA=warehouse[date]&&warehouse[date][aInst], eB=warehouse[date]&&warehouse[date][ZN];
+    const eA=warehouse[date]&&warehouse[date][aInst];
     A.rows=__initBlank?[]:(eA&&eA.rows?eA.rows:[]); A.price=eA&&eA.price?eA.price:[]; A.breaches=findBreaches(A.rows);
     const pd=priorDateWithPrice(date,aInst); A.priorPrice=pd?warehouse[pd][aInst].price:[];
-    B.rows=__initBlank?[]:(eB&&eB.rows?eB.rows:[]); B.breaches=findBreaches(B.rows);
-    computeAligned();
-    fnA.textContent=A.rows.length?'stored':'none'; fnB.textContent=B.rows.length?'stored':'none';
-    $('btnA').textContent=aInst;
-    chartTitle.textContent=aInst+' / ZN · '+(date||'');
+    fnA.textContent=A.rows.length?'stored':'none';
+    chartTitle.textContent=aInst+' · '+(date||'');
     draw();
     try{ if(window.__breachRefresh) requestAnimationFrame(function(){ try{ window.__breachRefresh(); }catch(_e){} }); }catch(_b){}
   }
@@ -265,7 +250,7 @@ const BAKED_PRICE={};  /* demo price dataset removed — back dates now show onl
     overlay.width=Math.round(w*dpr); overlay.height=Math.round(h*dpr); octx.setTransform(dpr,0,0,dpr,0,0);
     if(keep && keep.width===overlay.width){ octx.save(); octx.setTransform(1,0,0,1,0,0); octx.putImageData(keep,0,0); octx.restore(); }
     draw(); __initBlank=false; try{ if(window.__breachRefresh) requestAnimationFrame(function(){ try{ window.__breachRefresh(); }catch(_e){} }); }catch(_b){} }
-  window.__breachData=function(){ var rA=(__rowsFor(aInst,date))||((A&&A.rows)||[]); var rB=(__rowsFor(ZN,date))||((B&&B.rows)||[]); return {rowsA:rA, rowsB:rB, inst:aInst, date:date}; };
+  window.__breachData=function(){ var rA=(__rowsFor(aInst,date))||((A&&A.rows)||[]); return {rowsA:rA, inst:aInst, date:date}; };
   new ResizeObserver(sizeCanvas).observe(canvas);
   window.__detResize=sizeCanvas;
 
@@ -283,23 +268,17 @@ const BAKED_PRICE={};  /* demo price dataset removed — back dates now show onl
   function draw(now){
     if(!W||!H) return; now=(typeof now==='number')?now:0;
     ctx.clearRect(0,0,W,H); ctx.fillStyle='#07090d'; ctx.fillRect(0,0,W,H);
-    const both=(mode==='both' && A.rows.length && B.rows.length);
-    const padR=both?54:PAD_R;
-    const pW=W-PAD_L-padR, pH=H-PAD_T-PAD_B;
-    const exA=extentOf(A.rows), exB=extentOf(B.rows);
+    const pW=W-PAD_L-PAD_R, pH=H-PAD_T-PAD_B;
+    const exA=extentOf(A.rows);
     function zext(ex){ const c=(ex[0]+ex[1])/2 - yPan*(ex[1]-ex[0]); const h=(ex[1]-ex[0])/2/yScale; return [c-h,c+h]; }
-    const zA=zext(exA), zB=zext(exB);
+    const zA=zext(exA);
     const mapX=cw=>PAD_L+((cw-viewLo)/(viewHi-viewLo))*pW;
     const invX=px=>viewLo+((px-PAD_L)/pW)*(viewHi-viewLo);
     GEO={pW,pH,mapX,invX};
     const mYA=v=>PAD_T+(1-(v-zA[0])/(zA[1]-zA[0]))*pH;
-    const mYB=v=>PAD_T+(1-(v-zB[0])/(zB[1]-zB[0]))*pH;
     const clampY=y=>Math.max(PAD_T,Math.min(PAD_T+pH,y));
     const cx=mapX(0);
-    let baseY,splitY;
-    if(mode==='A'){ baseY=clampY(mYA(0)); splitY=baseY; }
-    else if(mode==='B'){ baseY=clampY(mYB(0)); splitY=baseY; }
-    else { baseY=PAD_T+pH; splitY=PAD_T+pH/2; }
+    const baseY=clampY(mYA(0));
 
     ctx.fillStyle='#0b0f14'; ctx.fillRect(PAD_L,PAD_T,pW,pH);
 
@@ -322,30 +301,18 @@ const BAKED_PRICE={};  /* demo price dataset removed — back dates now show onl
         ctx.strokeStyle='rgba(232,227,214,0.30)'; ctx.lineWidth=0.5;
         if(side==='L'){ ctx.textAlign='right'; ctx.beginPath();ctx.moveTo(PAD_L-4,y);ctx.lineTo(PAD_L,y);ctx.stroke(); ctx.fillText(fmt(val),PAD_L-7,y); }
         else { ctx.textAlign='left'; ctx.beginPath();ctx.moveTo(PAD_L+pW,y);ctx.lineTo(PAD_L+pW+4,y);ctx.stroke(); ctx.fillText(fmt(val),PAD_L+pW+7,y); } } }
-    if(both){ yLabels(zA,'L','#b58aa0'); yLabels(zB,'R','#b9a36a'); }
-    else if(mode==='A') yLabels(zA,'L','#a6a299');
-    else if(mode==='B') yLabels(zB,'L','#a6a299');
+    yLabels(zA,'L','#a6a299');
 
     ctx.save(); ctx.beginPath(); ctx.rect(PAD_L,PAD_T,pW,pH); ctx.clip();
 
-    if(priceToggle.checked && mode!=='B' && (A.price.length>1 || A.priorPrice.length>1)) drawPrice(A.priorPrice, A.price, mapX, pH);
-
-    if(both) for(const al of aligned){ const x=mapX(al.cw);
-      ctx.strokeStyle='rgba(127,209,224,0.55)'; ctx.lineWidth=1.4; ctx.setLineDash([6,4]);
-      ctx.beginPath(); ctx.moveTo(x,PAD_T); ctx.lineTo(x,PAD_T+pH); ctx.stroke(); ctx.setLineDash([]); }
+    if(priceToggle.checked && (A.price.length>1 || A.priorPrice.length>1)) drawPrice(A.priorPrice, A.price, mapX, pH);
 
     const ra=fitToggle.checked?0.26:1;
-    if(mode!=='B' && A.rows.length){ if(vis.A1)drawCurve(A.rows,1,'#d36b9b',[],mapX,mYA,ra); if(vis.A2)drawCurve(A.rows,2,'#5aa0d8',[],mapX,mYA,ra);
+    if(A.rows.length){ if(vis.A1)drawCurve(A.rows,1,'#d36b9b',[],mapX,mYA,ra); if(vis.A2)drawCurve(A.rows,2,'#5aa0d8',[],mapX,mYA,ra);
       if(fitToggle.checked){ if(fvis.A1)drawFit(A.rows,1,'#d36b9b',mapX,mYA,[]); if(fvis.A2)drawFit(A.rows,2,'#5aa0d8',mapX,mYA,[2,3]); } }
-    if(mode!=='A' && B.rows.length){ if(vis.B1)drawCurve(B.rows,1,'#f5f1e6',[6,4],mapX,mYB,ra); if(vis.B2)drawCurve(B.rows,2,'#e0b15a',[6,4],mapX,mYB,ra);
-      if(fitToggle.checked){ if(fvis.B1)drawFit(B.rows,1,'#f5f1e6',mapX,mYB,[8,4]); if(fvis.B2)drawFit(B.rows,2,'#e0b15a',mapX,mYB,[8,4,2,4]); } }
 
     screenPts=[];
-    if(mode!=='B') A.breaches.forEach(bp=>{ const x=mapX(bp.cw),y=mYA(bp.val); drawDot(x,y, highlight&&highlight.k==='A'&&highlight.cw===bp.cw, now); screenPts.push({x,y,cw:bp.cw,lab:aInst,k:'A'}); });
-    if(mode!=='A') B.breaches.forEach(bp=>{ const x=mapX(bp.cw),y=mYB(bp.val); drawDiamond(x,y, highlight&&highlight.k==='B'&&highlight.cw===bp.cw, now); screenPts.push({x,y,cw:bp.cw,lab:'ZN',k:'B'}); });
-
-    if(both) for(const al of aligned){ const x=mapX(al.cw);
-      ctx.strokeStyle='rgba(127,209,224,0.9)'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.arc(x,splitY,8,0,Math.PI*2); ctx.stroke(); }
+    A.breaches.forEach(bp=>{ const x=mapX(bp.cw),y=mYA(bp.val); drawDot(x,y, highlight&&highlight.cw===bp.cw, now); screenPts.push({x,y,cw:bp.cw,lab:aInst}); });
 
     if(cursor && !drag){ const mx=cursor.x,my=cursor.y;
       if(mx>=PAD_L&&mx<=PAD_L+pW&&my>=PAD_T&&my<=PAD_T+pH){ const cw=invX(mx);
@@ -354,8 +321,7 @@ const BAKED_PRICE={};  /* demo price dataset removed — back dates now show onl
           ctx.beginPath(); ctx.moveTo(gx,PAD_T); ctx.lineTo(gx,PAD_T+pH); ctx.stroke(); ctx.setLineDash([]);
           const mk=(rows,idx,mY,color)=>{ const v=interpAt(rows,idx,cwv); if(v==null)return; ctx.fillStyle=color; ctx.beginPath(); ctx.arc(gx,mY(v),3.4,0,Math.PI*2); ctx.fill(); };
           const mkFit=(rows,idx,mY)=>{ if(rows.length<8||cwv<rows[0][0]||cwv>rows[rows.length-1][0])return; const src=rows.map(r=>[r[0],r[idx]]), mo=fitMaxO(); for(let deg=1;deg<=mo;deg++){ if(rows.length<deg+1)break; const c=polyfit(src,deg); ctx.strokeStyle=FITC[deg]||'#fff'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.arc(gx,mY(polyval(c,cwv)),3.2,0,Math.PI*2); ctx.stroke(); } };
-          if(mode!=='B'&&A.rows.length){ if(vis.A1)mk(A.rows,1,mYA,'#d36b9b'); if(vis.A2)mk(A.rows,2,mYA,'#5aa0d8'); if(fitToggle.checked){ if(fvis.A1)mkFit(A.rows,1,mYA); if(fvis.A2)mkFit(A.rows,2,mYA); } }
-          if(mode!=='A'&&B.rows.length){ if(vis.B1)mk(B.rows,1,mYB,'#f5f1e6'); if(vis.B2)mk(B.rows,2,mYB,'#e0b15a'); if(fitToggle.checked){ if(fvis.B1)mkFit(B.rows,1,mYB); if(fvis.B2)mkFit(B.rows,2,mYB); } }
+          if(A.rows.length){ if(vis.A1)mk(A.rows,1,mYA,'#d36b9b'); if(vis.A2)mk(A.rows,2,mYA,'#5aa0d8'); if(fitToggle.checked){ if(fvis.A1)mkFit(A.rows,1,mYA); if(fvis.A2)mkFit(A.rows,2,mYA); } }
           const lab=cwClock(cwv)+' ET'; ctx.font='11px SF Mono,Menlo,monospace'; const tw=ctx.measureText(lab).width+14;
           const lx=Math.max(PAD_L,Math.min(PAD_L+pW-tw,gx-tw/2));
           ctx.fillStyle='rgba(18,18,22,0.94)'; ctx.fillRect(lx,PAD_T+2,tw,18); ctx.strokeStyle='#4c4c54'; ctx.lineWidth=0.5; ctx.strokeRect(lx,PAD_T+2,tw,18);
@@ -406,14 +372,12 @@ const BAKED_PRICE={};  /* demo price dataset removed — back dates now show onl
     ctx.restore(); }
   function drawDot(x,y,hl,now){ if(hl){ const ph=((now-t0)%900)/900; ctx.strokeStyle='rgba(232,92,92,'+(0.85*(1-ph)).toFixed(3)+')'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,5.5+ph*16,0,Math.PI*2); ctx.stroke(); }
     ctx.save(); ctx.shadowColor='#e85c5c'; ctx.shadowBlur=hl?16:10; ctx.fillStyle='#e85c5c'; ctx.beginPath(); ctx.arc(x,y,hl?5.5:4.5,0,Math.PI*2); ctx.fill(); ctx.restore(); }
-  function drawDiamond(x,y,hl,now){ const r=hl?6:5; if(hl){ const ph=((now-t0)%900)/900; ctx.strokeStyle='rgba(245,241,230,'+(0.85*(1-ph)).toFixed(3)+')'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,6+ph*16,0,Math.PI*2); ctx.stroke(); }
-    ctx.save(); ctx.strokeStyle='#f5f1e6'; ctx.lineWidth=2; ctx.shadowColor='#f5f1e6'; ctx.shadowBlur=hl?14:7; ctx.beginPath(); ctx.moveTo(x,y-r); ctx.lineTo(x+r,y); ctx.lineTo(x,y+r); ctx.lineTo(x-r,y); ctx.closePath(); ctx.stroke(); ctx.restore(); }
   function showTip(p){ dotTip.innerHTML='<b>'+cwClock(p.cw)+' ET</b> &middot; '+p.lab+' &middot; CW '+p.cw.toFixed(3); dotTip.style.left=p.x+'px'; dotTip.style.top=p.y+'px'; dotTip.style.display='block'; }
   function resetView(){ viewLo=-1; viewHi=1; yScale=1; yPan=0; draw(); }
   canvas.addEventListener('mousemove',e=>{ const r=canvas.getBoundingClientRect(); const mx=e.clientX-r.left,my=e.clientY-r.top;
     cursor={x:mx,y:my};
     let hit=null,best=12; for(const p of screenPts){ const d=Math.hypot(mx-p.x,my-p.y); if(d<best){best=d;hit=p;} }
-    if(hit){ canvas.style.cursor='pointer'; if(!highlight||highlight.cw!==hit.cw||highlight.k!==hit.k) startPulse({cw:hit.cw,k:hit.k}); showTip(hit); }
+    if(hit){ canvas.style.cursor='pointer'; if(!highlight||highlight.cw!==hit.cw) startPulse({cw:hit.cw}); showTip(hit); }
     else { canvas.style.cursor='crosshair'; dotTip.style.display='none'; if(highlight) stopPulse(); else draw(); } });
   canvas.addEventListener('mouseleave',()=>{ dotTip.style.display='none'; canvas.style.cursor='default'; cursor=null; if(highlight) stopPulse(); else draw(); });
   canvas.addEventListener('dblclick',resetView);
@@ -476,10 +440,10 @@ const BAKED_PRICE={};  /* demo price dataset removed — back dates now show onl
   overlay.addEventListener('pointerleave',()=>{ drawing=false; snap=null; });
   overlay.addEventListener('wheel',e=>{ e.preventDefault(); },{passive:false});
 
-  function updateList(){ alignCount.textContent=(A.rows.length&&B.rows.length)?aligned.length:'\u2014';
-    if(!A.rows.length||!B.rows.length){ alignList.innerHTML='<span class="empty">&mdash; load both CSVs to find aligned crossings</span>'; return; }
-    if(!aligned.length){ alignList.innerHTML='<span class="empty">no aligned crossings within \u00b1'+TOL+' CW</span>'; return; }
-    alignList.innerHTML=aligned.map(al=>'<span class="chip">'+cwClock(al.cw)+' ET &middot; '+aInst+' '+al.a.toFixed(3)+' / ZN '+al.b.toFixed(3)+'</span>').join(''); }
+  function updateList(){ alignCount.textContent=A.rows.length?A.breaches.length:'\u2014';
+    if(!A.rows.length){ alignList.innerHTML='<span class="empty">&mdash; load a chain to find breach crossings</span>'; return; }
+    if(!A.breaches.length){ alignList.innerHTML='<span class="empty">no breach crossings found</span>'; return; }
+    alignList.innerHTML=A.breaches.map(bp=>'<span class="chip">'+cwClock(bp.cw)+' ET &middot; '+aInst+' '+bp.val.toFixed(3)+'</span>').join(''); }
 
   // central store (__qStore[inst].det) is the persisted source of truth; warehouse is a derived in-memory cache
   function rebuildWarehouse(){ warehouse={};
