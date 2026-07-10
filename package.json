@@ -7,7 +7,7 @@
     "deploy:barchart": "wrangler deploy -c workers/wrangler-barchart.toml"
   },
   "devDependencies": {
-    "@cloudflare/puppeteer": "latest",
-    "wrangler": "latest"
+    "@cloudflare/puppeteer": "1.1.0",
+    "wrangler": "4.107.0"
   }
 }
