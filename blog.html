@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<!-- ==========================================================================
+     HŪS RIHTLǼFAN — daily field brief blogroll (blog.husrihtlaefan.org).
+     Public. Reads /api/blog (KV-backed, published from the terminal's
+     Publish panel). Post pages render through the same __viewRenderReport
+     used by the client terminal, so a brief looks identical everywhere.
+     Served at /blog on the main domain; the blog subdomain's root is
+     rewritten here via _redirects.
+     ========================================================================== -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Hūs Rihtlǽfan — Daily Field Brief</title>
+<meta name="description" content="The daily chronometric field brief from The Qu'an terminal — dealer positioning, structural levels and session classification for options & futures.">
+<meta property="og:title" content="Hūs Rihtlǽfan — Daily Field Brief">
+<meta property="og:description" content="Daily dealer-positioning briefs from The Qu'an terminal.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/theme.css">
+<style>
+  /* blog is a document, not an app chassis — restore scroll */
+  html,body{height:auto;overflow:auto;background:var(--bg);}
+  body{line-height:1.55;}
+  .bwrap{max-width:880px;margin:0 auto;padding:0 24px 96px;}
+  .bnav{position:sticky;top:0;z-index:50;background:var(--glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+    border-bottom:0.5px solid var(--glass-line);}
+  .bnav-in{max-width:880px;margin:0 auto;padding:14px 24px;display:flex;align-items:baseline;gap:12px;}
+  .bnav .inf{font-size:20px;line-height:1;color:var(--cream);}
+  .bnav .name{font-size:13px;font-weight:600;letter-spacing:.26em;text-transform:uppercase;color:var(--cream);text-decoration:none;}
+  .bnav .sub{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--label);}
+  .bnav .term{margin-left:auto;font-size:12px;color:var(--cream-dim);text-decoration:none;transition:color .2s var(--ease);}
+  .bnav .term:hover{color:var(--cream);}
+  .bmast{padding:72px 0 48px;text-align:left;}
+  .bmast h1{margin:0 0 10px;font-size:clamp(28px,5vw,44px);font-weight:700;letter-spacing:-0.02em;color:var(--cream);}
+  .bmast p{margin:0;font-size:15px;color:var(--cream-dim);max-width:56ch;}
+  .roll{display:flex;flex-direction:column;gap:12px;}
+  .post-card{display:block;text-decoration:none;background:var(--panel);border-radius:var(--radius-md);
+    padding:20px 22px;transition:background .22s var(--ease),transform .22s var(--ease);}
+  .post-card:hover{background:var(--panel2);transform:translateY(-1px);}
+  .post-card .meta{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
+  .post-card .date{font-family:var(--font-mono);font-size:11px;color:var(--label);font-variant-numeric:tabular-nums;}
+  .post-card .inst{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--cream-dim);
+    background:var(--fill);border-radius:999px;padding:3px 10px;}
+  .post-card .cls{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--cream);}
+  .post-card h2{margin:0 0 6px;font-size:18px;font-weight:600;letter-spacing:-0.01em;color:var(--cream);}
+  .post-card p{margin:0;font-size:13.5px;color:var(--cream-dim);}
+  .bempty{color:var(--label);font-size:13.5px;padding:24px 0;}
+  /* post view */
+  .bback{display:inline-flex;align-items:center;gap:7px;margin:28px 0 0;background:var(--fill);border:none;border-radius:999px;
+    color:var(--cream-dim);font-family:inherit;font-size:12px;font-weight:500;padding:8px 16px;cursor:pointer;text-decoration:none;
+    transition:background .2s var(--ease),color .2s var(--ease);}
+  .bback:hover{background:var(--fill-2);color:var(--cream);}
+  .bpost-head{padding:36px 0 26px;}
+  .bpost-head .meta{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .bpost-head h1{margin:0 0 8px;font-size:clamp(24px,4vw,36px);font-weight:700;letter-spacing:-0.02em;color:var(--cream);}
+  .bpost-head .cls{font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--cream);}
+  .bpost-head .sum{margin:0;font-size:14.5px;color:var(--cream-dim);max-width:64ch;}
+  .bfoot{margin-top:72px;padding-top:24px;border-top:0.5px solid var(--line);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+  .bfoot small{font-size:12px;color:var(--label);}
+  .bdisc{margin-top:14px;font-size:11px;color:var(--label);line-height:1.6;}
+  #postBody .rgroup{margin-bottom:4px;}
+  .hide{display:none !important;}
+</style>
+</head>
+<body>
+<nav class="bnav">
+  <div class="bnav-in">
+    <span class="inf">&#8734;</span>
+    <a class="name" href="#/">H&#363;s Rihtl&#509;fan</a>
+    <span class="sub">Daily Field Brief</span>
+    <a class="term" href="https://husrihtlaefan.org" rel="noopener">The Qu'an terminal &rarr;</a>
+  </div>
+</nav>
+
+<div class="bwrap">
+  <!-- roll -->
+  <div id="rollView">
+    <header class="bmast">
+      <h1>The Daily Field Brief.</h1>
+      <p>Dealer positioning, structural levels and session classification — published from The Qu'an terminal after each session's read.</p>
+    </header>
+    <div class="roll" id="roll"><div class="bempty">Loading briefs&hellip;</div></div>
+  </div>
+
+  <!-- single post -->
+  <div id="postView" class="hide">
+    <a class="bback" href="#/">&larr; All briefs</a>
+    <header class="bpost-head">
+      <div class="meta">
+        <span class="date" id="postDate" style="font-family:var(--font-mono);font-size:12px;color:var(--label);"></span>
+        <span id="postInst" style="padding:3px 10px;background:var(--fill);border-radius:999px;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--cream-dim);"></span>
+      </div>
+      <h1 id="postTitle"></h1>
+      <div class="cls" id="postCls"></div>
+      <p class="sum" id="postSum"></p>
+    </header>
+    <div id="postBody" class="rptBody"></div>
+  </div>
+
+  <footer class="bfoot">
+    <small>&copy; <span id="yr"></span> H&#363;s Rihtl&#509;fan &middot; The Qu'an</small>
+    <small><a href="https://husrihtlaefan.org" style="color:inherit;text-decoration:none;">husrihtlaefan.org</a></small>
+  </footer>
+  <p class="bdisc"><b>Risk disclosure.</b> These briefs are analytics provided for informational and educational purposes only —
+    not investment advice, and not a recommendation to buy or sell any security, future, or option. Trading involves
+    substantial risk of loss. You are solely responsible for your own trading decisions.</p>
+</div>
+
+<script src="js/view-report.js" defer></script>
+<script defer>
+(function(){
+  var rollView, postView, rollEl;
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+  function showRoll(){ postView.classList.add('hide'); rollView.classList.remove('hide'); document.title='Hūs Rihtlǽfan — Daily Field Brief'; }
+  function showPost(){ rollView.classList.add('hide'); postView.classList.remove('hide'); window.scrollTo(0,0); }
+
+  function renderRoll(posts){
+    if(!posts.length){ rollEl.innerHTML='<div class="bempty">No briefs published yet — check back after the next session.</div>'; return; }
+    rollEl.innerHTML=posts.map(function(p){
+      return '<a class="post-card" href="#/'+esc(p.slug)+'">'
+        +'<div class="meta"><span class="date">'+esc(p.date)+'</span><span class="inst">'+esc(p.inst)+'</span>'
+        +(p.classification?'<span class="cls">'+esc(p.classification)+'</span>':'')+'</div>'
+        +'<h2>'+esc(p.title)+'</h2>'
+        +(p.summary?'<p>'+esc(p.summary)+'</p>':'')
+        +'</a>';
+    }).join('');
+  }
+
+  function loadRoll(){
+    fetch('/api/blog').then(function(r){return r.json();}).then(function(d){
+      renderRoll((d&&d.posts)||[]);
+    }).catch(function(){ rollEl.innerHTML='<div class="bempty">Could not reach the server — try again in a moment.</div>'; });
+  }
+
+  function loadPost(slug){
+    fetch('/api/blog?slug='+encodeURIComponent(slug)).then(function(r){
+      if(!r.ok) throw new Error('not found');
+      return r.json();
+    }).then(function(p){
+      document.getElementById('postDate').textContent=p.date||'';
+      document.getElementById('postInst').textContent=p.inst||'';
+      document.getElementById('postTitle').textContent=p.title||'';
+      document.getElementById('postCls').textContent=p.classification||'';
+      document.getElementById('postSum').textContent=p.summary||'';
+      document.title=(p.title||'Brief')+' — Hūs Rihtlǽfan';
+      window.__viewRenderReport(document.getElementById('postBody'), p.report||null);
+      showPost();
+    }).catch(function(){
+      document.getElementById('postTitle').textContent='Brief not found';
+      document.getElementById('postCls').textContent='';
+      document.getElementById('postSum').textContent='This brief may have been removed.';
+      document.getElementById('postBody').innerHTML='';
+      showPost();
+    });
+  }
+
+  function route(){
+    var h=location.hash.replace(/^#\/?/,'');
+    if(h) loadPost(h); else showRoll();
+  }
+
+  document.addEventListener('DOMContentLoaded',function(){
+    rollView=document.getElementById('rollView'); postView=document.getElementById('postView'); rollEl=document.getElementById('roll');
+    document.getElementById('yr').textContent=new Date().getFullYear();
+    loadRoll();
+    window.addEventListener('hashchange',route);
+    route();
+  });
+})();
+</script>
+</body>
+</html>

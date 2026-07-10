@@ -120,6 +120,25 @@ Pages project → **Custom domains → Set up a domain**. Point your domain at t
 Pages project; Cloudflare provisions TLS automatically. Then set `APP_BASE_URL`
 to that domain so Stripe success/cancel URLs are absolute and correct.
 
+### 4b. Blog subdomain (`blog.husrihtlaefan.org`)
+
+The public daily-brief blogroll (`blog.html` + `/api/blog`) lives on its own
+subdomain but is served by this same Pages project — no second deploy:
+
+1. Pages project → **Custom domains → Set up a domain** → add
+   `blog.husrihtlaefan.org`. (Since the zone is already on Cloudflare this is
+   one click; TLS is automatic.)
+2. That's it — the committed `_redirects` file rewrites the subdomain's root
+   to `/blog.html`, while `css/`, `js/` and `/api/*` keep resolving normally
+   on that host. Individual posts are hash routes (`#/<slug>`), so no other
+   paths are involved.
+
+Blog posts are published from the terminal: header **Publish** panel →
+**→ Blog**. They're stored in the same `QUAN_PUBLISH` KV namespace (§3b) under
+`blog:*` keys with **no TTL** — a post stays up until deleted via
+`DELETE /api/blog?slug=...`. Publishing is gated by `OPERATOR_EMAIL`; reading
+is public. The roll is also reachable on the main domain at `/blog`.
+
 ---
 
 ## 5. Market data plane (`/api/quote`, `/api/history`)

@@ -69,6 +69,28 @@
   }
   nowBtn.addEventListener('click',publishNow);
 
+  // ---- public blog: same report snapshot, permanent KV (no TTL), rendered by blog.html ----
+  var blogBtn=$('publishBlogBtn');
+  async function publishBlog(){
+    var inst=curInst(), date=curDate();
+    if(!inst||!date){ statusEl.textContent='pick an instrument + date first'; return; }
+    var report=null; try{ report=window.__reportData?window.__reportData(inst,date):null; }catch(_){}
+    if(!report){ statusEl.textContent='no computed brief for '+inst+' · '+date; return; }
+    var clsEl=$('rptClass'), subEl=$('rptSub');
+    var classification=(clsEl&&!clsEl.classList.contains('rwait')&&clsEl.textContent.trim())||null;
+    var summary=(subEl&&subEl.textContent.trim())||null;
+    if(summary==='—') summary=null; // rptSub's em-dash placeholder means "no summary yet"
+    blogBtn.disabled=true; statusEl.textContent='publishing to blog…';
+    try{
+      var r=await fetch('/api/blog',{method:'POST',headers:authHeaders(),body:JSON.stringify({inst:inst,date:date,classification:classification,summary:summary,report:report})});
+      var d=await r.json().catch(function(){return {};});
+      if(r.ok) statusEl.textContent='on the blog ✓ /blog#/'+(d.slug||'');
+      else statusEl.textContent='blog failed: '+(d.error||r.status);
+    }catch(_e){ statusEl.textContent='blog failed: network error'; }
+    blogBtn.disabled=false;
+  }
+  if(blogBtn) blogBtn.addEventListener('click',publishBlog);
+
   // ---- client link management ----
   function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
   async function refreshLinks(){

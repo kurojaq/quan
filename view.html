@@ -1,59 +1,104 @@
 <!DOCTYPE html>
+<!-- ==========================================================================
+     THE QU'AN — client terminal (stripped-down operator view).
+     Three tabs only: Daily Report / Heat Map / Price. Fed entirely by
+     /api/view?token=... (published snapshots) — no chain upload, no engine.
+     Element IDs are load-bearing for js/view-app.js, js/chart-tab.js and
+     js/view-report.js — restyle freely, never rename.
+     ========================================================================== -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>The Qu'an — Client View</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#050506">
+<title>The Qu'an — Client Terminal</title>
 <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/theme.css">
 <style>
-  body{margin:0;background:var(--bg,#0a0a0a);color:var(--fg,#e6e6e6);font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;}
-  .vhdr{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 16px;border-bottom:0.5px solid #2a2a2a;}
-  .vhdr h1{font-size:14px;font-weight:600;margin:0;letter-spacing:.02em;}
-  .vtabbar{display:flex;gap:6px;padding:10px 16px;border-bottom:0.5px solid #2a2a2a;}
-  .vtab{background:transparent;color:#9a9a9a;border:0.5px solid #3a3a3a;border-radius:8px;padding:6px 12px;font-size:12.5px;cursor:pointer;}
-  .vtab.on{background:#fff;color:#000;border-color:#fff;}
-  .vdaterow{display:flex;gap:6px;padding:8px 16px;flex-wrap:wrap;}
-  .vpane{display:none;height:calc(100vh - 150px);padding:0 16px 16px;box-sizing:border-box;}
-  .vpane.on{display:block;}
-  #vPaneHeat iframe{width:100%;height:100%;border:0;background:#1a1a1a;}
-  #vPaneChart{display:none;}
-  #vPaneChart.on{display:flex;flex-direction:column;}
-  #chartMount{flex:1 1 auto;min-height:0;}
-  .verr{padding:16px;color:#e85c5c;}
+  /* client-terminal chassis on top of theme.css tokens */
+  html,body{height:100%;overflow:hidden;}
+  .vwrap{height:100vh;height:100dvh;display:flex;flex-direction:column;}
+  .vhdr{flex:0 0 auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:calc(12px + env(safe-area-inset-top)) max(18px,env(safe-area-inset-right)) 12px max(18px,env(safe-area-inset-left));
+    background:var(--glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+    border-bottom:0.5px solid var(--glass-line);z-index:20;}
+  .vbrand{display:flex;align-items:baseline;gap:11px;min-width:0;}
+  .vbrand .inf{font-size:21px;line-height:1;color:var(--cream);}
+  .vbrand .name{font-size:13px;font-weight:600;letter-spacing:.26em;color:var(--cream);text-transform:uppercase;white-space:nowrap;}
+  .vbrand h1{margin:0;font-size:10px;font-weight:500;letter-spacing:.18em;color:var(--label);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40vw;}
+  .vhdr-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .vtabrow{flex:0 0 auto;display:flex;align-items:center;gap:4px;flex-wrap:wrap;
+    padding:10px max(18px,env(safe-area-inset-right)) 4px max(18px,env(safe-area-inset-left));}
+  .vtab{background:transparent;border:none;border-radius:999px;color:var(--cream-dim);
+    font-family:inherit;font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;
+    padding:8px 15px;cursor:pointer;
+    transition:background .22s var(--ease),color .22s var(--ease),transform .12s var(--ease);}
+  .vtab:hover{color:var(--cream);background:var(--fill);}
+  .vtab.on{background:var(--fill-2);color:var(--cream);}
+  .vtab:active{transform:scale(0.96);}
+  .vdaterow{flex:0 0 auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;
+    padding:6px max(18px,env(safe-area-inset-right)) 10px max(18px,env(safe-area-inset-left));}
+  .vdaterow .ctool{font-family:var(--font-mono);font-size:11px;letter-spacing:.02em;}
+  .vdaterow .ctool.on{background:var(--fill-3);color:var(--cream);}
+  .vpane{display:none;flex:1 1 auto;min-height:0;
+    padding:0 max(18px,env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));}
+  .vpane.on{display:flex;flex-direction:column;animation:tabIn .28s var(--ease);}
+  #vPaneHeat iframe{flex:1 1 auto;width:100%;border:0.5px solid var(--line);border-radius:var(--radius-lg);background:var(--bg);}
+  #vPaneChart .vchartbar{flex:0 0 auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:0 0 10px;}
+  #vPaneChart .vchartbar .fn{font-family:var(--font-mono);font-size:11px;color:var(--cream-dim);margin-right:auto;}
+  #chartMount{flex:1 1 auto;min-height:0;border:0.5px solid var(--line);border-radius:var(--radius-lg);overflow:hidden;background:#0a0a0b;}
+  #vPaneReport .rptScroll{padding-top:2px;}
+  .verr{padding:4px max(18px,env(safe-area-inset-right)) 0 max(18px,env(safe-area-inset-left));
+    color:var(--cream-dim);font-size:12.5px;}
+  .verr:empty{display:none;}
+  .rgroup{margin-bottom:2px;}
+  .chart-tf.on{background:var(--fill-3);color:var(--cream);}
 </style>
 </head>
 <body>
-<div class="vhdr">
-  <h1 id="vLabel">Loading…</h1>
-  <div class="slot" style="margin-left:auto;" title="Session state for the selected date (set by the operator when publishing)"><span class="tag">Session</span><select class="field" id="gSessKind"><option value="">Auto</option><option value="full">Full</option><option value="early">Early</option><option value="closed">Closed</option></select></div>
-  <select class="field" id="vInst"></select>
-</div>
-<div id="vError" class="verr"></div>
-<div class="vtabbar">
-  <button class="vtab" data-vtab="heat" type="button">Heat Map</button>
-  <button class="vtab" data-vtab="chart" type="button">Chart</button>
-  <button class="vtab on" data-vtab="report" type="button">Report</button>
-</div>
-<div class="vdaterow" id="vDates"></div>
-
-<div class="vpane" id="vPaneHeat"><iframe id="heatFrame" title="Deep Strike Heat Map" src="heatmap.html"></iframe></div>
-
-<div class="vpane" id="vPaneChart">
-  <div class="chart-tools-wrap">
-    <span class="fn" id="chartPriceTitle">—</span>
-    <button class="chart-tf on" data-range="5d" data-interval="5m" type="button">5D/5m</button>
-    <button class="chart-tf" data-range="1mo" data-interval="15m" type="button">1M/15m</button>
-    <button class="chart-tf" data-range="6mo" data-interval="1d" type="button">6M/1D</button>
-    <button class="ctool" id="chartRefreshBtn" type="button">&#8635;</button>
-    <span class="expnote" id="chartStatus"></span>
+<div class="vwrap">
+  <div class="vhdr">
+    <div class="vbrand">
+      <span class="inf">&#8734;</span>
+      <span class="name">The Qu'an</span>
+      <h1 id="vLabel">Loading&hellip;</h1>
+    </div>
+    <div class="vhdr-right">
+      <div class="slot" title="Session state for the selected date (set by the operator when publishing)"><span class="tag">Session</span><select class="field" id="gSessKind"><option value="">Auto</option><option value="full">Full</option><option value="early">Early</option><option value="closed">Closed</option></select></div>
+      <div class="slot"><span class="tag">Instrument</span><select class="field" id="vInst"></select></div>
+    </div>
   </div>
-  <div id="chartMount"></div>
-</div>
+  <div id="vError" class="verr"></div>
+  <div class="vtabrow">
+    <button class="vtab on" data-vtab="report" type="button">Daily Report</button>
+    <button class="vtab" data-vtab="heat" type="button">Heat Map</button>
+    <button class="vtab" data-vtab="chart" type="button">Price</button>
+  </div>
+  <div class="vdaterow" id="vDates"></div>
 
-<div class="vpane on" id="vPaneReport">
-  <div class="rptScroll">
-    <div id="vReportBody" class="rptBody"></div>
+  <div class="vpane" id="vPaneHeat"><iframe id="heatFrame" title="Deep Strike Heat Map" src="heatmap.html"></iframe></div>
+
+  <div class="vpane" id="vPaneChart">
+    <div class="vchartbar">
+      <span class="fn" id="chartPriceTitle">&mdash;</span>
+      <button class="ctool chart-tf on" data-range="5d" data-interval="5m" type="button">5D / 5m</button>
+      <button class="ctool chart-tf" data-range="1mo" data-interval="15m" type="button">1M / 15m</button>
+      <button class="ctool chart-tf" data-range="6mo" data-interval="1d" type="button">6M / 1D</button>
+      <button class="ctool" id="chartRefreshBtn" type="button" title="Refresh">&#8635;</button>
+      <span class="expnote" id="chartStatus"></span>
+    </div>
+    <div id="chartMount"></div>
+  </div>
+
+  <div class="vpane on" id="vPaneReport">
+    <div class="rptScroll">
+      <div id="vReportBody" class="rptBody"></div>
+    </div>
   </div>
 </div>
 
