@@ -300,6 +300,248 @@ async function dispatch(env, action, params) {
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   PHASE 3b — Temporal Order Activator (Durable Object).
+
+   The cockpit's pending queue is a launch queue: orders staged here are DORMANT
+   until their activation conditions qualify, at which point they route to the
+   broker — and, crucially, that evaluation runs SERVER-SIDE on a Durable Object
+   alarm() every ~5s, so a staged order fires even with the browser closed.
+
+   What can be evaluated headless vs. from a pushed snapshot:
+     • clock (ET) and CME session-fraction  → computed natively here (Intl), fully
+       headless. These are the "browser can be closed" conditions.
+     • price                                → polled from a market-data source when
+       the order carries a quoteSymbol; else the terminal's last pushed price.
+     • detector / field / chronometer state → the terminal pushes a snapshot while
+       open (pushState); evaluated against the most recent one.
+
+   MARKET-DATA SOURCE IS PLUGGABLE. getPrice() is the single seam: today it polls a
+   quote feed / uses the pushed price. When the proprietary Tick Engine lands (its
+   own blueprint), this becomes a subscription to the tick stream and NOTHING else
+   in the activation engine changes — same lifecycle, same audit, same state
+   machine. That is the whole point of isolating it here.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const TERMINAL = new Set(['filled', 'rejected', 'cancelled']);
+const MAX_PENDING = 100;
+const ALARM_MS = 5000;
+
+// ET wall-clock parts (DST-correct via the platform's tz database).
+function etParts(d) {
+  const f = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false, weekday: 'short', hour: '2-digit', minute: '2-digit' });
+  const p = Object.fromEntries(f.formatToParts(d).map((x) => [x.type, x.value]));
+  return { hour: Number(p.hour) % 24, minute: Number(p.minute), weekday: p.weekday };
+}
+// CME-style session fraction: 18:00 ET → 17:00 ET next day (23h span). Matches the
+// terminal's session model; used only when no fresh pushed sessionT is available.
+function cmeSessionFrac(d) {
+  const { hour, minute } = etParts(d);
+  const et = hour * 60 + minute;
+  const since18 = (et - 18 * 60 + 1440) % 1440; // minutes since 18:00 ET
+  const span = 23 * 60;
+  if (since18 > span) return 1; // 17:00–18:00 ET maintenance window
+  return Math.max(0, Math.min(1, since18 / span));
+}
+const hhmmToMin = (s) => { const m = String(s || '').match(/^(\d{1,2}):(\d{2})$/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+
+// Yahoo last price — the interim market-data source (see getPrice seam above).
+async function fetchQuote(symbol) {
+  const hosts = ['https://query1.finance.yahoo.com', 'https://query2.finance.yahoo.com'];
+  for (const h of hosts) {
+    try {
+      const r = await fetch(`${h}/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1m`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      const d = await r.json().catch(() => ({}));
+      const m = d && d.chart && d.chart.result && d.chart.result[0] && d.chart.result[0].meta;
+      if (m && m.regularMarketPrice != null) return Number(m.regularMarketPrice);
+    } catch (_) {}
+  }
+  return null;
+}
+
+// Poll a single order's broker status to advance the lifecycle after routing.
+async function pollOrderStatus(env, orderId) {
+  if (orderId == null) return null;
+  try { const o = await tv(env, `/order/item?id=${Number(orderId)}`); return o && (o.ordStatus || o.status) ? String(o.ordStatus || o.status) : null; }
+  catch (_) { return null; }
+}
+function mapBrokerStatus(st) {
+  if (/fill/i.test(st)) return 'filled';
+  if (/reject/i.test(st)) return 'rejected';
+  if (/cancel|expired/i.test(st)) return 'cancelled';
+  if (/work|accept|new|pending/i.test(st)) return 'working';
+  return null;
+}
+
+// A condition is one clause; an order qualifies when EVERY clause holds (AND).
+function condTrue(c, ctx) {
+  const v = c.value;
+  switch (c.type) {
+    case 'clockAfter': { const m = hhmmToMin(v); return ctx.etMin != null && m != null && ctx.etMin >= m; }
+    case 'clockBefore': { const m = hhmmToMin(v); return ctx.etMin != null && m != null && ctx.etMin <= m; }
+    case 'sessionAbove': return ctx.sessionFrac != null && ctx.sessionFrac >= Number(v);
+    case 'sessionBelow': return ctx.sessionFrac != null && ctx.sessionFrac <= Number(v);
+    case 'priceAbove': return ctx.price != null && ctx.price >= Number(v);
+    case 'priceBelow': return ctx.price != null && ctx.price <= Number(v);
+    case 'priceInside': return ctx.price != null && Array.isArray(v) && ctx.price >= Math.min(v[0], v[1]) && ctx.price <= Math.max(v[0], v[1]);
+    case 'detectorIs': return ctx.detector != null && ctx.detector.toLowerCase().indexOf(String(v).toLowerCase()) >= 0;
+    default: return false;
+  }
+}
+const condLabel = (c) => {
+  const map = { clockAfter: 'clock ≥', clockBefore: 'clock ≤', sessionAbove: 'session ≥', sessionBelow: 'session ≤', priceAbove: 'price ≥', priceBelow: 'price ≤', priceInside: 'price ∈', detectorIs: 'detector ∋' };
+  return (map[c.type] || c.type) + ' ' + (Array.isArray(c.value) ? c.value.join('–') : c.value);
+};
+
+const doJson = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
+
+export class ExecutionEngine {
+  constructor(state, env) { this.state = state; this.env = env; }
+  async _get(k, f) { const v = await this.state.storage.get(k); return v === undefined ? f : v; }
+  async _put(k, v) { await this.state.storage.put(k, v); }
+
+  async fetch(request) {
+    const body = await request.json().catch(() => ({}));
+    try { return doJson({ ok: true, result: await this.op(body.action, body.params || {}) }); }
+    catch (e) { return doJson({ error: e.message, needsLogin: !!e.needsLogin }, e.status || 502); }
+  }
+  async op(action, p) {
+    switch (action) {
+      case 'stage': return this.stage(p);
+      case 'listPending': return this.list();
+      case 'cancelPending': return this.cancel(p.id);
+      case 'arm': return this.setArmed(p.id, true);
+      case 'disarm': return this.setArmed(p.id, false);
+      case 'pushState': return this.pushState(p);
+      case 'clearTerminal': return this.clearTerminal();
+      default: throw Object.assign(new Error(`unknown DO action "${action}"`), { status: 400 });
+    }
+  }
+
+  async list() {
+    const pending = await this._get('pending', []);
+    const snapshot = await this._get('snapshot', null);
+    return { pending, snapshot, serverTime: Date.now() };
+  }
+  async pushState(p) {
+    await this._put('snapshot', { sessionT: p.sessionT != null ? Number(p.sessionT) : null, date: p.date || null, detector: p.detector || null, price: p.price != null ? Number(p.price) : null, ts: Date.now() });
+    return { ok: true };
+  }
+  async stage(p) {
+    const t = p.ticket || {};
+    if (!t.symbol || !(Number(t.orderQty) > 0)) throw Object.assign(new Error('ticket needs symbol + qty'), { status: 400 });
+    const pending = await this._get('pending', []);
+    if (pending.length >= MAX_PENDING) throw Object.assign(new Error('pending queue full'), { status: 400 });
+    const now = Date.now();
+    const order = {
+      id: 'o' + now.toString(36) + Math.random().toString(36).slice(2, 6),
+      ticket: t,
+      conditions: Array.isArray(p.conditions) ? p.conditions : [],
+      quoteSymbol: p.quoteSymbol || null,
+      armed: !!p.armed,
+      status: p.armed ? 'armed' : 'staged',
+      orderId: null, note: '',
+      createdTs: now, updatedTs: now,
+      audit: [{ ts: now, to: p.armed ? 'armed' : 'staged', note: 'staged' }],
+    };
+    pending.push(order);
+    await this._put('pending', pending);
+    if (order.armed) await this.ensureAlarm();
+    return order;
+  }
+  async setArmed(id, armed) {
+    const pending = await this._get('pending', []);
+    const o = pending.find((x) => x.id === id);
+    if (!o) throw Object.assign(new Error('not found'), { status: 404 });
+    if (TERMINAL.has(o.status)) throw Object.assign(new Error('order is terminal'), { status: 400 });
+    o.armed = armed; this._transition(o, armed ? 'armed' : 'staged', armed ? 'armed' : 'disarmed');
+    await this._put('pending', pending);
+    if (armed) await this.ensureAlarm();
+    return o;
+  }
+  async cancel(id) {
+    const pending = await this._get('pending', []);
+    const o = pending.find((x) => x.id === id);
+    if (!o) throw Object.assign(new Error('not found'), { status: 404 });
+    // If it has already routed, cancel at the broker too.
+    if (o.orderId != null && (o.status === 'sent' || o.status === 'working')) { try { await cancelOrder(this.env, o.orderId); } catch (_) {} }
+    o.armed = false; this._transition(o, 'cancelled', 'cancelled by operator');
+    await this._put('pending', pending);
+    return o;
+  }
+  async clearTerminal() {
+    let pending = await this._get('pending', []);
+    pending = pending.filter((o) => !TERMINAL.has(o.status));
+    await this._put('pending', pending);
+    return { ok: true, remaining: pending.length };
+  }
+
+  _transition(o, to, note) {
+    o.status = to; o.updatedTs = Date.now(); o.note = note || o.note;
+    o.audit = (o.audit || []).concat([{ ts: o.updatedTs, to, note }]).slice(-40);
+  }
+
+  // Single market-data seam (see header). Returns a price or null.
+  async getPrice(order, snapshot, cache) {
+    if (order.quoteSymbol) {
+      if (!(order.quoteSymbol in cache)) cache[order.quoteSymbol] = await fetchQuote(order.quoteSymbol);
+      if (cache[order.quoteSymbol] != null) return cache[order.quoteSymbol];
+    }
+    if (snapshot && Date.now() - snapshot.ts < 90000 && snapshot.price != null) return snapshot.price;
+    return null;
+  }
+
+  async ensureAlarm() { if ((await this.state.storage.getAlarm()) == null) await this.state.storage.setAlarm(Date.now() + ALARM_MS); }
+
+  async alarm() {
+    const pending = await this._get('pending', []);
+    const snapshot = await this._get('snapshot', null);
+    const now = Date.now();
+    const fresh = snapshot && now - snapshot.ts < 90000;
+    const base = { etMin: (() => { const p = etParts(new Date(now)); return p.hour * 60 + p.minute; })(),
+      sessionFrac: (fresh && snapshot.sessionT != null) ? snapshot.sessionT : cmeSessionFrac(new Date(now)),
+      detector: (snapshot && now - snapshot.ts < 300000 && snapshot.detector) ? [snapshot.detector.direction, snapshot.detector.bias, snapshot.detector.action].filter(Boolean).join(' ') : null };
+    const priceCache = {};
+    let alive = false;
+
+    for (const o of pending) {
+      if (TERMINAL.has(o.status)) continue;
+      // Advance already-routed orders by polling broker status.
+      if (o.status === 'sent' || o.status === 'working') {
+        alive = true;
+        const st = await pollOrderStatus(this.env, o.orderId);
+        const mapped = st && mapBrokerStatus(st);
+        if (mapped && mapped !== o.status) this._transition(o, mapped, 'broker: ' + st);
+        continue;
+      }
+      if (!o.armed) continue;
+      alive = true;
+      const price = await this.getPrice(o, snapshot, priceCache);
+      const ctx = { etMin: base.etMin, sessionFrac: base.sessionFrac, detector: base.detector, price };
+      const qualifies = (o.conditions || []).every((c) => condTrue(c, ctx));
+      if (!qualifies) continue;
+      this._transition(o, 'qualified', 'conditions met');
+      try {
+        const res = (o.ticket.bracket && (o.ticket.stopLoss != null || o.ticket.takeProfit != null))
+          ? await placeBracket(this.env, o.ticket) : await placeOrder(this.env, o.ticket);
+        o.orderId = res && (res.orderId != null ? res.orderId : (res.orderId === 0 ? 0 : null));
+        this._transition(o, 'sent', 'routed order ' + (o.orderId != null ? o.orderId : '?'));
+      } catch (e) {
+        // needsLogin/transient → stay blocked and retry next tick; hard reject → terminal.
+        this._transition(o, e.needsLogin ? 'blocked' : 'rejected', 'place failed: ' + e.message);
+        if (e.needsLogin) { o.armed = true; alive = true; } // keep trying once reconnected
+      }
+    }
+
+    await this._put('pending', pending);
+    if (alive) await this.state.storage.setAlarm(now + ALARM_MS);
+  }
+}
+
+// DO-routed actions (the singleton activation engine holds all launch-queue state).
+const DO_ACTIONS = new Set(['stage', 'listPending', 'cancelPending', 'arm', 'disarm', 'pushState', 'clearTerminal']);
+function execDo(env) { return env.EXEC_DO.get(env.EXEC_DO.idFromName('operator')); }
+
 export default {
   async fetch(request, env) {
     if (env.EXECUTION_KEY) {
@@ -312,6 +554,13 @@ export default {
     const body = await request.json().catch(() => ({}));
     const action = body && body.action;
     if (!action) return new Response(JSON.stringify({ error: 'action required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+
+    // Launch-queue / activation actions live in the Durable Object.
+    if (DO_ACTIONS.has(action)) {
+      if (!env.EXEC_DO) return new Response(JSON.stringify({ error: 'EXEC_DO durable object not bound' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+      return execDo(env).fetch('https://exec.do/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, params: body.params || {} }) });
+    }
+
     try {
       const result = await dispatch(env, action, body.params || {});
       return new Response(JSON.stringify({ ok: true, result }), { headers: { 'Content-Type': 'application/json' } });

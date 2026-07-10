@@ -18,9 +18,10 @@
 */
 import { json, badRequest, serverError, requireOperator } from './_shared.js';
 
-// Actions that create/modify/cancel real broker state. Read-only actions skip
-// the confirm gate so the cockpit can poll the book freely.
-const WRITE_ACTIONS = new Set(['placeorder', 'bracket', 'cancelorder', 'modifyorder']);
+// Actions that create/modify/cancel real broker state, or ARM an order that will
+// later route on its own. Read-only actions skip the confirm gate so the cockpit
+// can poll the book / launch queue freely.
+const WRITE_ACTIONS = new Set(['placeorder', 'bracket', 'cancelorder', 'modifyorder', 'stage', 'arm']);
 
 export async function onRequestPost({ request, env }) {
   const gate = await requireOperator(env, request);

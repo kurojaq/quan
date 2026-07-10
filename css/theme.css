@@ -811,3 +811,17 @@
   .exLoginFoot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .exLoginNote{font:10px/1.5 var(--font-mono);color:var(--label);}
   .exLoginPanel .exField input,.exLoginPanel .exField select{width:100%;box-sizing:border-box;}
+  /* Activation-condition builder (Temporal Order Activator). */
+  .exActivation{border-top:0.5px solid var(--line);padding-top:9px;}
+  .exActivation>summary{cursor:pointer;font-size:11px;color:var(--cream);list-style:none;display:flex;align-items:baseline;gap:8px;}
+  .exActivation>summary::-webkit-details-marker{display:none;}
+  .exActivation>summary::before{content:'▸ ';color:var(--label);} .exActivation[open]>summary::before{content:'▾ ';}
+  .exActSub{font:9.5px var(--font-mono);color:var(--label);letter-spacing:.05em;text-transform:uppercase;}
+  .exActBody{display:flex;flex-direction:column;gap:9px;margin-top:9px;}
+  .exActRow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+  .exActRow .field{background:var(--fill);border:none;outline:none;border-radius:var(--radius-sm);color:var(--cream);padding:6px 8px;font-size:11px;}
+  .exCondList{display:flex;flex-direction:column;gap:6px;}
+  .exCondItem{display:flex;align-items:center;gap:8px;background:var(--fill);border-radius:var(--radius-sm);padding:6px 9px;font:11px var(--font-mono);color:var(--cream);}
+  .exCondItem .exCondText{flex:1;}
+  .exCondSummary{font:10px var(--font-mono);color:var(--cream-dim);}
+  .exOrderConds{width:100%;font:10px var(--font-mono);color:var(--label);margin-top:3px;}

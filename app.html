@@ -505,8 +505,31 @@
           <label class="exField exField-sm"><span>Stop-loss</span><input type="number" id="exSL" step="any" placeholder="—" disabled></label>
           <label class="exField exField-sm"><span>Take-profit</span><input type="number" id="exTP" step="any" placeholder="—" disabled></label>
         </div>
+        <details class="exActivation" id="exActivation">
+          <summary>Activation conditions <span class="exActSub">fires when ALL hold · evaluated server-side</span></summary>
+          <div class="exActBody">
+            <div class="exCondList" id="exCondList"></div>
+            <div class="exActRow">
+              <select class="field" id="exCondType">
+                <option value="sessionAbove">Session ≥</option>
+                <option value="sessionBelow">Session ≤</option>
+                <option value="clockAfter">Clock ≥ (ET HH:MM)</option>
+                <option value="clockBefore">Clock ≤ (ET HH:MM)</option>
+                <option value="priceAbove">Price ≥</option>
+                <option value="priceBelow">Price ≤</option>
+                <option value="priceInside">Price ∈ band</option>
+                <option value="detectorIs">Detector contains</option>
+              </select>
+              <input type="text" id="exCondVal" class="field" placeholder="value" spellcheck="false" style="max-width:120px">
+              <input type="text" id="exCondVal2" class="field" placeholder="hi" spellcheck="false" style="max-width:70px;display:none">
+              <button class="exMini" id="exCondAdd" type="button">+ add</button>
+            </div>
+            <label class="exField exField-sm"><span>Headless quote symbol (Yahoo, optional — enables price checks with the browser closed)</span><input type="text" id="exQuoteSym" spellcheck="false" placeholder="ES=F"></label>
+          </div>
+        </details>
         <div class="exFormFoot">
-          <button class="rptbtn" id="exStageBtn" type="button" title="Stage this order in the pending queue (dormant until you route it)">Stage &#8595;</button>
+          <button class="rptbtn" id="exStageBtn" type="button" title="Stage dormant in the launch queue (won't fire until you arm it)">Stage &#8595;</button>
+          <button class="rptbtn" id="exArmBtn" type="button" title="Stage ARMED — the server fires it when the activation conditions qualify, even with the browser closed">Arm ◎</button>
           <button class="rptbtn rptbtn-on" id="exRouteBtn" type="button" title="Route this ticket to the broker now">Route now</button>
           <span class="exFormMsg" id="exFormMsg"></span>
         </div>
