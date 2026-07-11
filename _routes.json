@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Only invoke Pages Functions for the API; everything else is served as a static asset.",
-  "include": ["/api/*"],
+  "description": "Invoke Pages Functions for the API and for '/' (functions/_middleware.js rewrites subdomain roots to their pages); everything else is served as a static asset.",
+  "include": ["/api/*", "/"],
   "exclude": []
 }

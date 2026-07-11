@@ -131,9 +131,13 @@ the DNS record and TLS automatically. No second deploy — one project, many hos
 | Hostname                     | Serves                    | How it routes |
 |------------------------------|---------------------------|---------------|
 | `www.husrihtlaefan.org`      | landing (index.html)      | default root |
-| `app.husrihtlaefan.org`      | operator terminal         | `_redirects` root rewrite → /app.html |
-| `client.husrihtlaefan.org`   | client terminal (tokens)  | `_redirects` root rewrite → /view.html (query preserved) |
-| `blog.husrihtlaefan.org`     | daily-brief blogroll      | `_redirects` root rewrite → /blog.html |
+| `app.husrihtlaefan.org`      | operator terminal         | middleware root rewrite → /app.html |
+| `client.husrihtlaefan.org`   | client terminal (tokens)  | middleware root rewrite → /view.html (query preserved) |
+| `blog.husrihtlaefan.org`     | daily-brief blogroll      | middleware root rewrite → /blog.html |
+
+Root routing is `functions/_middleware.js` (routed via `_routes.json`'s `"/"`
+entry) — NOT `_redirects`: Pages silently ignores host-matched 200 rewrites
+there (host sources only work for 3xx redirects; verified 2026-07-11).
 
 The apex (`husrihtlaefan.org`) currently serves the standalone splash page and
 is untouched by this. `css/`, `js/`, `assets/` and `/api/*` resolve normally on
