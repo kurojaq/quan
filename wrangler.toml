@@ -41,14 +41,12 @@ service = "quan-barchart-fetch"
 # reach it privately (env.EXECUTION.fetch) with no public URL. The Worker is
 # deployed separately (workers/wrangler-execution.toml) and holds the broker
 # credentials + access token; the terminal only ever calls /api/execution.
-# COMMENTED OUT until `npm run deploy:execution` has created the quan-execution
-# Worker — Pages validates service bindings at deploy time and FAILS THE WHOLE
-# DEPLOY if the target service doesn't exist (verified 2026-07-10). Once the
-# Worker is deployed, uncomment this AND add the binding by hand in the dashboard:
-# Pages → Settings → Bindings → Service binding → variable EXECUTION → service quan-execution.
-# [[services]]
-# binding = "EXECUTION"
-# service = "quan-execution"
+# ENABLED 2026-07-11: quan-execution is now deployed, so Pages' deploy-time
+# service-binding validation passes. This project's Pages bindings are managed
+# through this file, so this block is what actually wires the EXECUTION binding.
+[[services]]
+binding = "EXECUTION"
+service = "quan-execution"
 
 # Secrets/vars are set in the dashboard (Settings → Environment variables), not
 # committed here. Required keys are listed in functions/api/_shared.js and

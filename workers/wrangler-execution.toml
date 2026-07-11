@@ -50,9 +50,18 @@ id = "88472c90139149dea44668ce0c0a7d8a"
 name = "EXEC_DO"
 class_name = "ExecutionEngine"
 
+# SQLite-backed Durable Object (free-plan eligible; the KV storage API we use —
+# get/put/setAlarm — is identical to the classic backing, so no code change).
 [[migrations]]
 tag = "v1"
-new_classes = ["ExecutionEngine"]
+new_sqlite_classes = ["ExecutionEngine"]
+
+# A route-less, workers_dev=false Worker has no deploy target, so `wrangler deploy`
+# uploads a version but deploys nothing ("No targets deployed") and the EXECUTION
+# service binding can't resolve it. This cron IS that deploy target (same reason
+# the Barchart Worker has one); scheduled() runs a cheap DO watchdog every 10 min.
+[triggers]
+crons = ["*/10 * * * *"]
 
 # Secrets (TRADOVATE_USER/PASS/CID/SEC/APP_ID, optional DEVICE_ID, EXECUTION_KEY)
 # are set with `wrangler secret put`, never committed here.

@@ -414,8 +414,20 @@ export class ExecutionEngine {
       case 'disarm': return this.setArmed(p.id, false);
       case 'pushState': return this.pushState(p);
       case 'clearTerminal': return this.clearTerminal();
+      case 'watchdog': return this.watchdog();
       default: throw Object.assign(new Error(`unknown DO action "${action}"`), { status: 400 });
     }
+  }
+
+  // Cron-driven safety net: if any order is still armed/working but the alarm
+  // somehow isn't scheduled (eviction edge cases), re-arm it. The alarm itself is
+  // durable, so this is belt-and-suspenders — and it gives the Worker a deploy
+  // target (a service-binding-only Worker won't deploy without a route/trigger).
+  async watchdog() {
+    const pending = await this._get('pending', []);
+    const active = pending.some((o) => !TERMINAL.has(o.status) && (o.armed || o.status === 'sent' || o.status === 'working'));
+    if (active) await this.ensureAlarm();
+    return { active, pending: pending.length };
   }
 
   async list() {
@@ -543,6 +555,12 @@ const DO_ACTIONS = new Set(['stage', 'listPending', 'cancelPending', 'arm', 'dis
 function execDo(env) { return env.EXEC_DO.get(env.EXEC_DO.idFromName('operator')); }
 
 export default {
+  // Watchdog tick — keeps the activation loop alive and gives this route-less
+  // Worker a deploy target so the EXECUTION service binding resolves.
+  async scheduled(_event, env, ctx) {
+    if (!env.EXEC_DO) return;
+    ctx.waitUntil(execDo(env).fetch('https://exec.do/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'watchdog', params: {} }) }));
+  },
   async fetch(request, env) {
     if (env.EXECUTION_KEY) {
       const key = request.headers.get('X-Execution-Key') || '';
