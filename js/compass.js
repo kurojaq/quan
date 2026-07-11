@@ -729,7 +729,9 @@ $('cp_gk').onchange=e=>{showGk=e.target.checked;render();};
 ['cRipn','cSop'].forEach(_id=>{ const _cv=$(_id); if(_cv){ _cv.addEventListener('mousemove',e=>scrubAt(_cv,e)); _cv.addEventListener('mouseleave',scrubOff); } });
 document.querySelectorAll('[data-l]').forEach(c=>c.onchange=()=>{layers[c.dataset.l]=c.checked;render();});
 const _etFmt=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour12:false,weekday:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'});
-function sessionT(){ const P={}; for(const p of _etFmt.formatToParts(new Date())) P[p.type]=p.value;
+function sessionT(){
+  if(window.QuanExchange && window.QuanExchange.get()==='CBOE') return window.QuanExchange.sessionFraction('CBOE'); // CBOE RTH clock (09:30→16:15 ET)
+  const P={}; for(const p of _etFmt.formatToParts(new Date())) P[p.type]=p.value;
   let h=+P.hour; if(h>=24)h-=24; const sod=h*3600+(+P.minute)*60+(+P.second); let el=(h>=18)?(sod-64800):(sod+21600); let pt=el/82800; pt=pt<0?0:(pt>1?1:pt);
   return window.__sessFrac?window.__sessFrac(pt,sessLabel(Date.now()/1000)):pt; }
 function marketClosed(){ const P={}; for(const p of _etFmt.formatToParts(new Date())) P[p.type]=p.value; let h=+P.hour; if(h>=24)h-=24; const d=P.weekday;
