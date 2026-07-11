@@ -44,21 +44,35 @@
       <input id="lockInput" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" placeholder="••••••••">
       <button id="lockGo">Unlock</button>
     </div>
+    <div class="lockrow" id="lockPw2Row" style="display:none;">
+      <input id="lockPw2" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="confirm password">
+    </div>
     <div class="lockhint" id="lockHint"></div>
+    <div class="lockswitch" id="lockSwitch" style="display:none;">
+      <a href="#" id="lockToSignup">Create account</a>
+      <span class="sep">·</span>
+      <a href="#" id="lockToReset">Forgot password?</a>
+      <a href="#" id="lockToSignin" style="display:none;">Back to sign in</a>
+    </div>
   </div>
 </div>
 <canvas id="matrixCanvas"></canvas>
 <script src="js/matrix-effect.js" defer></script>
 <div class="wrap">
   <nav class="tabbar">
-    <button class="tabbtn on" data-tab="detector">Detector</button>
-    <button class="tabbtn" data-tab="polar">Field Study</button>
-    <button class="tabbtn" data-tab="strike">Strike Field</button>
-    <button class="tabbtn" data-tab="heat">Heat Map</button>
-    <button class="tabbtn" data-tab="chart">Chart</button>
-    <button class="tabbtn" data-tab="compass">Compass</button>
+    <div class="xchg" id="xchgToggle" title="Exchange scope — swaps the session clock and tab set (CME Globex ⇄ CBOE RTH)">
+      <button class="xchgbtn on" data-xchg="CME" type="button">CME</button>
+      <button class="xchgbtn" data-xchg="CBOE" type="button">CBOE</button>
+    </div>
+    <button class="tabbtn on" data-tab="detector" data-xchg-scope="CME">Detector</button>
+    <button class="tabbtn" data-tab="polar" data-xchg-scope="CME">Field Study</button>
+    <button class="tabbtn" data-tab="strike" data-xchg-scope="CME">Strike Field</button>
+    <button class="tabbtn" data-tab="heat" data-xchg-scope="CME">Heat Map</button>
+    <button class="tabbtn" data-tab="chart" data-xchg-scope="CME">Chart</button>
+    <button class="tabbtn" data-tab="compass" data-xchg-scope="CME">Compass</button>
     <button class="tabbtn" data-tab="sim">Account Sim</button>
     <button class="tabbtn" data-tab="exec">Execution</button>
+    <button class="tabbtn" data-tab="cboe" data-xchg-scope="CBOE" style="display:none">CBOE Portfolio</button>
     <button class="tabbtn splitplus" data-tab="split" id="splitTab" title="Split view — show two tabs at once">+</button>
     <div class="gctrls">
       <div class="instrbar"><select class="field" id="instA"></select></div>
@@ -560,9 +574,11 @@
     </div>
   </div>
   </section>
+  <section class="tabsec" id="tabCboe"><div id="cboeMount" style="flex:1 1 auto;min-height:0;width:100%;overflow:auto;"></div></section>
   <div class="splitDiv" id="splitDiv"></div>
   </div>
 </div>
+<script src="js/exchange.js" defer></script>
 <script src="js/cloud-storage.js" defer></script>
 <script src="js/chart-zoom.js" defer></script>
 <script src="js/detector.js" defer></script>
@@ -582,6 +598,7 @@
 <script src="js/auth-config.js" defer></script>
 <script src="js/auth.js" defer></script>
 <script src="js/subscription-gate.js" defer></script>
+<script src="js/entitlement-gate.js" defer></script>
 <script src="js/lock-screen.js" defer></script>
 <script src="js/warehouse.js" defer></script>
 <script src="js/instrument-adapter.js" defer></script>
@@ -629,5 +646,6 @@
 <div id="rptPrintDoc"></div>
 <script src="js/account-sim.js" defer></script>
 <script src="js/execution.js" defer></script>
+<script src="js/cboe-portfolio.js" defer></script>
 </body>
 </html>

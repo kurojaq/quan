@@ -111,6 +111,27 @@
   .tabbtn:hover{color:var(--cream);background:var(--fill);}
   .tabbtn.on{background:var(--fill-2);color:var(--cream);}
   .tabbtn:active{transform:scale(0.96);}
+  /* ---- entitlement gate: locked tabs ---- */
+  .tabbtn.locked{color:var(--cream-dim);opacity:0.5;}
+  .tabbtn.locked:hover{background:var(--fill);opacity:0.72;}
+  .tabbtn .tablock{font-size:8px;margin-left:5px;opacity:0.85;filter:grayscale(1);vertical-align:middle;}
+  /* ---- entitlement gate: upgrade sheet ---- */
+  #quGateSheet{position:fixed;inset:0;z-index:10000;display:none;align-items:center;justify-content:center;
+    background:rgba(4,4,6,0.62);backdrop-filter:saturate(160%) blur(10px);-webkit-backdrop-filter:saturate(160%) blur(10px);
+    padding:calc(20px + env(safe-area-inset-top)) 20px;}
+  #quGateSheet .qg-card{max-width:420px;width:100%;background:var(--fill);border:0.5px solid rgba(255,255,255,0.12);
+    border-radius:var(--radius-lg);box-shadow:var(--shadow-lg,0 24px 70px rgba(0,0,0,.6));padding:26px 24px;text-align:center;
+    font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:var(--cream);}
+  #quGateSheet .qg-lock{font-size:26px;filter:grayscale(1);margin-bottom:8px;}
+  #quGateSheet .qg-title{font-size:16px;font-weight:600;letter-spacing:.01em;margin-bottom:8px;}
+  #quGateSheet .qg-title b{font-weight:700;}
+  #quGateSheet .qg-sub{font-size:13px;line-height:1.5;color:var(--cream-dim);margin-bottom:20px;}
+  #quGateSheet .qg-actions{display:flex;flex-direction:column;gap:9px;}
+  #quGateSheet .qg-btn{font:inherit;font-weight:600;font-size:13px;padding:11px 16px;border-radius:999px;cursor:pointer;
+    background:transparent;color:var(--cream);border:0.5px solid rgba(255,255,255,0.18);transition:background .2s var(--ease);}
+  #quGateSheet .qg-btn:hover{background:var(--fill-2);}
+  #quGateSheet .qg-primary{background:#fff;color:#000;border-color:#fff;}
+  #quGateSheet .qg-primary:hover{background:#eaeaea;}
   /* unified iOS interaction polish: smooth state transitions + subtle press feedback */
   .ctool,.rptbtn,.field,.pnow,.pctl button,.modeToggle button,.expbtn,.rptbtn-on{
     transition:background .2s var(--ease),color .2s var(--ease),box-shadow .2s var(--ease),transform .12s var(--ease);}
@@ -369,9 +390,9 @@
   .lockrow{display:flex;align-items:center;gap:8px;background:rgba(10,10,11,0.72);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
     border:0.5px solid rgba(255,255,255,0.09);border-radius:var(--radius-md);padding:6px 8px;box-shadow:var(--shadow-sm);}
   .lockrow.bad{animation:shake .42s;}
-  #lockInput{background:transparent;border:none;outline:none;color:#f5f5f7;font-family:var(--font-mono);
+  #lockInput,#lockPw2{background:transparent;border:none;outline:none;color:#f5f5f7;font-family:var(--font-mono);
     font-size:14px;letter-spacing:.18em;width:190px;text-align:center;}
-  #lockInput::placeholder{color:rgba(235,235,245,0.36);letter-spacing:.12em;}
+  #lockInput::placeholder,#lockPw2::placeholder{color:rgba(235,235,245,0.36);letter-spacing:.12em;}
   #lockEmail{background:transparent;border:none;outline:none;color:#f5f5f7;font-family:var(--font-mono);
     font-size:13px;width:190px;text-align:center;}
   #lockGo{background:rgba(255,255,255,0.09);border:none;border-radius:var(--radius-sm);color:#f5f5f7;
@@ -380,6 +401,10 @@
   #lockGo:hover{background:rgba(255,255,255,0.15);}
   #lockGo:active{transform:scale(0.96);}
   .lockhint{font-size:9px;letter-spacing:.1em;color:rgba(235,235,245,0.36);min-height:11px;}
+  .lockswitch{display:flex;align-items:center;gap:9px;font-size:10px;letter-spacing:.06em;margin-top:2px;}
+  .lockswitch a{color:rgba(235,235,245,0.55);text-decoration:none;transition:color .2s var(--ease);cursor:pointer;}
+  .lockswitch a:hover{color:#f5f5f7;}
+  .lockswitch .sep{color:rgba(235,235,245,0.28);}
   @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
 
   /* ---- expiry toggle (Daily/EOM): iOS segmented control ---- */
@@ -825,3 +850,57 @@
   .exCondItem .exCondText{flex:1;}
   .exCondSummary{font:10px var(--font-mono);color:var(--cream-dim);}
   .exOrderConds{width:100%;font:10px var(--font-mono);color:var(--label);margin-top:3px;}
+
+  /* ===== Exchange toggle (CME ⇄ CBOE) ===== */
+  .xchg{display:inline-flex;align-items:center;gap:2px;background:var(--fill);border-radius:999px;padding:2px;margin-right:4px;}
+  .xchgbtn{background:transparent;border:none;border-radius:999px;color:var(--cream-dim);
+    font:600 10px/1 var(--font-mono);letter-spacing:.08em;padding:5px 10px;cursor:pointer;transition:.15s;}
+  .xchgbtn.on{background:var(--fill-3);color:var(--cream);}
+  .xchgbtn:hover:not(.on){color:var(--cream);}
+
+  /* ===== CBOE portfolio / risk board ===== */
+  #tabCboe{overflow:hidden;}
+  .cbHead{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 20px 12px;}
+  .cbTitle{font-size:15px;font-weight:600;color:var(--cream);display:flex;align-items:center;gap:9px;}
+  .cbTitle .inf{opacity:.5;font-size:17px;}
+  .cbSub{font:11px var(--font-mono);color:var(--cream-dim);letter-spacing:.03em;font-weight:400;}
+  .cbTools{display:flex;align-items:center;gap:12px;}
+  .cbCount{font:11px var(--font-mono);color:var(--label);}
+  .cbUp{display:inline-flex;align-items:center;gap:6px;background:var(--fill-2);color:var(--cream);
+    border-radius:var(--radius-sm);padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;transition:.15s;}
+  .cbUp:hover{background:var(--fill-3);}
+  .cbUp input{display:none;}
+  .cbClear{background:transparent;border:none;color:var(--cream-dim);font-size:11px;cursor:pointer;padding:6px 8px;border-radius:var(--radius-sm);}
+  .cbClear:hover{color:#e85c5c;background:var(--fill);}
+  .cbEmpty{margin:40px 20px;padding:34px 28px;background:var(--panel);border-radius:var(--radius-md);
+    color:var(--cream-dim);font-size:13px;line-height:1.7;text-align:center;max-width:640px;}
+  .cbEmpty b{color:var(--cream);font-weight:600;}
+  .cbTableWrap{overflow-x:auto;margin:0 12px;}
+  .cbTable{width:100%;border-collapse:collapse;font-size:12px;}
+  .cbTable th{position:sticky;top:0;background:var(--glass-strong);backdrop-filter:var(--blur);
+    font:600 10px/1 var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--label);
+    padding:9px 12px;cursor:pointer;user-select:none;white-space:nowrap;border-bottom:0.5px solid var(--glass-line);}
+  .cbTable th.r{text-align:right;} .cbTable th.l{text-align:left;}
+  .cbTable th.cbOn{color:var(--cream);}
+  .cbTable th:hover{color:var(--cream-dim);}
+  .cbTable td{padding:9px 12px;border-bottom:0.5px solid var(--glass-line);color:var(--cream);
+    font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .cbTable td.r{text-align:right;font-family:var(--font-mono);} .cbTable td.l{text-align:left;}
+  .cbTable tbody tr{cursor:pointer;transition:background .12s;}
+  .cbTable tbody tr:hover{background:var(--fill);}
+  .cbTable td.cbPut{color:#5fd08a;font-weight:600;} .cbTable td.cbCall{color:#e8886c;font-weight:600;}
+  .cbDist{color:var(--label);font-size:10px;margin-left:6px;}
+  .cbDrill{margin:14px 20px 24px;}
+  .cbDrillHead{font:12px var(--font-mono);color:var(--cream);margin-bottom:12px;letter-spacing:.02em;}
+  .cbDrillGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;}
+  .cbDrillGrid>div{background:var(--panel);border-radius:var(--radius-md);padding:12px 14px;}
+  .cbLbl{display:block;font:600 9px/1 var(--font-mono);letter-spacing:.09em;text-transform:uppercase;color:var(--label);margin-bottom:9px;}
+  .cbRungs{display:flex;flex-wrap:wrap;gap:6px;}
+  .cbRungs i{color:var(--label);font-style:normal;}
+  .cbRung{display:inline-flex;align-items:baseline;gap:4px;font:11px var(--font-mono);
+    padding:4px 8px;border-radius:8px;background:var(--fill);}
+  .cbRung i{font-size:9px;}
+  .cbRung.c{color:#e8886c;} .cbRung.f{color:#5fd08a;}
+  .cbSig{font:11px var(--font-mono);padding:4px 8px;border-radius:8px;background:var(--fill);color:var(--cream);}
+  .cbSig i{color:var(--label);font-style:normal;font-size:9px;}
+  .cbDrillNote{margin-top:12px;font:10px var(--font-mono);color:var(--label);line-height:1.5;}
