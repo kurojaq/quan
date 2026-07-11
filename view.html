@@ -88,9 +88,13 @@
       <span class="fn" id="chartPriceTitle">&mdash;</span>
       <div class="expsel">
         <button class="expbtn chart-view on" data-chartview="price" type="button">Price</button>
+        <button class="expbtn chart-view" data-chartview="line" type="button">Line</button>
         <button class="expbtn chart-view" data-chartview="bookmap" type="button">Bookmap</button>
       </div>
-      <select class="field" id="chartHeatMetric" title="Heat metric" style="display:none"></select>
+      <select class="field" id="chartHeatMetric" title="Heat metric — any heat map column" style="display:none"></select>
+      <span id="chartGranWrap" style="display:none;align-items:center;gap:5px;"><span class="tag" style="font-size:9px;letter-spacing:.08em;color:var(--label);text-transform:uppercase;">Gran</span><input type="range" id="chartGran" min="0" max="3" step="1" value="0" style="width:64px"><span class="expnote" id="chartGranV">&times;1</span></span>
+      <button class="ctool" id="chartCandlesBtn" type="button" style="display:none" title="Show / hide the candlesticks">Candles</button>
+      <button class="ctool" id="chartMonoBtn" type="button" style="display:none" title="Grayscale the heat field">Mono</button>
       <button class="ctool chart-tf on" data-range="5d" data-interval="5m" type="button">5D / 5m</button>
       <button class="ctool chart-tf" data-range="1mo" data-interval="15m" type="button">1M / 15m</button>
       <button class="ctool chart-tf" data-range="6mo" data-interval="1d" type="button">6M / 1D</button>

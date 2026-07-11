@@ -316,12 +316,16 @@
       <span class="sub">Price Chart</span>
     </div>
     <div class="hdr-right">
-      <div class="slot" title="Chart view — plain price, or the heat map blended behind price (Bookmap-style)">
+      <div class="slot" title="Chart view — candles, a line chart, or the heat map blended behind price (Bookmap-style)">
         <div class="expsel">
           <button class="expbtn chart-view on" data-chartview="price" type="button">Price</button>
+          <button class="expbtn chart-view" data-chartview="line" type="button">Line</button>
           <button class="expbtn chart-view" data-chartview="bookmap" type="button">Bookmap</button>
         </div>
-        <select class="field" id="chartHeatMetric" title="Heat metric" style="display:none"></select>
+        <select class="field" id="chartHeatMetric" title="Heat metric — any heat map column" style="display:none"></select>
+        <span id="chartGranWrap" style="display:none;align-items:center;gap:5px;"><span class="tag">Gran</span><input type="range" id="chartGran" min="0" max="3" step="1" value="0" style="width:64px"><span class="expnote" id="chartGranV">&times;1</span></span>
+        <button class="ctool" id="chartCandlesBtn" type="button" style="display:none" title="Show / hide the candlesticks">Candles</button>
+        <button class="ctool" id="chartMonoBtn" type="button" style="display:none" title="Grayscale the heat field">Mono</button>
       </div>
       <div class="slot" id="chartTfRow">
         <button class="ctool chart-tf" data-range="5d" data-interval="1m" type="button">1m</button>
