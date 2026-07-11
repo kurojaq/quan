@@ -8,10 +8,13 @@
    _routes.json only routes "/api/*" and "/" through Functions, so this runs for
    root requests and API requests only; every other path stays pure static.
 */
+// Extensionless targets: asking ASSETS for '/blog.html' triggers Pages'
+// clean-URL normalizer, which answers 308 → '/blog' (and that redirect would
+// drop a client link's ?token= query). The clean URLs serve content directly.
 const HOST_PAGES = {
-  'blog.husrihtlaefan.org': '/blog.html',
-  'app.husrihtlaefan.org': '/app.html',
-  'client.husrihtlaefan.org': '/view.html'
+  'blog.husrihtlaefan.org': '/blog',
+  'app.husrihtlaefan.org': '/app',
+  'client.husrihtlaefan.org': '/view'
 };
 
 export async function onRequest(context) {
