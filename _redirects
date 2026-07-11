@@ -6,3 +6,5 @@
 # below rewrites only the subdomain's ROOT to the blogroll page; every other
 # path (css/, js/, /api/*, post hashes) resolves normally on that host too.
 https://blog.husrihtlaefan.org/ /blog.html 200
+https://app.husrihtlaefan.org/ /app.html 200
+https://client.husrihtlaefan.org/ /view.html 200

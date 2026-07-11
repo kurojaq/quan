@@ -120,24 +120,36 @@ Pages project → **Custom domains → Set up a domain**. Point your domain at t
 Pages project; Cloudflare provisions TLS automatically. Then set `APP_BASE_URL`
 to that domain so Stripe success/cancel URLs are absolute and correct.
 
-### 4b. Blog subdomain (`blog.husrihtlaefan.org`)
+### 4b. Production subdomains (all served by this one Pages project)
 
-The public daily-brief blogroll (`blog.html` + `/api/blog`) lives on its own
-subdomain but is served by this same Pages project — no second deploy:
+The `husrihtlaefan.org` zone's DNS is already ON Cloudflare (nameservers
+opal/micah.ns.cloudflare.com — IONOS is registrar only, do NOT create records
+there). Every subdomain below is added the same way: Pages project →
+**Custom domains → Set up a domain** → type the hostname → Cloudflare creates
+the DNS record and TLS automatically. No second deploy — one project, many hosts.
 
-1. Pages project → **Custom domains → Set up a domain** → add
-   `blog.husrihtlaefan.org`. (Since the zone is already on Cloudflare this is
-   one click; TLS is automatic.)
-2. That's it — the committed `_redirects` file rewrites the subdomain's root
-   to `/blog.html`, while `css/`, `js/` and `/api/*` keep resolving normally
-   on that host. Individual posts are hash routes (`#/<slug>`), so no other
-   paths are involved.
+| Hostname                     | Serves                    | How it routes |
+|------------------------------|---------------------------|---------------|
+| `www.husrihtlaefan.org`      | landing (index.html)      | default root |
+| `app.husrihtlaefan.org`      | operator terminal         | `_redirects` root rewrite → /app.html |
+| `client.husrihtlaefan.org`   | client terminal (tokens)  | `_redirects` root rewrite → /view.html (query preserved) |
+| `blog.husrihtlaefan.org`     | daily-brief blogroll      | `_redirects` root rewrite → /blog.html |
+
+The apex (`husrihtlaefan.org`) currently serves the standalone splash page and
+is untouched by this. `css/`, `js/`, `assets/` and `/api/*` resolve normally on
+every host, so the API is same-origin everywhere. Client links minted from the
+publish panel automatically use `client.husrihtlaefan.org/?token=...` when the
+operator is on a production host (js/publish-panel.js).
+
+After attaching `app.`: set `APP_BASE_URL=https://app.husrihtlaefan.org` in the
+Pages env vars so Stripe success/cancel URLs are right, and add the host to
+Supabase → Auth → URL Configuration (Site URL / redirect allow-list).
 
 Blog posts are published from the terminal: header **Publish** panel →
 **→ Blog**. They're stored in the same `QUAN_PUBLISH` KV namespace (§3b) under
 `blog:*` keys with **no TTL** — a post stays up until deleted via
 `DELETE /api/blog?slug=...`. Publishing is gated by `OPERATOR_EMAIL`; reading
-is public. The roll is also reachable on the main domain at `/blog`.
+is public. The roll is also reachable on any host at `/blog`.
 
 ---
 

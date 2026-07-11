@@ -102,7 +102,10 @@
       var rows=d.tokens||[];
       if(!rows.length){ listEl.textContent='no client links yet'; return; }
       listEl.innerHTML=rows.map(function(t){
-        var url=location.origin+'/view.html?token='+t.token;
+        // client links live on the branded subdomain when the operator is on the production domain
+        // (client.husrihtlaefan.org's root is rewritten to /view.html via _redirects, query preserved)
+        var base=/husrihtlaefan\.org$/.test(location.hostname)?'https://client.husrihtlaefan.org/?token=':(location.origin+'/view.html?token=');
+        var url=base+t.token;
         return '<div style="border:0.5px solid #2a2a2a;border-radius:8px;padding:7px 8px;">'
           +'<div style="font-weight:600;">'+esc(t.label)+'</div>'
           +'<div style="color:#8a8a8a;margin:2px 0 6px;">'+esc((t.instruments||[]).join(', '))+'</div>'
