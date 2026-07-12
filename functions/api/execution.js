@@ -89,6 +89,11 @@ export async function onRequestPost({ request, env }) {
     }
 
     const wr = await call(action, body.params || {});
+    // TEMP DIAGNOSTIC — remove once the 502/DOCTYPE issue is root-caused.
+    try {
+      const rawPreview = (await wr.clone().text()).slice(0, 300);
+      console.log('EXEC_DIAG', JSON.stringify({ action, wrStatus: wr.status, wrOk: wr.ok, rawPreview }));
+    } catch (diagErr) { console.log('EXEC_DIAG_ERR', diagErr.message); }
     const data = await wr.json().catch(() => ({ error: `runtime ${wr.status}` }));
     return json(data, wr.ok ? 200 : (wr.status || 502));
   } catch (err) {
