@@ -105,6 +105,104 @@
     return { meta: meta, expirations: exps, expiration: pick, rows: sel };
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // BARCHART EQUITY ADAPTER — AAPL/NVDA/… come as TWO Barchart files (side-by-side
+  // chain + volatility-greeks). Unlike CBOE index quotedata, these carry OBSERVED
+  // premium (Latest) and full greeks, so NO energy reconstruction is needed — the
+  // directive's "observed" source. We map both into the SAME row schema, so
+  // vendorCsv/greeksCsv/cascade/summarize all work unchanged.
+  // ══════════════════════════════════════════════════════════════════════════
+  function pctnum(s) { var n = num(String(s == null ? "" : s).replace("%", "")); return isFinite(n) ? n / 100 : NaN; }
+  function isBarchartChain(text) {
+    var h = (String(text).replace(/^﻿/, "").split("\n")[0] || "").toLowerCase();
+    return /^"?type"?,/.test(h) && h.indexOf("strike") >= 0;
+  }
+  function isBarchartGreeks(text) {
+    var h = (String(text).replace(/^﻿/, "").split("\n")[0] || "").toLowerCase();
+    return /^"?strike"?,/.test(h) && h.indexOf("delta") >= 0;
+  }
+  function detectFormat(text) {
+    return isBarchartChain(text) ? "barchart-chain" : isBarchartGreeks(text) ? "barchart-greeks" : "cboe";
+  }
+  function tickerFromName(name) {
+    var b = String(name || "").split(/[\/\\]/).pop();
+    var m = /^([a-z0-9.]+?)[-_]/i.exec(b);
+    return (m ? m[1] : b.replace(/\.csv$/i, "")).toUpperCase();
+  }
+  function expFromName(name) { var m = /exp[-_](\d{4})[-_](\d{2})[-_](\d{2})/i.exec(name || ""); return m ? (m[1] + "-" + m[2] + "-" + m[3]) : null; }
+  function asofFromName(name) { var m = /(\d{2})[-_](\d{2})[-_](\d{4})\.csv/i.exec(name || ""); return m ? (m[3] + "-" + m[1] + "-" + m[2]) : ""; }
+
+  // Barchart side-by-side chain: Type,Latest,Bid,Ask,Change,Volume,OpenInt,IV,LastTrade,Strike,(put …)
+  function parseBarchartChain(text) {
+    var lines = String(text).replace(/\r\n/g, "\n").split("\n"), map = {};
+    for (var i = 1; i < lines.length; i++) {
+      var l = lines[i]; if (!l || /^"?downloaded/i.test(l)) continue;
+      var f = parseLine(l); if (f.length < 19) continue;
+      var K = num(f[9]); if (!isFinite(K)) continue;
+      map[K] = { callLast: num(f[1]), callVol: num(f[5]), callOI: num(f[6]), callIV: pctnum(f[7]),
+                 putLast: num(f[11]), putVol: num(f[15]), putOI: num(f[16]), putIV: pctnum(f[17]) };
+    }
+    return map;
+  }
+  // Barchart volatility-greeks: Strike,Latest,Theor.,IV,Delta,Gamma,Theta,Vega,Rho,…,Type
+  function parseBarchartGreeks(text) {
+    var lines = String(text).replace(/\r\n/g, "\n").split("\n"), map = {};
+    for (var i = 1; i < lines.length; i++) {
+      var l = lines[i]; if (!l || /^"?downloaded/i.test(l)) continue;
+      var f = parseLine(l); if (f.length < 14) continue;
+      var K = num(f[0]); if (!isFinite(K)) continue;
+      var e = map[K] || (map[K] = {}), put = /put/i.test(f[13] || "");
+      var iv = pctnum(f[3]), dl = num(f[4]), ga = num(f[5]);
+      if (put) { e.putDelta = dl; e.putGamma = ga; if (isFinite(iv)) e.putIV = iv; }
+      else { e.callDelta = dl; e.callGamma = ga; if (isFinite(iv)) e.callIV = iv; }
+    }
+    return map;
+  }
+  // Derive the ATM/spot. Prefer the call-delta ≈ 0.5 crossing (robust); fall back
+  // to the put-call premium cross, skipping rows with a stale Latest=0 (deep-ITM
+  // no-trade rows otherwise fake a cross far from the money).
+  function deriveSpot(rows) {
+    var prev = null, i, r, t;
+    for (i = 0; i < rows.length; i++) {                       // delta 0.5 (delta falls as strike rises)
+      r = rows[i]; if (!isFinite(r.callDelta) || r.callDelta === 0) continue;   // skip stale no-trade δ=0 rows
+      if (prev && ((prev.v >= 0.5 && r.callDelta < 0.5) || (prev.v < 0.5 && r.callDelta >= 0.5))) {
+        t = (prev.v - r.callDelta) !== 0 ? (prev.v - 0.5) / (prev.v - r.callDelta) : 0;
+        return prev.k + t * (r.strike - prev.k);
+      }
+      prev = { v: r.callDelta, k: r.strike };
+    }
+    prev = null;
+    for (i = 0; i < rows.length; i++) {                       // premium cross (guarded)
+      r = rows[i]; if (!(r.callLast > 0) || !(r.putLast > 0)) continue;
+      var d = r.callLast - r.putLast;
+      if (prev && ((prev.v <= 0 && d > 0) || (prev.v > 0 && d <= 0))) {
+        t = (prev.v - d) !== 0 ? prev.v / (prev.v - d) : 0; return prev.k + t * (r.strike - prev.k);
+      }
+      prev = { v: d, k: r.strike };
+    }
+    return rows.length ? rows[Math.floor(rows.length / 2)].strike : NaN;
+  }
+  function ingestBarchart(chainText, greeksText, filename) {
+    var chain = parseBarchartChain(chainText), gk = greeksText ? parseBarchartGreeks(greeksText) : {};
+    var ticker = tickerFromName(filename), expISO = expFromName(filename);
+    var expLabel = expISO ? new Date(expISO + "T12:00:00").toDateString() : "";   // "Mon Jul 13 2026"
+    var expMs = expISO ? Date.parse(expISO + "T20:00:00Z") : NaN;
+    var tau = Math.max((isFinite(expMs) ? expMs - Date.now() : 0) / 1000, TAU_FLOOR) / YEAR_S;
+    var rows = [];
+    Object.keys(chain).forEach(function (K) {
+      var c = chain[K], g = gk[K] || {};
+      rows.push({ exp: expLabel, strike: +K,
+        callOI: c.callOI, putOI: c.putOI, callVol: c.callVol, putVol: c.putVol,
+        callLast: c.callLast, putLast: c.putLast,
+        callIV: isFinite(g.callIV) ? g.callIV : c.callIV, putIV: isFinite(g.putIV) ? g.putIV : c.putIV, tau: tau,
+        callDelta: g.callDelta, putDelta: g.putDelta, callGamma: g.callGamma, putGamma: g.putGamma,
+        callPrem: c.callLast, putPrem: c.putLast });   // OBSERVED premium — no reconstruction
+    });
+    rows.sort(function (a, b) { return a.strike - b.strike; });
+    return { meta: { symbol: ticker, spot: deriveSpot(rows), asof: asofFromName(filename), source: "barchart" },
+             expirations: expLabel ? [expLabel] : [], expiration: expLabel, rows: rows };
+  }
+
   // ---- cascade (port of quan_engine.compute_cascade) on reconstructed premium -
   function cascade(rows) {
     var AP = [], AR = [], AT = [];
@@ -426,21 +524,38 @@
 
   function handleFiles(files) {
     var list = Array.prototype.slice.call(files || []);
-    var done = 0, added = [];
-    list.forEach(function(file){
-      var rd = new FileReader();
-      rd.onload = function(){
-        try {
-          var parsed = ingest(rd.result);
-          if (parsed.rows.length) {
-            var s = summarize(parsed); PORT[s.symbol] = s;
-            CHAINS[s.symbol] = { meta: parsed.meta, expiration: parsed.expiration, rows: parsed.rows };
-            ACTIVE = s.symbol; added.push(s.symbol);
-          }
-        } catch (e) { console.warn("CBOE ingest failed for", file.name, e); }
-        if (++done === list.length) { save(); render(); syncInstr(); notifyChanged(); if (added.length===1) drill(added[0]); }
+    if (!list.length) return;
+    // read every file first, then dispatch by format (Barchart needs chain+greeks paired)
+    Promise.all(list.map(function (file) {
+      return new Promise(function (res) {
+        var rd = new FileReader();
+        rd.onload = function () { res({ name: file.name, text: rd.result, fmt: detectFormat(rd.result) }); };
+        rd.onerror = function () { res(null); };
+        rd.readAsText(file);
+      });
+    })).then(function (items) {
+      items = items.filter(Boolean);
+      var added = [];
+      var stash = function (parsed) {
+        if (!parsed || !parsed.rows.length) return;
+        var s = summarize(parsed); PORT[s.symbol] = s;
+        CHAINS[s.symbol] = { meta: parsed.meta, expiration: parsed.expiration, rows: parsed.rows };
+        ACTIVE = s.symbol; added.push(s.symbol);
       };
-      rd.readAsText(file);
+      // CBOE index quotedata — one entry per file (reconstructed premium)
+      items.filter(function (x) { return x.fmt === "cboe"; }).forEach(function (x) {
+        try { stash(ingest(x.text)); } catch (e) { console.warn("CBOE ingest failed:", x.name, e); }
+      });
+      // Barchart equity — pair a side-by-side chain with its greeks file by ticker
+      var greeks = items.filter(function (x) { return x.fmt === "barchart-greeks"; });
+      items.filter(function (x) { return x.fmt === "barchart-chain"; }).forEach(function (c) {
+        var tk = tickerFromName(c.name);
+        var g = greeks.filter(function (gg) { return tickerFromName(gg.name) === tk; })[0];
+        try { stash(ingestBarchart(c.text, g ? g.text : null, c.name)); }
+        catch (e) { console.warn("Barchart ingest failed:", c.name, e); }
+      });
+      save(); render(); syncInstr(); notifyChanged();
+      if (added.length === 1) drill(added[0]);
     });
   }
 
