@@ -11,6 +11,11 @@ THREESESSION_COMPASS_ENGINE_1_16.html
 node_modules/
 package-lock.json
 
+# Build / runtime caches — never committed
+.wrangler/
+__pycache__/
+*.pyc
+
 # Local wrangler build cache / Python bytecode cache
 .wrangler/
 __pycache__/
