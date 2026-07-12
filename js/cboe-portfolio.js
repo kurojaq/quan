@@ -44,9 +44,27 @@
   }
 
   // Positional columns in the CBOE quotedata table (see quan_cboe.py _COL).
-  var C = { exp:0, callLast:2, callVol:6, callOI:10, strike:11, putLast:13, putVol:17, putOI:21 };
+  var C = { exp:0, callLast:2, callVol:6, callIV:7, callOI:10, strike:11,
+            putLast:13, putVol:17, putIV:18, putOI:21 };
 
-  // ---- ingest (port of ingest_cboe) -----------------------------------------
+  // ---- latent premium reconstruction: E = (K/S)^2 * IV * sqrt(tau) ----------
+  // Premium is not missing on CBOE, it is latent. Reconstruct it from strike,
+  // spot, per-side IV and time so the FULL cascade (DID/DIT/DR3/CDS) runs — the
+  // same read CME gets from observed premium. (Port of quan_cboe.energy.)
+  var YEAR_S = 365.25 * 86400, TAU_FLOOR = 3600;
+  function tauYears(exp, asofMs) {
+    var m = /[A-Za-z]{3}\s+([A-Za-z]{3})\s+(\d{1,2})\s+(\d{4})/.exec(String(exp).trim());
+    if (!m) return TAU_FLOOR / YEAR_S;
+    var expMs = Date.UTC(+m[3], (MONTHS[m[1]]||1)-1, +m[2], 20, 0, 0); // ~16:00 ET settle
+    var ref = isFinite(asofMs) ? asofMs : Date.now();
+    return Math.max((expMs - ref) / 1000, TAU_FLOOR) / YEAR_S;
+  }
+  function energy(K, S, iv, tau) {
+    if (!(S > 0) || !isFinite(iv) || !isFinite(tau)) return NaN;
+    var m = K / S; return m * m * iv * Math.sqrt(tau);
+  }
+
+  // ---- ingest (port of ingest_cboe, premium="energy") -----------------------
   function ingest(text, expiration) {
     var lines = String(text).replace(/\r\n/g, "\n").split("\n");
     // meta from lines 2-3 (index 1-2)
@@ -55,7 +73,9 @@
       meta.symbol = parseLine(lines[1])[0].trim();
       var mL = /Last:\s*([-\d.]+)/.exec(lines[1]); if (mL) meta.spot = +mL[1];
     }
-    if (lines[2]) { var mD = /Date:\s*(.+?)"?\s*,/.exec(lines[2]); if (mD) meta.asof = mD[1].replace(/"/g, "").trim(); }
+    var asofMs = NaN;
+    if (lines[2]) { var mD = /Date:\s*(.+?)"/.exec(lines[2]);   // capture full quoted "July 11, 2026 at 12:46 AM EDT"
+      if (mD) { meta.asof = mD[1].replace(/"/g, "").trim(); var t = Date.parse(meta.asof.replace(/\s+at\s+/, " ").replace(/\s+[A-Z]{2,4}$/, "")); if (isFinite(t)) asofMs = t; } }
 
     var rows = [], expsSet = {};
     for (var r = 4; r < lines.length; r++) {
@@ -63,10 +83,14 @@
       var f = parseLine(lines[r]);
       var strike = num(f[C.strike]); if (!isFinite(strike)) continue;
       var exp = (f[C.exp] || "").trim(); if (exp) expsSet[exp] = 1;
+      var tau = tauYears(exp, asofMs), cIV = num(f[C.callIV]), pIV = num(f[C.putIV]);
       rows.push({ exp: exp, strike: strike,
         callOI: num(f[C.callOI]), putOI: num(f[C.putOI]),
         callVol: num(f[C.callVol]), putVol: num(f[C.putVol]),
-        callLast: num(f[C.callLast]), putLast: num(f[C.putLast]) });
+        callLast: num(f[C.callLast]), putLast: num(f[C.putLast]),
+        callIV: cIV, putIV: pIV, tau: tau,
+        callPrem: energy(strike, meta.spot, cIV, tau),   // reconstructed latent premium
+        putPrem:  energy(strike, meta.spot, pIV, tau) });
     }
     var exps = Object.keys(expsSet).sort(function (a, b) { return expKey(a) - expKey(b); });
     var pick = expiration || (exps[0] || null);
@@ -74,6 +98,24 @@
     if (pick && pick !== "ALL") sel = rows.filter(function (x) { return x.exp === pick; });
     sel.sort(function (a, b) { return a.strike - b.strike; });
     return { meta: meta, expirations: exps, expiration: pick, rows: sel };
+  }
+
+  // ---- cascade (port of quan_engine.compute_cascade) on reconstructed premium -
+  function cascade(rows) {
+    var AP = [], AR = [], AT = [];
+    rows.forEach(function (x) {
+      var AN = (x.putPrem || 0) - (x.callPrem || 0);
+      var O = (x.putOI || 0) - (x.callOI || 0), L = (x.putVol || 0) - (x.callVol || 0);
+      var ap = O !== 0 ? AN / O : NaN, ar = L !== 0 ? AN / L : NaN;
+      AP.push(ap); AR.push(ar); AT.push((ar && isFinite(ar)) ? ap / ar : NaN);
+    });
+    var DIDS = skew(AP), DITS = skew(AR), DR3S = skew(AT);
+    var DIDK = kurt(AP), DITK = kurt(AR), DR3K = kurt(AT);
+    var cds = ((DIDS < 0 ? 1 : -1) + (DITS < 0 ? 1 : -1) + (DR3S > 0 ? 1 : -1)) / 3;
+    var bias = cds >= 0.67 ? "STRONG_BULL" : cds > 0 ? "BULL" : cds === 0 ? "NEUTRAL"
+             : cds >= -0.67 ? "BEAR" : "STRONG_BEAR";
+    return { CDS: +cds.toFixed(3), BIAS: bias,
+             DIDS: DIDS, DITS: DITS, DR3S: DR3S, DIDK: DIDK, DITK: DITK, DR3K: DR3K };
   }
 
   // ---- Excel sample skew/kurt (blank-excluding) ------------------------------
@@ -133,6 +175,7 @@
     rows.forEach(function(x){ sumCOI+=x.callOI||0; sumPOI+=x.putOI||0; sumCV+=x.callVol||0; sumPV+=x.putVol||0; });
     var ps = perStrike(rows);
     var lv = levels(ps, spot);
+    var cx = cascade(rows);          // Dealer Intent cascade on reconstructed premium
     var dsc = ps.filter(function(r){return r.isDSC;}).length, pdsl = ps.filter(function(r){return r.isPDSL;}).length;
     var netTot = sumPOI - sumCOI;
     var support = lv.DFLOOR ? lv.DFLOOR.strike : (lv.SFLOOR?lv.SFLOOR.strike:null);
@@ -153,11 +196,12 @@
       pcrOI: +(div(sumPOI, Math.max(sumCOI,1e-9))).toFixed(3),
       pcrVol: +(div(sumPV, Math.max(sumCV,1e-9))).toFixed(3),
       bias: netTot > 0 ? "PUT-HEAVY" : "CALL-HEAVY",
+      cds: cx.CDS, dealerBias: cx.BIAS, dr3s: isFinite(cx.DR3S) ? +cx.DR3S.toFixed(2) : null,
       support: support, resist: resist, pin: pin,
       supDist: (support!=null && isFinite(spot)) ? Math.round(support-spot) : null,
       resDist: (resist!=null && isFinite(spot)) ? Math.round(resist-spot) : null,
       signals: pdsl*10 + dsc, dsc: dsc, pdsl: pdsl,
-      ts: Date.now(), drill: drill
+      ts: Date.now(), drill: drill, cascade: cx
     };
   }
 
@@ -171,6 +215,7 @@
     { k:"spot", t:"Spot", num:true, fmt:function(v){return v==null?"—":v.toLocaleString();} },
     { k:"pcrOI", t:"PCR-OI", num:true },
     { k:"pcrVol", t:"PCR-Vol", num:true },
+    { k:"cds", t:"Dealer (CDS)", num:true, fmt:function(v,row){return (v>0?"+":"")+v+" "+(row.dealerBias||"").replace("_"," ");} },
     { k:"bias", t:"Net-OI", num:false },
     { k:"support", t:"Support", num:true, sub:"supDist" },
     { k:"resist", t:"Resist", num:true, sub:"resDist" },
@@ -197,7 +242,7 @@
     var arr = rowsSorted();
     var h = '';
     h += '<div class="cbHead">';
-    h += '  <div class="cbTitle"><span class="inf">∞</span> CBOE Portfolio <span class="cbSub">P-C risk board · '
+    h += '  <div class="cbTitle"><span class="inf">∞</span> CBOE Portfolio <span class="cbSub">Golden Reference · reconstructed premium · '
        + (closed ? '<b style="color:#e85c5c">RTH CLOSED</b>' : '<b style="color:#5fd08a">RTH OPEN</b>') + '</span></div>';
     h += '  <div class="cbTools">';
     h += '    <label class="cbUp">＋ New ticker<input type="file" id="cbFile" accept=".csv" multiple></label>';
@@ -208,7 +253,8 @@
 
     if (!arr.length) {
       h += '<div class="cbEmpty">Upload a CBOE <b>Download CSV</b> (NDX, SPX, RUT, or any listed ticker) to index it.<br>'
-         + 'Each upload adds a row scored by the premium-free <b>P-C logic</b> — PCR, Net-OI walls, γ-pin, and DSC/PDSL signals.</div>';
+         + 'Premium is reconstructed as a latent energy field <b>E=(K/S)²·IV·√τ</b>, so each row carries the full '
+         + '<b>Dealer Intent cascade</b> (CDS bias, DR3) plus PCR, Net-OI walls, γ-pin and DSC/PDSL signals — the same Golden Reference as CME.</div>';
     } else {
       h += '<div class="cbTableWrap"><table class="cbTable"><thead><tr>';
       COLS.forEach(function(c){
@@ -223,6 +269,7 @@
           var v = row[c.k], disp = c.fmt ? c.fmt(v,row) : (v==null?"—":v);
           var cls = c.num ? 'r' : 'l';
           if (c.k==="bias") cls += row.bias==="PUT-HEAVY" ? ' cbPut' : ' cbCall';
+          if (c.k==="cds") cls += row.cds>0 ? ' cbPut' : row.cds<0 ? ' cbCall' : '';
           var sub = c.sub && row[c.sub]!=null ? '<span class="cbDist">'+(row[c.sub]>0?"+":"")+row[c.sub]+'</span>' : '';
           h += '<td class="'+cls+'">'+esc(disp)+sub+'</td>';
         });
@@ -243,15 +290,22 @@
       return '<span class="cbRung '+kind+'">'+x[0].toLocaleString()+'<i>'+(x[1]>0?"+":"")+Math.round(x[1])+'</i>'+wm+'</span>';
     }).join(""); }
     var top = (d.top||[]).map(function(x){ return '<span class="cbSig">'+x[0].toLocaleString()+' <i>'+x[1]+'× m'+x[2]+'</i></span>'; }).join("");
+    var cx = row.cascade || {};
+    var cf = function(v){ return (isFinite(v) ? (v>0?"+":"")+(+v).toFixed(2) : "—"); };
+    var intent = '<span class="cbSig">CDS <i>'+cf(cx.CDS)+' '+esc((row.dealerBias||"").replace("_"," "))+'</i></span>'
+               + '<span class="cbSig">DR3 skew <i>'+cf(cx.DR3S)+'</i></span>'
+               + '<span class="cbSig">DID skew <i>'+cf(cx.DIDS)+'</i></span>'
+               + '<span class="cbSig">DIT skew <i>'+cf(cx.DITS)+'</i></span>';
     var h = '<div class="cbDrillHead">'+esc(sym)+' · '+esc(row.expiration||"")+' · spot '+(row.spot!=null?row.spot.toLocaleString():"—")
           + ' · '+esc(row.asof)+'</div>';
     h += '<div class="cbDrillGrid">';
+    h += '<div><span class="cbLbl">Dealer Intent (reconstructed premium)</span><div class="cbRungs">'+intent+'</div></div>';
     h += '<div><span class="cbLbl">Resistance ladder (ceilings)</span><div class="cbRungs">'+(ladder(d.cl,"c")||'<i>none in band</i>')+'</div></div>';
     h += '<div><span class="cbLbl">Support ladder (floors)</span><div class="cbRungs">'+(ladder(d.fl,"f")||'<i>none in band</i>')+'</div></div>';
     h += '<div><span class="cbLbl">Watermarks |LR|&gt;20</span><div class="cbRungs">'+((d.wm||[]).map(function(x){return '<span class="cbRung '+(x[1]==="F"?"f":"c")+'">'+x[0].toLocaleString()+' '+x[1]+'</span>';}).join("")||'<i>none</i>')+'</div></div>';
-    h += '<div><span class="cbLbl">Top P-C signals (DSC/PDSL)</span><div class="cbRungs">'+(top||'<i>none ≥3 criteria</i>')+'</div></div>';
+    h += '<div><span class="cbLbl">Top signals (DSC/PDSL)</span><div class="cbRungs">'+(top||'<i>none ≥3 criteria</i>')+'</div></div>';
     h += '</div>';
-    h += '<div class="cbDrillNote">Premium-free read — no intent bias (CBOE has no premium). Walls, PCR &amp; γ-pin are OI/Volume-derived.</div>';
+    h += '<div class="cbDrillNote">Premium is reconstructed as latent energy E=(K/S)²·IV·√τ; Dealer Intent (CDS/DR3) is computed on it exactly as CME computes on observed premium. Walls, PCR &amp; γ-pin are OI/Volume-derived.</div>';
     box.innerHTML = h;
     box.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
