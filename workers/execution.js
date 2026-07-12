@@ -453,7 +453,11 @@ export class ExecutionEngine {
     // with uid only and must NOT overwrite the stored role.
     if (body.uid && body.role) await this._put('ctx', { uid: String(body.uid), role: body.role === 'operator' ? 'operator' : 'subscriber' });
     try { return doJson({ ok: true, result: await this.op(body.action, body.params || {}) }); }
-    catch (e) { return doJson({ error: e.message, needsLogin: !!e.needsLogin }, e.status || 502); }
+    // 4xx, not 502/503/504 — those get their bodies replaced by Cloudflare's own
+    // edge error page (Always Online / custom error pages) even when we sent
+    // valid JSON, which is exactly what turned a real Tradovate rejection into
+    // an unreadable DOCTYPE crash on the client.
+    catch (e) { return doJson({ error: e.message, needsLogin: !!e.needsLogin }, e.status || 400); }
   }
   async op(action, p) {
     switch (action) {
@@ -640,7 +644,9 @@ export default {
 
     // Launch-queue / activation actions live in the per-user Durable Object.
     if (DO_ACTIONS.has(action)) {
-      if (!env.EXEC_DO) return new Response(JSON.stringify({ error: 'EXEC_DO durable object not bound' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+      // 4xx here too — see the note below on why 5xx is avoided everywhere in
+      // this handler (Cloudflare's edge replaces 5xx bodies with its own HTML).
+      if (!env.EXEC_DO) return new Response(JSON.stringify({ error: 'EXEC_DO durable object not bound' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
       return execDo(env, uid).fetch('https://exec.do/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, params: body.params || {}, uid, role }) });
     }
 
@@ -648,7 +654,13 @@ export default {
       const result = await dispatch({ env, uid, role }, action, body.params || {});
       return new Response(JSON.stringify({ ok: true, result }), { headers: { 'Content-Type': 'application/json' } });
     } catch (err) {
-      const status = err.status || 502;
+      // 4xx, not 5xx: Cloudflare's edge (Always Online / custom error pages)
+      // silently swaps 502/503/504 (and sometimes 500) response BODIES for its
+      // own HTML even when we sent valid JSON — that's what turned a real
+      // Tradovate "wrong password" reply into an unreadable DOCTYPE crash.
+      // Every error surfaced here is an application-level rejection (bad
+      // creds, Tradovate said no, bad request), never an actual gateway fault.
+      const status = err.status && err.status < 500 ? err.status : 400;
       const payload = { error: err.message };
       if (err.needsLogin) payload.needsLogin = true;
       if (err.penalty) payload.penalty = err.penalty;

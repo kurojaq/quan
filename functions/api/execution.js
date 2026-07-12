@@ -89,13 +89,15 @@ export async function onRequestPost({ request, env }) {
     }
 
     const wr = await call(action, body.params || {});
-    // TEMP DIAGNOSTIC — remove once the 502/DOCTYPE issue is root-caused.
-    try {
-      const rawPreview = (await wr.clone().text()).slice(0, 300);
-      console.log('EXEC_DIAG', JSON.stringify({ action, wrStatus: wr.status, wrOk: wr.ok, rawPreview }));
-    } catch (diagErr) { console.log('EXEC_DIAG_ERR', diagErr.message); }
     const data = await wr.json().catch(() => ({ error: `runtime ${wr.status}` }));
-    return json(data, wr.ok ? 200 : (wr.status || 502));
+    // Never pass through a 5xx here: Cloudflare's edge (Always Online / custom
+    // error pages) silently replaces 502/503/504 response BODIES with its own
+    // HTML, even when the origin sent valid JSON — which is exactly what turned
+    // a normal "wrong password" reply into an unreadable DOCTYPE crash on the
+    // client. Application-level rejections (bad creds, Tradovate errors, etc.)
+    // are the caller's fault, not a gateway failure, so they belong in the 4xx
+    // range, which Cloudflare never intercepts.
+    return json(data, wr.ok ? 200 : (wr.status && wr.status < 500 ? wr.status : 400));
   } catch (err) {
     return serverError(err.message);
   }
