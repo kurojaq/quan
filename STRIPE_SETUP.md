@@ -1,9 +1,9 @@
 # Wiring Stripe subscriptions
 
-The Qu'an sells three plans. **Scout** is free (no Stripe object). **Operator**
-and **Desk** are Stripe subscriptions with a 14-day trial. The server never
-trusts a price sent from the browser — the client sends `{ plan, cycle }` and the
-Pages Function maps that to a price id from environment variables.
+The Qu'an sells four plans. **Scout** is free (no Stripe object). **Operator**,
+**Prime** and **Desk** are Stripe subscriptions with a 14-day trial. The server
+never trusts a price sent from the browser — the client sends `{ plan, cycle }`
+and the Pages Function maps that to a price id from environment variables.
 
 Do everything in **Test mode** first (toggle top-right in the Stripe dashboard),
 then repeat in Live mode.
@@ -12,15 +12,17 @@ then repeat in Live mode.
 
 ## 1. Create the products & prices
 
-Stripe dashboard → **Product catalog → Add product**. Create two products, each
-with a monthly and an annual recurring price:
+Stripe dashboard → **Product catalog → Add product**. Create three products, each
+with a monthly and an annual recurring price (annual = 2 months free = monthly ×10):
 
 | Product | Price | Interval | Env var to hold the price id |
 |---|---|---|---|
-| Operator | $49.00 | Monthly | `STRIPE_PRICE_OPERATOR_MONTHLY` |
-| Operator | $490.00 | Yearly | `STRIPE_PRICE_OPERATOR_ANNUAL` |
-| Desk | $149.00 | Monthly | `STRIPE_PRICE_DESK_MONTHLY` |
-| Desk | $1,490.00 | Yearly | `STRIPE_PRICE_DESK_ANNUAL` |
+| Operator | $99.00 | Monthly | `STRIPE_PRICE_OPERATOR_MONTHLY` |
+| Operator | $990.00 | Yearly | `STRIPE_PRICE_OPERATOR_ANNUAL` |
+| Prime | $249.00 | Monthly | `STRIPE_PRICE_PRIME_MONTHLY` |
+| Prime | $2,490.00 | Yearly | `STRIPE_PRICE_PRIME_ANNUAL` |
+| Desk | $699.00 | Monthly | `STRIPE_PRICE_DESK_MONTHLY` |
+| Desk | $6,990.00 | Yearly | `STRIPE_PRICE_DESK_ANNUAL` |
 
 Each saved price has an id like `price_1QabcXYZ…`. Copy each into the matching
 Cloudflare Pages environment variable (see [CLOUDFLARE_SETUP.md](CLOUDFLARE_SETUP.md)).

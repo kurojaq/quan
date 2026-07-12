@@ -14,6 +14,16 @@ export async function onRequestGet({ request, env }) {
     const user = await getUserFromRequest(env, request);
     if (!user) return unauthorized();
 
+    // The app owner has no subscription row — grant full (desk) access so the
+    // client-side entitlement gate never locks the operator out of their own
+    // terminal. Mirrors resolveIdentity()'s operator handling in _shared.js.
+    if (env.OPERATOR_EMAIL && user.email === env.OPERATOR_EMAIL) {
+      return json({
+        authenticated: true, active: true, plan: 'desk', status: 'active',
+        current_period_end: null, cancel_at_period_end: false, operator: true
+      });
+    }
+
     const rows = await supaAdmin(env,
       `subscriptions?user_id=eq.${user.id}` +
       `&select=plan,status,current_period_end,cancel_at_period_end&limit=1`);

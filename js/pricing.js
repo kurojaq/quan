@@ -20,12 +20,16 @@
       annual:  { amt: '$0', per: '/forever', note: '14-day full-access trial included' }
     },
     operator: {
-      monthly: { amt: '$49',  per: '/month', note: 'Billed monthly · cancel anytime' },
-      annual:  { amt: '$41',  per: '/month', note: '$490 billed yearly · 2 months free' }
+      monthly: { amt: '$99',  per: '/month', note: 'Billed monthly · cancel anytime' },
+      annual:  { amt: '$83',  per: '/month', note: '$990 billed yearly · 2 months free' }
+    },
+    prime: {
+      monthly: { amt: '$249', per: '/month', note: 'Billed monthly · cancel anytime' },
+      annual:  { amt: '$208', per: '/month', note: '$2,490 billed yearly · 2 months free' }
     },
     desk: {
-      monthly: { amt: '$149', per: '/month', note: 'Up to 5 seats · billed monthly' },
-      annual:  { amt: '$124', per: '/month', note: '$1,490 billed yearly · 2 months free' }
+      monthly: { amt: '$699', per: '/month', note: 'Up to 5 seats · billed monthly' },
+      annual:  { amt: '$583', per: '/month', note: '$6,990 billed yearly · 2 months free' }
     }
   };
 

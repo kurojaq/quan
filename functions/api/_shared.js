@@ -11,6 +11,8 @@
      STRIPE_WEBHOOK_SECRET        (secret)  whsec_…
      STRIPE_PRICE_OPERATOR_MONTHLY          price_…
      STRIPE_PRICE_OPERATOR_ANNUAL           price_…
+     STRIPE_PRICE_PRIME_MONTHLY             price_…
+     STRIPE_PRICE_PRIME_ANNUAL              price_…
      STRIPE_PRICE_DESK_MONTHLY              price_…
      STRIPE_PRICE_DESK_ANNUAL               price_…
      SUPABASE_URL                           https://…supabase.co
@@ -175,16 +177,16 @@ export function siteOrigin(env, request) {
    precise upgrade (Phase 4). If KV isn't bound the limiter fails open.
    ========================================================================== */
 
-// requests/minute per tier. trialing == an Operator trial.
-export const RATE_LIMITS = { desk: 240, operator: 120, trialing: 120, scout: 20, client: 40 };
+// requests/minute per tier. trialing == a paid-plan trial (full access).
+export const RATE_LIMITS = { desk: 300, prime: 240, operator: 120, trialing: 240, scout: 20, client: 40 };
 // edge-cache TTL (seconds) for /quote per tier — paid tiers get fresher data.
-export const QUOTE_TTL = { desk: 8, operator: 8, trialing: 8, scout: 30, client: 20 };
+export const QUOTE_TTL = { desk: 5, prime: 5, operator: 8, trialing: 5, scout: 30, client: 20 };
 export const HISTORY_TTL = 60; // history is far less latency-sensitive
 
 const ACTIVE_STATUS = new Set(['active', 'trialing']);
 
-// look up a user's plan ('operator' | 'desk' | 'scout'), cached ~60s in KV.
-async function planForUser(env, userId) {
+// look up a user's plan ('operator' | 'prime' | 'desk' | 'scout'), cached ~60s in KV.
+export async function planForUser(env, userId) {
   try { const c = env.QUAN_PUBLISH && await env.QUAN_PUBLISH.get(`plan:${userId}`); if (c) return c; } catch (_) {}
   let plan = 'scout';
   try {

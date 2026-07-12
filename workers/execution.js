@@ -5,36 +5,36 @@
  * the ONLY place that ever holds a Tradovate access token or talks to Tradovate.
  *
  * Why a separate Worker (not a Pages Function):
- *   • It custodies the broker access token; that must not sit in client JS or on
- *     a publicly-routable surface.
- *   • The activation loop + order lifecycle (Phase 3b) will run in a Durable
- *     Object with alarm()/WebSocket — Pages Functions can't host those. Building
- *     the REST core here first means the DO slots in beside it with no move.
+ *   • It custodies broker access tokens; those must not sit in client JS or on a
+ *     publicly-routable surface.
+ *   • The activation loop + order lifecycle run in a Durable Object with
+ *     alarm()/storage — Pages Functions can't host those.
  *
  * ── Reachability ────────────────────────────────────────────────────────────
  *   Route-less (workers_dev = false, no routes). Reachable ONLY through the Pages
- *   Service binding EXECUTION (functions/api/execution.js proxies to it,
- *   operator-gated) — never over the open Internet. Mirrors the BARCHART Worker.
+ *   Service binding EXECUTION (functions/api/execution.js proxies to it), never
+ *   over the open Internet.
+ *
+ * ── MULTI-TENANCY (Prime) ───────────────────────────────────────────────────
+ *   Every request arrives with { action, params, uid, role } where the Pages
+ *   proxy has already verified the Supabase user + tier. This Worker TRUSTS
+ *   uid/role because the internal Service binding is the only caller. It keys ALL
+ *   state by uid:
+ *     • token  → KV  exec:token:<uid>   (AES-GCM encrypted when EXEC_ENC_KEY is set)
+ *     • queue  → Durable Object idFromName('u:'+uid)  (per-user launch queue+alarm)
+ *   role ∈ 'operator' | 'subscriber':
+ *     • operator   → live allowed; unattended secret-fallback creds allowed.
+ *     • subscriber → CLAMPED TO DEMO (connect/route/automation); no secret fallback
+ *                    (they must sign into their own Tradovate). This caps the
+ *                    liability of automating real money for subscribers at launch.
+ *   The single seam for a future per-user "live enabled" flag is userMayGoLive().
  *
  * ── Auth model — connect from the terminal, no CLI ──────────────────────────
- *   The operator clicks Connect in the cockpit and signs in (env + username +
- *   password, optional API key). Those land here via the `login` action; we
- *   exchange them for a Tradovate access token, cache the TOKEN in KV
- *   (exec:token) with its real expirationTime, and DISCARD the password — it is
- *   never persisted. Subsequent calls reuse the cached token and RENEW it
- *   (/auth/renewaccesstoken) as it nears expiry, so a single sign-in lasts.
- *   When renewal finally fails the cockpit simply prompts to sign in again.
- *
- *   Optional fallback: if TRADOVATE_USER/PASS/… are set as Worker secrets, a
- *   plain `connect` (no login) will use them — handy for an unattended/cron
- *   deployment. The UI path needs none of that.
- *
- * ── DEMO vs LIVE ────────────────────────────────────────────────────────────
- *   The environment is chosen at sign-in (defaulting demo) and stored on the
- *   token record, so every call routes to the right host. `health`/`connect`
- *   echo the active env, and the Pages proxy pre-checks it before any order so a
- *   live route can never slip through unacknowledged. TRADOVATE_ENV is only the
- *   default for the secret-fallback path.
+ *   The user clicks Connect in the cockpit and signs in (env + username +
+ *   password, optional API key). Those land here via `login`; we exchange them
+ *   for a Tradovate access token, cache the TOKEN (per-user) with its real
+ *   expirationTime, and DISCARD the password. Subsequent calls reuse + RENEW the
+ *   token. Optional operator-only fallback: TRADOVATE_USER/PASS/… Worker secrets.
  */
 
 /* ── Tradovate hosts per environment ───────────────────────────────────────── */
@@ -45,27 +45,64 @@ const HOSTS = {
 const normEnv = (v) => (String(v || '').toLowerCase() === 'live' ? 'live' : 'demo');
 const defaultEnv = (env) => normEnv(env.TRADOVATE_ENV || 'demo');
 
-/* ── KV keys (shared QUAN_PUBLISH namespace, exec: prefix) ──────────────────── */
-const K = {
-  token: 'exec:token', // cached { accessToken, mdAccessToken, expirationTime, userId, name, env }
-};
+// The single authority on whether a caller may touch the LIVE book. Today only
+// the operator; a per-user flag can widen this later without touching call sites.
+const userMayGoLive = (role) => role === 'operator';
+
+/* ── Per-user token store (shared QUAN_PUBLISH namespace, exec:token: prefix) ──
+   Encrypted at rest with AES-GCM when EXEC_ENC_KEY (base64 of 32 bytes) is set;
+   plaintext JSON otherwise so a pre-config deploy still works. */
+const tokenKey = (uid) => `exec:token:${uid || 'operator'}`;
 
 const nowMs = () => Date.now();
 const TOKEN_SKEW_MS = 5 * 60 * 1000; // renew when within 5 min of expiry
 
-async function readJSON(env, key, fallback) {
-  if (!env.QUAN_PUBLISH) return fallback;
-  try { const raw = await env.QUAN_PUBLISH.get(key); return raw ? JSON.parse(raw) : fallback; }
-  catch (_) { return fallback; }
+function b64ToBytes(b64) { const bin = atob(b64); const a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; }
+function bytesToB64(bytes) { let s = ''; for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return btoa(s); }
+
+async function encKey(env) {
+  if (!env.EXEC_ENC_KEY) return null;
+  try { return await crypto.subtle.importKey('raw', b64ToBytes(env.EXEC_ENC_KEY), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']); }
+  catch (_) { return null; }
 }
-async function writeJSON(env, key, val, ttlSec) {
-  if (!env.QUAN_PUBLISH) return;
-  try { await env.QUAN_PUBLISH.put(key, JSON.stringify(val), ttlSec ? { expirationTtl: ttlSec } : undefined); }
-  catch (_) {}
+async function encStr(env, plaintext) {
+  const key = await encKey(env);
+  if (!key) return plaintext;                       // no key → store plaintext (back-compat)
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plaintext));
+  return `enc:v1:${bytesToB64(iv)}:${bytesToB64(new Uint8Array(ct))}`;
+}
+async function decStr(env, stored) {
+  if (typeof stored !== 'string' || !stored.startsWith('enc:v1:')) return stored; // plaintext record
+  const key = await encKey(env);
+  if (!key) return null;                            // encrypted but key gone → unreadable
+  try {
+    const parts = stored.split(':'); // enc : v1 : iv : ct
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64ToBytes(parts[2]) }, key, b64ToBytes(parts[3]));
+    return new TextDecoder().decode(pt);
+  } catch (_) { return null; }
 }
 
-// Optional Worker-secret credentials (unattended fallback). The UI login path
-// supplies its own and needs none of these.
+async function readTokenRec(env, uid) {
+  if (!env.QUAN_PUBLISH) return null;
+  let raw;
+  try { raw = await env.QUAN_PUBLISH.get(tokenKey(uid)); } catch (_) { return null; }
+  if (!raw) return null;
+  const dec = await decStr(env, raw);
+  if (dec == null) return null;
+  try { return JSON.parse(dec); } catch (_) { return null; }
+}
+async function writeTokenRec(env, uid, rec) {
+  if (!env.QUAN_PUBLISH) return;
+  try { await env.QUAN_PUBLISH.put(tokenKey(uid), await encStr(env, JSON.stringify(rec))); } catch (_) {}
+}
+async function deleteTokenRec(env, uid) {
+  if (!env.QUAN_PUBLISH) return;
+  try { await env.QUAN_PUBLISH.delete(tokenKey(uid)); } catch (_) {}
+}
+
+// Optional Worker-secret credentials — OPERATOR-ONLY unattended fallback. Never
+// offered to a subscriber (that would route them onto the operator's account).
 function secretCreds(env) {
   if (!env.TRADOVATE_USER || !env.TRADOVATE_PASS) return null;
   return {
@@ -82,7 +119,7 @@ function secretCreds(env) {
 
 /* ── Token lifecycle ────────────────────────────────────────────────────────
    A token is valid while it exists and is more than TOKEN_SKEW_MS from expiry.
-   The env is whatever was chosen at sign-in (stored on the record). */
+   ctx = { env, uid, role } threads identity through every broker call. */
 function tokenValid(rec) {
   if (!rec || !rec.accessToken) return false;
   const exp = Date.parse(rec.expirationTime || '');
@@ -91,12 +128,15 @@ function tokenValid(rec) {
 
 const needsLogin = (msg) => Object.assign(new Error(msg || 'not connected — sign in to Tradovate'), { needsLogin: true, status: 401 });
 
-// Exchange credentials for an access token. `input` is the login form's params
-// (env/name/password/appId/appVersion/cid/sec) or a secretCreds() object.
-async function authenticate(env, input) {
-  const c = input && input.name && input.password ? input : secretCreds(env);
+// Exchange credentials for an access token. `input` is the login form's params or
+// a secretCreds() object (operator only). Subscribers are clamped to demo.
+async function authenticate(ctx, input) {
+  const { env, uid, role } = ctx;
+  const allowSecret = role === 'operator';
+  const c = input && input.name && input.password ? input : (allowSecret ? secretCreds(env) : null);
   if (!c || !c.name || !c.password) throw needsLogin();
-  const envn = normEnv(c.env || defaultEnv(env));
+  let envn = normEnv(c.env || defaultEnv(env));
+  if (!userMayGoLive(role)) envn = 'demo';           // subscribers: demo-only, no matter what they asked for
   const host = HOSTS[envn];
   const payload = {
     name: c.name,
@@ -127,46 +167,48 @@ async function authenticate(env, input) {
     env: envn,
     obtained: nowMs(),
   };
-  await writeJSON(env, K.token, rec); // token only — the password is never stored
+  await writeTokenRec(env, uid, rec); // token only — the password is never stored
   return rec;
 }
 
-async function renew(env, rec) {
+async function renew(ctx, rec) {
+  const { env, uid, role } = ctx;
   const host = HOSTS[rec.env] || HOSTS[defaultEnv(env)];
   try {
     const res = await fetch(`${host.rest}/auth/renewaccesstoken`, { headers: { Authorization: `Bearer ${rec.accessToken}` } });
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.accessToken) {
       const next = { ...rec, accessToken: data.accessToken, mdAccessToken: data.mdAccessToken || rec.mdAccessToken, expirationTime: data.expirationTime, obtained: nowMs() };
-      await writeJSON(env, K.token, next);
+      await writeTokenRec(env, uid, next);
       return next;
     }
   } catch (_) { /* fall through */ }
-  // Renewal failed — try the secret-fallback creds; otherwise the session is over.
-  const fb = secretCreds(env);
-  if (fb) return authenticate(env, fb);
+  // Renewal failed — operator may fall back to secret creds; a subscriber cannot.
+  if (role === 'operator') { const fb = secretCreds(env); if (fb) return authenticate(ctx, fb); }
   throw needsLogin('session expired — sign in to Tradovate again');
 }
 
 // Return a valid token, renewing/minting as needed. Throws needsLogin when there
-// is no session and no secret fallback.
-async function getToken(env, force) {
-  const rec = await readJSON(env, K.token, null);
+// is no session (and, for the operator, no secret fallback).
+async function getToken(ctx, force) {
+  const rec = await readTokenRec(ctx.env, ctx.uid);
   if (!force && tokenValid(rec)) return rec;
-  if (rec && rec.accessToken) return renew(env, rec);
-  return authenticate(env); // secret fallback, or throws needsLogin
+  if (rec && rec.accessToken) return renew(ctx, rec);
+  return authenticate(ctx); // operator: secret fallback, else throws needsLogin
 }
 
 /* ── Tradovate REST helper (one re-auth retry on 401) ──────────────────────── */
-async function tv(env, path, { method = 'GET', body, _retried } = {}) {
-  const rec = await getToken(env);
-  const host = HOSTS[rec.env] || HOSTS[defaultEnv(env)];
+async function tv(ctx, path, { method = 'GET', body, _retried } = {}) {
+  const rec = await getToken(ctx);
+  // Defense-in-depth: a subscriber's record must never resolve to the live host.
+  if (rec.env === 'live' && !userMayGoLive(ctx.role)) throw new Error('live routing is not permitted for this account');
+  const host = HOSTS[rec.env] || HOSTS[defaultEnv(ctx.env)];
   const res = await fetch(`${host.rest}${path}`, {
     method,
     headers: { Authorization: `Bearer ${rec.accessToken}`, ...(method !== 'GET' ? { 'Content-Type': 'application/json' } : {}) },
     body: method !== 'GET' && body != null ? JSON.stringify(body) : undefined,
   });
-  if (res.status === 401 && !_retried) { await getToken(env, true); return tv(env, path, { method, body, _retried: true }); }
+  if (res.status === 401 && !_retried) { await getToken(ctx, true); return tv(ctx, path, { method, body, _retried: true }); }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.errorText || data.errorMessage || `Tradovate ${method} ${path} → ${res.status}`);
   return data;
@@ -175,41 +217,42 @@ async function tv(env, path, { method = 'GET', body, _retried } = {}) {
 /* ── Higher-level operations the cockpit calls ─────────────────────────────── */
 
 // Identity + accounts (with balances) in one round-trip for the status bar.
-function sessionPayload(rec, accounts) {
-  return { connected: true, env: rec.env, userId: rec.userId, name: rec.name, hasLive: !!rec.hasLive, expirationTime: rec.expirationTime, accounts };
+// liveAllowed tells the cockpit whether to offer the LIVE env option.
+function sessionPayload(ctx, rec, accounts) {
+  return { connected: true, env: rec.env, userId: rec.userId, name: rec.name, hasLive: !!rec.hasLive, liveAllowed: userMayGoLive(ctx.role), expirationTime: rec.expirationTime, accounts };
 }
 
 // Sign in with credentials from the cockpit's Connect popover.
-async function login(env, params) {
-  const rec = await authenticate(env, {
+async function login(ctx, params) {
+  const rec = await authenticate(ctx, {
     env: params.env, name: params.name, password: params.password,
     appId: params.appId, appVersion: params.appVersion, cid: params.cid, sec: params.sec, deviceId: params.deviceId,
   });
-  return sessionPayload(rec, await accountsWithBalances(env));
+  return sessionPayload(ctx, rec, await accountsWithBalances(ctx));
 }
 
-// Reuse an existing session (or the secret fallback). If neither exists, report
-// needsLogin rather than throwing — the cockpit shows the Connect popover.
-async function connect(env) {
+// Reuse an existing session (or, for the operator, the secret fallback). If
+// neither exists, report needsLogin so the cockpit shows the Connect popover.
+async function connect(ctx) {
   let rec;
-  try { rec = await getToken(env); }
-  catch (e) { if (e.needsLogin) return { connected: false, needsLogin: true, env: defaultEnv(env) }; throw e; }
-  return sessionPayload(rec, await accountsWithBalances(env));
+  try { rec = await getToken(ctx); }
+  catch (e) { if (e.needsLogin) return { connected: false, needsLogin: true, env: defaultEnv(ctx.env), liveAllowed: userMayGoLive(ctx.role) }; throw e; }
+  return sessionPayload(ctx, rec, await accountsWithBalances(ctx));
 }
 
-async function logout(env) {
-  if (env.QUAN_PUBLISH) { try { await env.QUAN_PUBLISH.delete(K.token); } catch (_) {} }
-  return { connected: false, env: defaultEnv(env) };
+async function logout(ctx) {
+  await deleteTokenRec(ctx.env, ctx.uid);
+  return { connected: false, env: defaultEnv(ctx.env) };
 }
 
-async function accountsWithBalances(env) {
-  const list = await tv(env, '/account/list');
+async function accountsWithBalances(ctx) {
+  const list = await tv(ctx, '/account/list');
   const accounts = Array.isArray(list) ? list : [];
   const out = [];
   for (const a of accounts) {
     let balance = null;
     try {
-      const snap = await tv(env, '/cashBalance/getcashbalancesnapshot', { method: 'POST', body: { accountId: a.id } });
+      const snap = await tv(ctx, '/cashBalance/getcashbalancesnapshot', { method: 'POST', body: { accountId: a.id } });
       balance = snap && (snap.totalCashValue != null ? snap.totalCashValue : snap.amount);
     } catch (_) {}
     out.push({ id: a.id, name: a.name, nickname: a.nickname || null, accountType: a.accountType, active: a.active, legalStatus: a.legalStatus, balance });
@@ -217,7 +260,7 @@ async function accountsWithBalances(env) {
   return out;
 }
 
-async function placeOrder(env, p) {
+async function placeOrder(ctx, p) {
   const orderType = p.orderType || 'Limit';
   const body = {
     accountId: Number(p.accountId),
@@ -231,12 +274,12 @@ async function placeOrder(env, p) {
     timeInForce: p.timeInForce || 'Day',
     isAutomated: true,
   };
-  const data = await tv(env, '/order/placeorder', { method: 'POST', body });
+  const data = await tv(ctx, '/order/placeorder', { method: 'POST', body });
   if (data && data.failureReason) throw new Error(`${data.failureReason}: ${data.failureText || ''}`.trim());
   return data;
 }
 
-async function placeBracket(env, p) {
+async function placeBracket(ctx, p) {
   const entryType = p.orderType || 'Limit';
   const body = {
     accountId: Number(p.accountId),
@@ -252,75 +295,71 @@ async function placeBracket(env, p) {
     bracket1: p.stopLoss != null ? { action: opposite(p.action), orderType: 'Stop', stopPrice: Number(p.stopLoss) } : undefined,
     bracket2: p.takeProfit != null ? { action: opposite(p.action), orderType: 'Limit', price: Number(p.takeProfit) } : undefined,
   };
-  const data = await tv(env, '/order/placeOSO', { method: 'POST', body });
+  const data = await tv(ctx, '/order/placeOSO', { method: 'POST', body });
   if (data && data.failureReason) throw new Error(`${data.failureReason}: ${data.failureText || ''}`.trim());
   return data;
 }
 const opposite = (a) => (String(a).toLowerCase() === 'buy' ? 'Sell' : 'Buy');
 
-async function cancelOrder(env, orderId) { return tv(env, '/order/cancelorder', { method: 'POST', body: { orderId: Number(orderId) } }); }
-async function modifyOrder(env, p) {
+async function cancelOrder(ctx, orderId) { return tv(ctx, '/order/cancelorder', { method: 'POST', body: { orderId: Number(orderId) } }); }
+async function modifyOrder(ctx, p) {
   const body = { orderId: Number(p.orderId) };
   if (p.orderQty != null) body.orderQty = Number(p.orderQty);
   if (p.price != null) body.price = Number(p.price);
   if (p.stopPrice != null) body.stopPrice = Number(p.stopPrice);
-  return tv(env, '/order/modifyorder', { method: 'POST', body });
+  return tv(ctx, '/order/modifyorder', { method: 'POST', body });
 }
 
-async function book(env) {
+async function book(ctx) {
   const [orders, positions, fills] = await Promise.all([
-    tv(env, '/order/list').catch(() => []),
-    tv(env, '/position/list').catch(() => []),
-    tv(env, '/fill/list').catch(() => []),
+    tv(ctx, '/order/list').catch(() => []),
+    tv(ctx, '/position/list').catch(() => []),
+    tv(ctx, '/fill/list').catch(() => []),
   ]);
-  const rec = await readJSON(env, K.token, null);
-  return { env: (rec && rec.env) || defaultEnv(env), orders, positions, fills };
+  const rec = await readTokenRec(ctx.env, ctx.uid);
+  return { env: (rec && rec.env) || defaultEnv(ctx.env), orders, positions, fills };
 }
 
-async function health(env) {
-  const rec = await readJSON(env, K.token, null);
+async function health(ctx) {
+  const rec = await readTokenRec(ctx.env, ctx.uid);
   const connected = tokenValid(rec);
-  return { ok: true, env: (rec && rec.env) || defaultEnv(env), connected, needsLogin: !connected && !secretCreds(env) };
+  return {
+    ok: true,
+    env: (rec && rec.env) || defaultEnv(ctx.env),
+    connected,
+    liveAllowed: userMayGoLive(ctx.role),
+    needsLogin: !connected && !(ctx.role === 'operator' && secretCreds(ctx.env)),
+  };
 }
 
 /* ── Action dispatch (called by the Pages proxy over the service binding) ───── */
-async function dispatch(env, action, params) {
+async function dispatch(ctx, action, params) {
   switch (action) {
-    case 'health': return health(env);
-    case 'login': return login(env, params);
-    case 'logout': return logout(env);
-    case 'connect': return connect(env);
-    case 'accounts': return { env: (await readJSON(env, K.token, {})).env || defaultEnv(env), accounts: await accountsWithBalances(env) };
-    case 'book': return book(env);
-    case 'placeorder': return placeOrder(env, params);
-    case 'bracket': return placeBracket(env, params);
-    case 'cancelorder': return cancelOrder(env, params.orderId);
-    case 'modifyorder': return modifyOrder(env, params);
+    case 'health': return health(ctx);
+    case 'login': return login(ctx, params);
+    case 'logout': return logout(ctx);
+    case 'connect': return connect(ctx);
+    case 'accounts': { const rec = await readTokenRec(ctx.env, ctx.uid); return { env: (rec && rec.env) || defaultEnv(ctx.env), accounts: await accountsWithBalances(ctx) }; }
+    case 'book': return book(ctx);
+    case 'placeorder': return placeOrder(ctx, params);
+    case 'bracket': return placeBracket(ctx, params);
+    case 'cancelorder': return cancelOrder(ctx, params.orderId);
+    case 'modifyorder': return modifyOrder(ctx, params);
     default: throw Object.assign(new Error(`unknown action "${action}"`), { status: 400 });
   }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   PHASE 3b — Temporal Order Activator (Durable Object).
+   Temporal Order Activator (Durable Object) — PER USER.
 
-   The cockpit's pending queue is a launch queue: orders staged here are DORMANT
-   until their activation conditions qualify, at which point they route to the
-   broker — and, crucially, that evaluation runs SERVER-SIDE on a Durable Object
-   alarm() every ~5s, so a staged order fires even with the browser closed.
+   Orders staged here are DORMANT until their activation conditions qualify, at
+   which point they route to the broker — evaluated SERVER-SIDE on an alarm()
+   every ~5s, so a staged order fires even with the browser closed. Each user has
+   their OWN instance (idFromName('u:'+uid)); the DO persists its owner's
+   { uid, role } so the detached alarm() routes with that user's token.
 
-   What can be evaluated headless vs. from a pushed snapshot:
-     • clock (ET) and CME session-fraction  → computed natively here (Intl), fully
-       headless. These are the "browser can be closed" conditions.
-     • price                                → polled from a market-data source when
-       the order carries a quoteSymbol; else the terminal's last pushed price.
-     • detector / field / chronometer state → the terminal pushes a snapshot while
-       open (pushState); evaluated against the most recent one.
-
-   MARKET-DATA SOURCE IS PLUGGABLE. getPrice() is the single seam: today it polls a
-   quote feed / uses the pushed price. When the proprietary Tick Engine lands (its
-   own blueprint), this becomes a subscription to the tick stream and NOTHING else
-   in the activation engine changes — same lifecycle, same audit, same state
-   machine. That is the whole point of isolating it here.
+   MARKET-DATA SOURCE IS PLUGGABLE via getPrice() — the single seam the Tick
+   Engine plugs into later with no other change to the activation engine.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const TERMINAL = new Set(['filled', 'rejected', 'cancelled']);
@@ -360,9 +399,9 @@ async function fetchQuote(symbol) {
 }
 
 // Poll a single order's broker status to advance the lifecycle after routing.
-async function pollOrderStatus(env, orderId) {
+async function pollOrderStatus(ctx, orderId) {
   if (orderId == null) return null;
-  try { const o = await tv(env, `/order/item?id=${Number(orderId)}`); return o && (o.ordStatus || o.status) ? String(o.ordStatus || o.status) : null; }
+  try { const o = await tv(ctx, `/order/item?id=${Number(orderId)}`); return o && (o.ordStatus || o.status) ? String(o.ordStatus || o.status) : null; }
   catch (_) { return null; }
 }
 function mapBrokerStatus(st) {
@@ -400,8 +439,19 @@ export class ExecutionEngine {
   async _get(k, f) { const v = await this.state.storage.get(k); return v === undefined ? f : v; }
   async _put(k, v) { await this.state.storage.put(k, v); }
 
+  // The owner's identity, persisted so the detached alarm() can route with it.
+  async brokerCtx() {
+    const c = await this._get('ctx', { uid: 'operator', role: 'operator' });
+    return { env: this.env, uid: c.uid, role: c.role };
+  }
+
   async fetch(request) {
     const body = await request.json().catch(() => ({}));
+    // Persist the caller's identity (each DO instance is 1:1 with a uid, so this
+    // only ever records this user's own context) for the headless alarm loop.
+    // Only real proxy calls carry BOTH uid+role; the scheduled() watchdog pokes
+    // with uid only and must NOT overwrite the stored role.
+    if (body.uid && body.role) await this._put('ctx', { uid: String(body.uid), role: body.role === 'operator' ? 'operator' : 'subscriber' });
     try { return doJson({ ok: true, result: await this.op(body.action, body.params || {}) }); }
     catch (e) { return doJson({ error: e.message, needsLogin: !!e.needsLogin }, e.status || 502); }
   }
@@ -419,15 +469,29 @@ export class ExecutionEngine {
     }
   }
 
-  // Cron-driven safety net: if any order is still armed/working but the alarm
-  // somehow isn't scheduled (eviction edge cases), re-arm it. The alarm itself is
-  // durable, so this is belt-and-suspenders — and it gives the Worker a deploy
-  // target (a service-binding-only Worker won't deploy without a route/trigger).
+  // Registry of DOs with live orders, so the cron watchdog can find them without
+  // enumerating every user. Refreshed whenever an alarm is (re)armed; expires on
+  // its own so an idle user drops out.
+  async register() {
+    try {
+      const c = await this._get('ctx', null);
+      if (c && c.uid && this.env.QUAN_PUBLISH) await this.env.QUAN_PUBLISH.put('exec:active:' + c.uid, '1', { expirationTtl: 3 * 3600 });
+    } catch (_) {}
+  }
+  async deregister() {
+    try {
+      const c = await this._get('ctx', null);
+      if (c && c.uid && this.env.QUAN_PUBLISH) await this.env.QUAN_PUBLISH.delete('exec:active:' + c.uid);
+    } catch (_) {}
+  }
+  // Cron safety net: if this DO still has live orders but its alarm was somehow
+  // dropped, re-arm it; otherwise fall out of the active registry.
   async watchdog() {
     const pending = await this._get('pending', []);
-    const active = pending.some((o) => !TERMINAL.has(o.status) && (o.armed || o.status === 'sent' || o.status === 'working'));
-    if (active) await this.ensureAlarm();
-    return { active, pending: pending.length };
+    const alive = pending.some((o) => !TERMINAL.has(o.status) && (o.armed || o.status === 'sent' || o.status === 'working'));
+    if (alive) await this.ensureAlarm();
+    else await this.deregister();
+    return { alive };
   }
 
   async list() {
@@ -475,8 +539,8 @@ export class ExecutionEngine {
     const pending = await this._get('pending', []);
     const o = pending.find((x) => x.id === id);
     if (!o) throw Object.assign(new Error('not found'), { status: 404 });
-    // If it has already routed, cancel at the broker too.
-    if (o.orderId != null && (o.status === 'sent' || o.status === 'working')) { try { await cancelOrder(this.env, o.orderId); } catch (_) {} }
+    // If it has already routed, cancel at the broker too — with the owner's token.
+    if (o.orderId != null && (o.status === 'sent' || o.status === 'working')) { try { await cancelOrder(await this.brokerCtx(), o.orderId); } catch (_) {} }
     o.armed = false; this._transition(o, 'cancelled', 'cancelled by operator');
     await this._put('pending', pending);
     return o;
@@ -503,11 +567,12 @@ export class ExecutionEngine {
     return null;
   }
 
-  async ensureAlarm() { if ((await this.state.storage.getAlarm()) == null) await this.state.storage.setAlarm(Date.now() + ALARM_MS); }
+  async ensureAlarm() { if ((await this.state.storage.getAlarm()) == null) await this.state.storage.setAlarm(Date.now() + ALARM_MS); await this.register(); }
 
   async alarm() {
     const pending = await this._get('pending', []);
     const snapshot = await this._get('snapshot', null);
+    const bctx = await this.brokerCtx();
     const now = Date.now();
     const fresh = snapshot && now - snapshot.ts < 90000;
     const base = { etMin: (() => { const p = etParts(new Date(now)); return p.hour * 60 + p.minute; })(),
@@ -521,7 +586,7 @@ export class ExecutionEngine {
       // Advance already-routed orders by polling broker status.
       if (o.status === 'sent' || o.status === 'working') {
         alive = true;
-        const st = await pollOrderStatus(this.env, o.orderId);
+        const st = await pollOrderStatus(bctx, o.orderId);
         const mapped = st && mapBrokerStatus(st);
         if (mapped && mapped !== o.status) this._transition(o, mapped, 'broker: ' + st);
         continue;
@@ -535,7 +600,7 @@ export class ExecutionEngine {
       this._transition(o, 'qualified', 'conditions met');
       try {
         const res = (o.ticket.bracket && (o.ticket.stopLoss != null || o.ticket.takeProfit != null))
-          ? await placeBracket(this.env, o.ticket) : await placeOrder(this.env, o.ticket);
+          ? await placeBracket(bctx, o.ticket) : await placeOrder(bctx, o.ticket);
         o.orderId = res && (res.orderId != null ? res.orderId : (res.orderId === 0 ? 0 : null));
         this._transition(o, 'sent', 'routed order ' + (o.orderId != null ? o.orderId : '?'));
       } catch (e) {
@@ -550,37 +615,37 @@ export class ExecutionEngine {
   }
 }
 
-// DO-routed actions (the singleton activation engine holds all launch-queue state).
+// DO-routed actions (each user's launch queue lives in their own DO instance).
 const DO_ACTIONS = new Set(['stage', 'listPending', 'cancelPending', 'arm', 'disarm', 'pushState', 'clearTerminal']);
-function execDo(env) { return env.EXEC_DO.get(env.EXEC_DO.idFromName('operator')); }
+function execDo(env, uid) { return env.EXEC_DO.get(env.EXEC_DO.idFromName('u:' + (uid || 'operator'))); }
 
 export default {
-  // Watchdog tick — keeps the activation loop alive and gives this route-less
-  // Worker a deploy target so the EXECUTION service binding resolves.
-  async scheduled(_event, env, ctx) {
-    if (!env.EXEC_DO) return;
-    ctx.waitUntil(execDo(env).fetch('https://exec.do/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'watchdog', params: {} }) }));
-  },
   async fetch(request, env) {
     if (env.EXECUTION_KEY) {
       const key = request.headers.get('X-Execution-Key') || '';
       if (key !== env.EXECUTION_KEY) return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
     }
     if (request.method !== 'POST') {
-      return new Response(JSON.stringify(await health(env), null, 2), { headers: { 'Content-Type': 'application/json' } });
+      // Unattended health probe → operator context.
+      return new Response(JSON.stringify(await health({ env, uid: 'operator', role: 'operator' }), null, 2), { headers: { 'Content-Type': 'application/json' } });
     }
     const body = await request.json().catch(() => ({}));
     const action = body && body.action;
     if (!action) return new Response(JSON.stringify({ error: 'action required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
 
-    // Launch-queue / activation actions live in the Durable Object.
+    // Identity from the trusted Pages proxy. No uid → unattended/cron = operator.
+    let uid = body.uid, role;
+    if (uid == null || uid === '') { uid = 'operator'; role = 'operator'; }
+    else { uid = String(uid); role = body.role === 'operator' ? 'operator' : 'subscriber'; }
+
+    // Launch-queue / activation actions live in the per-user Durable Object.
     if (DO_ACTIONS.has(action)) {
       if (!env.EXEC_DO) return new Response(JSON.stringify({ error: 'EXEC_DO durable object not bound' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-      return execDo(env).fetch('https://exec.do/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, params: body.params || {} }) });
+      return execDo(env, uid).fetch('https://exec.do/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, params: body.params || {}, uid, role }) });
     }
 
     try {
-      const result = await dispatch(env, action, body.params || {});
+      const result = await dispatch({ env, uid, role }, action, body.params || {});
       return new Response(JSON.stringify({ ok: true, result }), { headers: { 'Content-Type': 'application/json' } });
     } catch (err) {
       const status = err.status || 502;
@@ -589,5 +654,26 @@ export default {
       if (err.penalty) payload.penalty = err.penalty;
       return new Response(JSON.stringify(payload), { status, headers: { 'Content-Type': 'application/json' } });
     }
+  },
+
+  // Cron watchdog (every ~10 min per wrangler-execution.toml). Also the deploy
+  // TARGET that lets this route-less Worker actually deploy so the EXECUTION
+  // service binding resolves. Pokes every user DO that has live orders (via the
+  // exec:active: KV registry) so a dropped alarm gets re-armed. Cheap: only
+  // active users are listed, and each poke is a no-op when the alarm is healthy.
+  async scheduled(event, env) {
+    if (!env.EXEC_DO || !env.QUAN_PUBLISH) return;
+    try {
+      const listing = await env.QUAN_PUBLISH.list({ prefix: 'exec:active:' });
+      for (const k of (listing.keys || [])) {
+        const uid = k.name.slice('exec:active:'.length);
+        try {
+          await execDo(env, uid).fetch('https://exec.do/rpc', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'watchdog', params: {}, uid }), // uid only — no role, so ctx is preserved
+          });
+        } catch (_) {}
+      }
+    } catch (_) {}
   },
 };

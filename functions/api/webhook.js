@@ -16,6 +16,8 @@ function planFromPrice(env, priceId) {
   const table = {
     [env.STRIPE_PRICE_OPERATOR_MONTHLY]: 'operator',
     [env.STRIPE_PRICE_OPERATOR_ANNUAL]: 'operator',
+    [env.STRIPE_PRICE_PRIME_MONTHLY]: 'prime',
+    [env.STRIPE_PRICE_PRIME_ANNUAL]: 'prime',
     [env.STRIPE_PRICE_DESK_MONTHLY]: 'desk',
     [env.STRIPE_PRICE_DESK_ANNUAL]: 'desk'
   };

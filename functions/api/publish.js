@@ -19,10 +19,13 @@ export async function onRequestPost({ request, env }) {
 
     const { inst, date, report, heatmap } = await request.json().catch(() => ({}));
     if (!inst || !date) return badRequest('inst and date are required');
+    if (String(inst).length > 32 || String(date).length > 32) return badRequest('inst/date too long');
 
     const key = `pub:${inst}:${date}`;
     const value = { inst, date, publishedAt: new Date().toISOString(), report: report || null, heatmap: heatmap || null };
-    await env.QUAN_PUBLISH.put(key, JSON.stringify(value), { expirationTtl: TTL_SEC });
+    const serialized = JSON.stringify(value);
+    if (serialized.length > 2 * 1024 * 1024) return badRequest('published payload exceeds 2 MB');
+    await env.QUAN_PUBLISH.put(key, serialized, { expirationTtl: TTL_SEC });
 
     return json({ ok: true, key });
   } catch (err) {

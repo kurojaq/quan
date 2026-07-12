@@ -1,0 +1,22 @@
+# Cloudflare Pages security headers — applied to every route (static + Functions).
+# Unlike functions/_middleware.js (which only runs for "/" and "/api/*" per
+# _routes.json), this file covers all asset responses.
+#
+# CSP notes (pragmatic, not maximal):
+#  - 'unsafe-inline' (script+style) is required by the terminal's heavy inline
+#    handlers/styles; 'unsafe-eval'/'wasm-unsafe-eval' are required by Pyodide
+#    (the in-page Python engine loaded from jsdelivr). A nonce-based CSP that
+#    drops 'unsafe-inline' is a large refactor tracked for later.
+#  - Real value delivered here: frame-ancestors (clickjacking), object-src/base-uri
+#    lockdown, and a tight allow-list for script/style/font/img/connect origins.
+#  - script/connect jsdelivr = Pyodide + supabase-js; unpkg = lightweight-charts;
+#    connect *.supabase.co = auth/REST/realtime; *.workers.dev = optional realtime.
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https://cdn.jsdelivr.net https://*.supabase.co wss://*.supabase.co https://*.workers.dev wss://*.workers.dev; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), usb=(), payment=(), interest-cohort=()
+  Cross-Origin-Resource-Policy: same-site

@@ -16,7 +16,7 @@
  * Lazy-booted once via window.__execBoot() the first time the tab is opened.
  */
 (function () {
-  var els = {}, booted = false, conn = null, refreshTimer = null, conds = [];
+  var els = {}, booted = false, conn = null, refreshTimer = null, conds = [], liveAllowed = true;
 
   /* ── helpers ────────────────────────────────────────────────────────────── */
   function $(id) { return document.getElementById(id); }
@@ -54,8 +54,32 @@
   function closeLogin() { if (!els.loginPanel) return; els.loginPanel.classList.remove('on'); els.loginPanel.setAttribute('aria-hidden', 'true'); if (els.loginPass) els.loginPass.value = ''; }
   function onConnectClick() { els.loginPanel.classList.contains('on') ? closeLogin() : openLogin(); }
 
+  // Subscribers are demo-clamped by the runtime; hide the LIVE option + show a
+  // one-line note so the cockpit matches what the server will allow.
+  function ensureBetaNote() {
+    if (els.loginBeta) return els.loginBeta;
+    if (!els.loginEnv) return null;
+    var n = document.createElement('div');
+    n.id = 'exLoginBeta'; n.className = 'exFormMsg'; n.style.display = 'none';
+    n.textContent = 'Live routing is operator-only during the Execution beta — you’re on demo.';
+    var field = els.loginEnv.closest ? els.loginEnv.closest('.exField') : null;
+    if (field && field.parentNode) field.parentNode.insertBefore(n, field.nextSibling);
+    els.loginBeta = n;
+    return n;
+  }
+  function applyLiveAllowed(allowed) {
+    if (allowed === undefined) return;
+    liveAllowed = !!allowed;
+    var sel = els.loginEnv;
+    var liveOpt = sel && (sel.querySelector ? sel.querySelector('option[value="live"]') : null);
+    if (liveOpt) { liveOpt.disabled = !liveAllowed; liveOpt.hidden = !liveAllowed; liveOpt.style.display = liveAllowed ? '' : 'none'; }
+    if (sel && !liveAllowed && sel.value === 'live') sel.value = 'demo';
+    var note = ensureBetaNote(); if (note) note.style.display = liveAllowed ? 'none' : '';
+  }
+
   function onConnected(c) {
     conn = c || {};
+    applyLiveAllowed(conn.liveAllowed);
     setBadge(conn.env);
     renderAccounts(conn.accounts || []);
     var n = (conn.accounts || []).length;
@@ -79,7 +103,11 @@
 
   function probeSession() {
     if (!(window.__authToken && window.__authToken())) return;
-    api('connect').then(function (res) { if (res.ok && res.data.result && res.data.result.connected) onConnected(res.data.result); }).catch(function () {});
+    api('connect').then(function (res) {
+      var r = res.ok && res.data && res.data.result;
+      if (r) applyLiveAllowed(r.liveAllowed);                 // hide LIVE even before they connect
+      if (r && r.connected) onConnected(r);
+    }).catch(function () {});
   }
 
   function renderAccounts(accts) {

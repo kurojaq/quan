@@ -16,6 +16,11 @@ export async function onRequestPost({ request, env }) {
     if (!label || !Array.isArray(instruments) || !instruments.length) {
       return badRequest('label and a non-empty instruments array are required');
     }
+    if (String(label).length > 120) return badRequest('label too long');
+    if (instruments.length > 50) return badRequest('too many instruments');
+    if (instruments.some((i) => typeof i !== 'string' || !i || i.length > 32)) {
+      return badRequest('each instrument must be a short string');
+    }
 
     const token = crypto.randomUUID();
     const row = { label, instruments, createdAt: new Date().toISOString() };

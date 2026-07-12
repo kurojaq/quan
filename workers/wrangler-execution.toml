@@ -18,6 +18,13 @@
 #   # TRADOVATE_APP_VERSION / TRADOVATE_DEVICE_ID are optional (defaults 1.0 / none)
 #   # EXECUTION_KEY is optional — only if you ever give this Worker a public route.
 #
+#   # Multi-tenancy: per-user Tradovate tokens are encrypted at rest (AES-GCM).
+#   # Set EXEC_ENC_KEY to a base64 32-byte key (fund-grade; if unset, tokens store
+#   # plaintext so nothing breaks pre-config):  openssl rand -base64 32
+#   npx wrangler secret put EXEC_ENC_KEY      -c workers/wrangler-execution.toml
+#   # TRADOVATE_USER/PASS/… are the OPERATOR-ONLY unattended fallback; subscribers
+#   # never use them (they sign into their own Tradovate DEMO account).
+#
 # Then bind it to the Pages project:
 #   Pages project → Settings → Bindings → Add → Service binding
 #     Variable name: EXECUTION   Service: quan-execution
@@ -42,10 +49,11 @@ TRADOVATE_APP_VERSION = "1.0"
 binding = "QUAN_PUBLISH"
 id = "88472c90139149dea44668ce0c0a7d8a"
 
-# Phase 3b — the Temporal Order Activator runs in this Durable Object. Its alarm()
-# loop evaluates staged orders' activation conditions server-side (~5s) and routes
-# them when they qualify, so orders fire even with the browser closed. One
-# singleton instance ("operator") holds the whole launch queue + audit trail.
+# The Temporal Order Activator runs in this Durable Object. Its alarm() loop
+# evaluates staged orders' activation conditions server-side (~5s) and routes them
+# when they qualify, so orders fire even with the browser closed. PER-USER: each
+# user gets their own instance (idFromName('u:'+uid)) holding their own launch
+# queue + audit trail, so subscribers are fully isolated from each other.
 [[durable_objects.bindings]]
 name = "EXEC_DO"
 class_name = "ExecutionEngine"

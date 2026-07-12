@@ -17,10 +17,28 @@
   'use strict';
 
   // Which plan unlocks what. Scout (free/no active sub) gets a limited set.
+  // Ladder: scout < operator < prime < desk. Prime adds Execution + realtime;
+  // Desk adds team seats + data export/API on top of Prime.
+  var OPERATOR_VIEWS = ['detector', 'chart', 'report', 'polar', 'strike', 'heat', 'compass', 'sim', 'payload', 'split', 'cboe'];
+  var PRIME_VIEWS = OPERATOR_VIEWS.concat(['exec']);
   var ENTITLEMENTS = {
     scout:    ['detector', 'chart'],
-    operator: ['detector', 'chart', 'report', 'polar', 'strike', 'heat', 'compass', 'sim', 'payload', 'split'],
-    desk:     ['detector', 'chart', 'report', 'polar', 'strike', 'heat', 'compass', 'sim', 'payload', 'split', 'team', 'export']
+    operator: OPERATOR_VIEWS,
+    prime:    PRIME_VIEWS,
+    desk:     PRIME_VIEWS.concat(['team', 'export'])
+  };
+
+  // Upgrade direction — higher rank = more access. Used by the entitlement gate
+  // to pick the right upsell target for a locked feature.
+  var TIER_RANK = { scout: 0, operator: 1, prime: 2, desk: 3 };
+  window.__quanTierRank = TIER_RANK;
+  // Lowest tier that unlocks a given feature (for "Upgrade to X" copy).
+  window.__quanTierFor = function (feature) {
+    var order = ['scout', 'operator', 'prime', 'desk'];
+    for (var i = 0; i < order.length; i++) {
+      if ((ENTITLEMENTS[order[i]] || []).indexOf(feature) !== -1) return order[i];
+    }
+    return 'operator';
   };
 
   window.__quanSub = { loaded: false, active: false, plan: null, status: 'unknown' };
@@ -91,8 +109,9 @@
     var b = ensureBar();
     b.style.display = 'flex';
     if (state && state.status === 'trialing') {
+      var planName = state.plan ? state.plan.charAt(0).toUpperCase() + state.plan.slice(1) : 'full';
       b.innerHTML =
-        '<span style="letter-spacing:.02em">You’re on the <b>Operator</b> free trial.</span>' +
+        '<span style="letter-spacing:.02em">You’re on the <b>' + esc(planName) + '</b> free trial.</span>' +
         '<span style="flex:1"></span>' +
         '<button id="quGoPro" style="' + btnCss(true) + '">Subscribe</button>' +
         '<button id="quPortal" style="' + btnCss(false) + '">Manage</button>';
@@ -107,7 +126,7 @@
       b.innerHTML =
         '<span style="letter-spacing:.02em">Free <b>Scout</b> — Detector &amp; Chart only. Unlock the full terminal.</span>' +
         '<span style="flex:1"></span>' +
-        '<button id="quGoPro" style="' + btnCss(true) + '">Upgrade to Operator — $49/mo</button>' +
+        '<button id="quGoPro" style="' + btnCss(true) + '">Upgrade to Operator — $99/mo</button>' +
         '<button id="quDismiss" style="' + btnCss(false) + '">Later</button>';
     }
     var go = b.querySelector('#quGoPro'); if (go) go.onclick = function () { window.__quanUpgrade('operator', 'monthly'); };

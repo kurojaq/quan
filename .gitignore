@@ -10,3 +10,7 @@ THREESESSION_COMPASS_ENGINE_1_16.html
 # Node tooling for the Workers build (installed in CI / locally, never committed)
 node_modules/
 package-lock.json
+
+# Local wrangler build cache / Python bytecode cache
+.wrangler/
+__pycache__/
