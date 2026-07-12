@@ -17,6 +17,9 @@
 
   var LS_KEY = "quan:cboe:portfolio";
   var PORT = {};          // symbol -> summary row (+ compact drill payload)
+  var CHAINS = {};        // symbol -> { meta, expiration, rows[] } — full Golden-Reference chain
+  var ACTIVE = null;      // active CBOE ticker symbol (feeds the instrument selector + tabs)
+  var LS_CHAINS = "quan:cboe:chains", LS_ACTIVE = "quan:cboe:active";
   var sortKey = "pcrOI", sortDir = -1;
   var mounted = false, host = null;
 
@@ -206,8 +209,30 @@
   }
 
   // ---- persistence -----------------------------------------------------------
-  function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(PORT)); } catch (_) {} }
-  function load() { try { var s = localStorage.getItem(LS_KEY); if (s) PORT = JSON.parse(s) || {}; } catch (_) { PORT = {}; } }
+  function save() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(PORT)); } catch (_) {}
+    try { localStorage.setItem(LS_CHAINS, JSON.stringify(CHAINS)); } catch (_) {}   // may exceed quota for 1000s — best-effort
+    try { localStorage.setItem(LS_ACTIVE, ACTIVE || ""); } catch (_) {}
+  }
+  function load() {
+    try { PORT = JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch (_) { PORT = {}; }
+    try { CHAINS = JSON.parse(localStorage.getItem(LS_CHAINS)) || {}; } catch (_) { CHAINS = {}; }
+    try { ACTIVE = localStorage.getItem(LS_ACTIVE) || null; } catch (_) { ACTIVE = null; }
+    if (ACTIVE && !PORT[ACTIVE]) ACTIVE = null;
+    if (!ACTIVE) { var k = Object.keys(PORT); ACTIVE = k.length ? k[0] : null; }
+  }
+
+  // ---- public adapter API: the active CBOE ticker's Golden Reference chain ----
+  function notifyChanged() {
+    try { root.dispatchEvent(new CustomEvent("quan:cboe:changed", { detail: { active: ACTIVE, tickers: Object.keys(PORT) } })); } catch (_) {}
+  }
+  root.QuanCboe = {
+    list: function () { return Object.keys(PORT); },
+    active: function () { return ACTIVE; },
+    setActive: function (sym) { if (PORT[sym]) { ACTIVE = sym; save(); syncInstr(); notifyChanged(); } return ACTIVE; },
+    summary: function (sym) { return PORT[sym || ACTIVE] || null; },
+    chain: function (sym) { return CHAINS[sym || ACTIVE] || null; }   // { meta, expiration, rows[] } for the engine adapter
+  };
 
   // ---- rendering -------------------------------------------------------------
   var COLS = [
@@ -318,9 +343,13 @@
       rd.onload = function(){
         try {
           var parsed = ingest(rd.result);
-          if (parsed.rows.length) { var s = summarize(parsed); PORT[s.symbol] = s; added.push(s.symbol); }
+          if (parsed.rows.length) {
+            var s = summarize(parsed); PORT[s.symbol] = s;
+            CHAINS[s.symbol] = { meta: parsed.meta, expiration: parsed.expiration, rows: parsed.rows };
+            ACTIVE = s.symbol; added.push(s.symbol);
+          }
         } catch (e) { console.warn("CBOE ingest failed for", file.name, e); }
-        if (++done === list.length) { save(); render(); if (added.length===1) drill(added[0]); }
+        if (++done === list.length) { save(); render(); syncInstr(); notifyChanged(); if (added.length===1) drill(added[0]); }
       };
       rd.readAsText(file);
     });
@@ -330,7 +359,7 @@
     var fi = document.getElementById("cbFile");
     if (fi) fi.addEventListener("change", function(){ handleFiles(this.files); this.value=""; });
     var cl = document.getElementById("cbClear");
-    if (cl) cl.addEventListener("click", function(){ PORT = {}; save(); render(); });
+    if (cl) cl.addEventListener("click", function(){ PORT = {}; CHAINS = {}; ACTIVE = null; save(); render(); syncInstr(); notifyChanged(); });
     host.querySelectorAll(".cbTable th").forEach(function(th){
       th.addEventListener("click", function(){ var k=th.dataset.k;
         if (k===sortKey) sortDir=-sortDir; else { sortKey=k; sortDir = th.classList.contains("l")?1:-1; }
@@ -341,13 +370,55 @@
     });
   }
 
+  // ---- instrument selector: contract dropdown ⇄ ticker dropdown --------------
+  // Directive: switching to CBOE turns the futures-contract selector into a
+  // ticker selector, populated from uploaded datasets, persisted for the session.
+  // #instA (CME) is left untouched; a sibling #instCboe is shown in its place.
+  function ensureInstCboe() {
+    var sel = document.getElementById("instCboe");
+    if (sel) return sel;
+    var bar = document.querySelector(".tabbar .instrbar"); if (!bar) return null;
+    sel = document.createElement("select");
+    sel.className = "field"; sel.id = "instCboe"; sel.style.display = "none";
+    sel.title = "CBOE ticker — populated from uploaded datasets";
+    sel.addEventListener("change", function () {
+      if (this.value && root.QuanCboe) root.QuanCboe.setActive(this.value);
+    });
+    bar.appendChild(sel);
+    return sel;
+  }
+  function syncInstr() {
+    var instA = document.getElementById("instA");
+    var sel = ensureInstCboe(); if (!sel) return;
+    var isCboe = root.QuanExchange && root.QuanExchange.get() === "CBOE";
+    if (instA) instA.style.display = isCboe ? "none" : "";
+    sel.style.display = isCboe ? "" : "none";
+    if (!isCboe) return;
+    var syms = Object.keys(PORT);
+    if (!syms.length) {
+      sel.innerHTML = '<option value="">upload a ticker…</option>';
+    } else {
+      sel.innerHTML = syms.map(function (s) {
+        return '<option value="' + esc(s) + '"' + (s === ACTIVE ? " selected" : "") + ">" + esc(s) + "</option>";
+      }).join("");
+      if (ACTIVE) sel.value = ACTIVE;
+    }
+  }
+
   // ---- boot ------------------------------------------------------------------
   root.__cboeBoot = function () {
     host = document.getElementById("cboeMount");
     if (!host) return;
     if (!mounted) { load(); mounted = true; }
-    render();
+    render(); syncInstr();
   };
-  // re-render clock badge when exchange flips to CBOE
-  root.addEventListener("quan:exchange", function(e){ if (e.detail && e.detail.exchange==="CBOE" && mounted) render(); });
+  // exchange flip → re-render board + swap the instrument selector
+  root.addEventListener("quan:exchange", function (e) {
+    if (!mounted) { load(); mounted = true; }
+    if (e.detail && e.detail.exchange === "CBOE" && host) render();
+    syncInstr();
+  });
+  // keep the selector correct even before the tab is first opened
+  if (document.readyState !== "loading") { load(); mounted = true; syncInstr(); }
+  else root.addEventListener("DOMContentLoaded", function () { load(); mounted = true; syncInstr(); });
 })(typeof window !== "undefined" ? window : this);
