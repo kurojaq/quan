@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<!-- ==========================================================================
+     THE QU'AN — CBOE (standalone app). Separate page, separate globals: nothing
+     here can touch the CME terminal (app.html). Portfolio/risk board + Deep
+     Strike Heat Map, fed the CBOE Golden Reference (reconstructed premium for
+     index quotedata, observed premium for Barchart equities).
+     ========================================================================== -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506" media="(prefers-color-scheme: dark)">
+<title>The Qu'an — CBOE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/theme.css">
+<style>
+  html,body{height:100%;margin:0;}
+  .cbApp{display:flex;flex-direction:column;height:100vh;min-height:0;}
+  .cbApp .brand{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:600;color:var(--cream);margin-right:6px;}
+  .cbApp .brand .inf{opacity:.55;font-size:18px;}
+  .cbApp .brand .cbSub{font:600 10px/1 var(--font-mono);letter-spacing:.12em;color:var(--cream-dim);padding:3px 7px;background:var(--fill);border-radius:999px;}
+  .cbSec{flex:1 1 auto;min-height:0;width:100%;}
+  #cbBoard{display:flex;}
+  #cbHeat{display:none;}
+  #cboeMount{flex:1 1 auto;min-height:0;width:100%;overflow:auto;}
+  #heatMount{flex:1 1 auto;min-height:0;display:flex;width:100%;background:var(--bg);border-radius:var(--radius-lg);overflow:hidden;margin:10px 14px 14px;}
+  #heatMount iframe{border:0;width:100%;height:100%;min-height:0;background:#1a1a1e;}
+</style>
+</head>
+<body>
+<div class="wrap cbApp">
+  <nav class="tabbar">
+    <span class="brand"><span class="inf">&#8734;</span> The Qu'an <span class="cbSub">CBOE</span></span>
+    <button class="tabbtn on" data-cbtab="board">Portfolio</button>
+    <button class="tabbtn" data-cbtab="heat">Heat Map</button>
+    <div class="gctrls">
+      <div class="instrbar"><span class="k">Ticker</span><select class="field" id="instA" title="Active CBOE ticker — from uploaded datasets"></select></div>
+    </div>
+  </nav>
+  <section class="cbSec" id="cbBoard"><div id="cboeMount"></div></section>
+  <section class="cbSec" id="cbHeat"><div id="heatMount"></div></section>
+</div>
+<script src="js/heatmap-loader.js" defer></script>
+<script src="js/exchange.js" defer></script>
+<script src="js/cboe-app.js" defer></script>
+<script src="js/cboe-portfolio.js" defer></script>
+</body>
+</html>
