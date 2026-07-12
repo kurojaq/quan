@@ -237,11 +237,15 @@
   // repeated call/put names into Name / Name.1.
   function vendorCsv(chain) {
     if (!chain || !chain.rows) return "";
-    var out = ["Latest,x,Volume,Open Int,Premium,Strike,x,Latest,Volume,Open Int,Premium"];
+    // One layout, FIVE parsers: heatmap + detector read POSITIONALLY (cVol=2, cOI=3,
+    // cPrem=4, Strike=5, pVol=8, pOI=9, pPrem=10); Python ingest_chain + Strike Field
+    // read BY HEADER NAME; Detector's parseCSV additionally gates on head[0]==='Type'.
+    // So 'Type' leads (col 0), Latest sits at 1/7, and the numeric positions are fixed.
+    var out = ["Type,Latest,Volume,Open Int,Premium,Strike,Type,Latest,Volume,Open Int,Premium"];
     var v = function (n) { return (n == null || !isFinite(n)) ? "" : n; };
     chain.rows.forEach(function (r) {
-      out.push([v(r.callLast), "", v(r.callVol), v(r.callOI), v(r.callPrem), r.strike,
-                "", v(r.putLast), v(r.putVol), v(r.putOI), v(r.putPrem)].join(","));
+      out.push(["Call", v(r.callLast), v(r.callVol), v(r.callOI), v(r.callPrem), r.strike,
+                "Put", v(r.putLast), v(r.putVol), v(r.putOI), v(r.putPrem)].join(","));
     });
     return out.join("\n");
   }
@@ -264,7 +268,8 @@
   root.QuanCboe = {
     list: function () { return Object.keys(PORT); },
     active: function () { return ACTIVE; },
-    setActive: function (sym) { if (PORT[sym]) { ACTIVE = sym; save(); syncInstr(); notifyChanged(); feedHeatmapCboe(); } return ACTIVE; },
+    setActive: function (sym) { if (PORT[sym]) { ACTIVE = sym; save(); notifyChanged();
+      if (root.QuanExchange && root.QuanExchange.get() === "CBOE") selectTicker(sym); else feedHeatmapCboe(); } return ACTIVE; },
     summary: function (sym) { return PORT[sym || ACTIVE] || null; },
     chain: function (sym) { return CHAINS[sym || ACTIVE] || null; },   // { meta, expiration, rows[] } for the engine adapter
     vendorCsv: function (sym) { return vendorCsv(CHAINS[sym || ACTIVE]); },
@@ -454,40 +459,82 @@
     });
   }
 
-  // ---- instrument selector: contract dropdown ⇄ ticker dropdown --------------
-  // Directive: switching to CBOE turns the futures-contract selector into a
-  // ticker selector, populated from uploaded datasets, persisted for the session.
-  // #instA (CME) is left untouched; a sibling #instCboe is shown in its place.
-  function ensureInstCboe() {
-    var sel = document.getElementById("instCboe");
-    if (sel) return sel;
-    var bar = document.querySelector(".tabbar .instrbar"); if (!bar) return null;
-    sel = document.createElement("select");
-    sel.className = "field"; sel.id = "instCboe"; sel.style.display = "none";
-    sel.title = "CBOE ticker — populated from uploaded datasets";
-    sel.addEventListener("change", function () {
-      if (this.value && root.QuanCboe) root.QuanCboe.setActive(this.value);
-    });
-    bar.appendChild(sel);
-    return sel;
+  // ---- instrument selector: the contract dropdown BECOMES a ticker dropdown --
+  // Directive: switching to CBOE turns #instA (the futures-contract selector) into
+  // a ticker selector. We REPURPOSE the same #instA rather than a sibling, because
+  // the whole terminal keys off it (warehouse curInst, detector aInst, per-tab
+  // state) — so an instA 'change' routes the CBOE Golden Reference through the hub
+  // (js/warehouse.js) and EVERY tab inherits, exactly like a CME instrument.
+  var _cmeInstHTML = null, _cmeInstVal = null, _routing = false;
+  function isoOf(ch) {
+    var t = Date.parse((((ch && ch.meta) || {}).asof || "").replace(/\s+at\s+/, " ").replace(/\s+[A-Z]{2,4}$/, ""));
+    return new Date(isFinite(t) ? t : Date.now()).toISOString().slice(0, 10);
+  }
+  // Load the active CBOE ticker's Golden Reference into the shared hub, so the
+  // strike/detector/field/report/heatmap tabs all render it. Assumes curInst/aInst
+  // are already the ticker (set by the instA 'change' that calls this).
+  function loadChainToHub(sym) {
+    var ch = CHAINS[sym]; if (!ch) return;
+    if (!root.__qLoadChain) { feedHeatmapCboe(); return; }   // hub absent → at least the heatmap
+    var day = document.getElementById("dayDate"); if (day) day.value = isoOf(ch);
+    var csv = vendorCsv(ch);
+    try {
+      root.__qLoadChain(csv, sym + " weekly.csv");                                  // → strike/polar/compass + quan:cell
+      if (root.__qLoadGreeks) root.__qLoadGreeks(greeksCsv(ch), sym + " weekly greeks.csv", 1);
+      if (ch.meta && isFinite(ch.meta.spot) && root.__qSetAnchor) root.__qSetAnchor(ch.meta.spot);
+    } catch (_) {}
+    // Detector renders from pre-computed tension rows (its warehouse-compute path
+    // needs the Pyodide engine). Feed it through its own upload path instead —
+    // aInst is already the ticker, and onCSV falls back to QuanTension in JS.
+    try {
+      var fileA = document.getElementById("fileA");
+      if (fileA) {
+        var dtf = new DataTransfer(); dtf.items.add(new File([csv], sym + ".csv", { type: "text/csv" }));
+        fileA.files = dtf.files; fileA.dispatchEvent(new Event("change"));
+      }
+    } catch (_) {}
+    feedHeatmapCboe();   // heatmap: inject ticker <option> + sync labels (overrides the hub's plain feed)
+  }
+  // Drive the whole terminal to a ticker via the normal instA 'change' path. Always
+  // dispatch 'change' (even if the value is unchanged) so the detector/warehouse
+  // listeners run and set aInst/curInst before our listener loads the chain.
+  function selectTicker(sym) {
+    var instA = document.getElementById("instA"); if (!instA) return;
+    if (!Array.prototype.some.call(instA.options, function (o) { return o.value === sym; })) {
+      var op = document.createElement("option"); op.value = sym; op.textContent = sym; instA.appendChild(op);
+    }
+    instA.value = sym;
+    instA.dispatchEvent(new Event("change"));
   }
   function syncInstr() {
-    var instA = document.getElementById("instA");
-    var sel = ensureInstCboe(); if (!sel) return;
+    var instA = document.getElementById("instA"); if (!instA) return;
     var isCboe = root.QuanExchange && root.QuanExchange.get() === "CBOE";
-    if (instA) instA.style.display = isCboe ? "none" : "";
-    sel.style.display = isCboe ? "" : "none";
-    if (!isCboe) return;
-    var syms = Object.keys(PORT);
-    if (!syms.length) {
-      sel.innerHTML = '<option value="">upload a ticker…</option>';
-    } else {
-      sel.innerHTML = syms.map(function (s) {
-        return '<option value="' + esc(s) + '"' + (s === ACTIVE ? " selected" : "") + ">" + esc(s) + "</option>";
-      }).join("");
-      if (ACTIVE) sel.value = ACTIVE;
+    if (isCboe) {
+      if (_cmeInstHTML === null) { _cmeInstHTML = instA.innerHTML; _cmeInstVal = instA.value; }   // remember CME list once
+      var syms = Object.keys(PORT);
+      instA.innerHTML = syms.length
+        ? syms.map(function (s) { return '<option value="' + esc(s) + '">' + esc(s) + "</option>"; }).join("")
+        : '<option value="">upload a ticker…</option>';
+      instA.title = "CBOE ticker — from uploaded datasets";
+      if (ACTIVE && syms.length) selectTicker(ACTIVE);
+    } else if (_cmeInstHTML !== null) {                                             // restore the CME contract list
+      instA.innerHTML = _cmeInstHTML; instA.value = _cmeInstVal || instA.value; instA.title = "";
+      _cmeInstHTML = null; _cmeInstVal = null;
+      instA.dispatchEvent(new Event("change"));                                     // restore curInst/aInst to the CME instrument
     }
   }
+  // Route on ticker change while in CBOE mode (runs after detector/warehouse
+  // listeners, so curInst/aInst are already the ticker).
+  (function wireInstA() {
+    var instA = document.getElementById("instA"); if (!instA) return;
+    instA.addEventListener("change", function () {
+      if (_routing) return;
+      if (root.QuanExchange && root.QuanExchange.get() === "CBOE" && this.value && PORT[this.value]) {
+        _routing = true; ACTIVE = this.value; save();
+        try { loadChainToHub(this.value); } finally { _routing = false; }
+      }
+    });
+  })();
 
   // ---- boot ------------------------------------------------------------------
   root.__cboeBoot = function () {
