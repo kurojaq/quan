@@ -47,8 +47,8 @@
   }
 
   // Positional columns in the CBOE quotedata table (see quan_cboe.py _COL).
-  var C = { exp:0, callLast:2, callVol:6, callIV:7, callOI:10, strike:11,
-            putLast:13, putVol:17, putIV:18, putOI:21 };
+  var C = { exp:0, callLast:2, callVol:6, callIV:7, callDelta:8, callGamma:9, callOI:10,
+            strike:11, putLast:13, putVol:17, putIV:18, putDelta:19, putGamma:20, putOI:21 };
 
   // ---- latent premium reconstruction: E = (K/S)^2 * IV * sqrt(tau) ----------
   // Premium is not missing on CBOE, it is latent. Reconstruct it from strike,
@@ -92,6 +92,8 @@
         callVol: num(f[C.callVol]), putVol: num(f[C.putVol]),
         callLast: num(f[C.callLast]), putLast: num(f[C.putLast]),
         callIV: cIV, putIV: pIV, tau: tau,
+        callDelta: num(f[C.callDelta]), putDelta: num(f[C.putDelta]),
+        callGamma: num(f[C.callGamma]), putGamma: num(f[C.putGamma]),
         callPrem: energy(strike, meta.spot, cIV, tau),   // reconstructed latent premium
         putPrem:  energy(strike, meta.spot, pIV, tau) });
     }
@@ -226,13 +228,95 @@
   function notifyChanged() {
     try { root.dispatchEvent(new CustomEvent("quan:cboe:changed", { detail: { active: ACTIVE, tickers: Object.keys(PORT) } })); } catch (_) {}
   }
+  // Emit a CME-vendor-format chain CSV from a CBOE chain, so any consumer written
+  // for the CME Golden Reference inherits it unchanged. TWO parsers must both be
+  // satisfied: the heatmap's JS display reads POSITIONALLY (cVol=2, cOI=3, cPrem=4,
+  // Strike=5, pVol=8, pOI=9, pPrem=10), while the Pyodide engine (quan_engine.
+  // ingest_chain) reads BY HEADER NAME (Strike, Premium/.1, Open Int/.1, Volume/.1,
+  // Latest/.1). This column order + header names satisfies both; pandas dedupes the
+  // repeated call/put names into Name / Name.1.
+  function vendorCsv(chain) {
+    if (!chain || !chain.rows) return "";
+    var out = ["Latest,x,Volume,Open Int,Premium,Strike,x,Latest,Volume,Open Int,Premium"];
+    var v = function (n) { return (n == null || !isFinite(n)) ? "" : n; };
+    chain.rows.forEach(function (r) {
+      out.push([v(r.callLast), "", v(r.callVol), v(r.callOI), v(r.callPrem), r.strike,
+                "", v(r.putLast), v(r.putVol), v(r.putOI), v(r.putPrem)].join(","));
+    });
+    return out.join("\n");
+  }
+  // greeks CSV: parseGreeks positions cIV=1, cGamma=3, Strike=9, pIV=11, pDelta=12, pGamma=13 (len>=19).
+  function greeksCsv(chain) {
+    if (!chain || !chain.rows) return "";
+    var head = new Array(19).fill("h");
+    var out = [head.join(",")];
+    var v = function (n) { return (n == null || !isFinite(n)) ? "" : n; };
+    chain.rows.forEach(function (r) {
+      var c = new Array(19).fill("");
+      c[1] = v(r.callIV); c[3] = v(r.callGamma);
+      c[9] = r.strike;
+      c[11] = v(r.putIV); c[12] = v(r.putDelta); c[13] = v(r.putGamma);
+      out.push(c.join(","));
+    });
+    return out.join("\n");
+  }
+
   root.QuanCboe = {
     list: function () { return Object.keys(PORT); },
     active: function () { return ACTIVE; },
-    setActive: function (sym) { if (PORT[sym]) { ACTIVE = sym; save(); syncInstr(); notifyChanged(); } return ACTIVE; },
+    setActive: function (sym) { if (PORT[sym]) { ACTIVE = sym; save(); syncInstr(); notifyChanged(); feedHeatmapCboe(); } return ACTIVE; },
     summary: function (sym) { return PORT[sym || ACTIVE] || null; },
-    chain: function (sym) { return CHAINS[sym || ACTIVE] || null; }   // { meta, expiration, rows[] } for the engine adapter
+    chain: function (sym) { return CHAINS[sym || ACTIVE] || null; },   // { meta, expiration, rows[] } for the engine adapter
+    vendorCsv: function (sym) { return vendorCsv(CHAINS[sym || ACTIVE]); },
+    greeksCsv: function (sym) { return greeksCsv(CHAINS[sym || ACTIVE]); }
   };
+
+  // Feed the active CBOE Golden Reference into the standalone Heat Map iframe —
+  // the same postMessage contract the CME path uses (compass.feedHeat), so the
+  // Deep Strike surface inherits CBOE with zero engine changes.
+  function feedHeatmapCboe(fid) {
+    fid = fid || "heatFrame";
+    var ch = CHAINS[ACTIVE]; if (!ch) return;
+    var fr = document.getElementById(fid); if (!fr || !fr.contentWindow) return;
+    var anchor = (ch.meta && isFinite(ch.meta.spot)) ? ch.meta.spot : null;
+    var W = fr.contentWindow, sym = ACTIVE;
+    // the iframe keys by [inst][date]; its #dayDate is <input type=date> so the
+    // date MUST be YYYY-MM-DD, and #instSel needs an <option> for the ticker or
+    // instSel.value won't take (loadDate would keep showing the baked CME inst).
+    var iso = "";
+    var t = Date.parse(((ch.meta && ch.meta.asof) || "").replace(/\s+at\s+/, " ").replace(/\s+[A-Z]{2,4}$/, ""));
+    iso = new Date(isFinite(t) ? t : Date.now()).toISOString().slice(0, 10);
+    try {
+      var doc = fr.contentDocument, sel = doc && doc.getElementById("instSel");
+      if (sel && !Array.prototype.some.call(sel.options, function (o) { return o.value === sym; })) {
+        var op = doc.createElement("option"); op.value = sym; op.textContent = sym; sel.appendChild(op);
+      }
+    } catch (_) {}
+    try {
+      W.postMessage({ type: "quanFeed", kind: "chain", text: vendorCsv(ch), name: sym + ".csv", inst: sym, date: iso, anchor: anchor }, "*");
+      W.postMessage({ type: "quanFeed", kind: "greeks", text: greeksCsv(ch), name: sym + "_greeks.csv", inst: sym, date: iso, anchor: anchor }, "*");
+      W.postMessage({ type: "quanFeed", kind: "setView", inst: sym, date: iso }, "*");
+    } catch (_) {}
+    // The iframe renders the grid + engine surface off the uploaded chain, but its
+    // header labels (inst/anchor/ATM/expiry) refresh only on its own upload path,
+    // so sync them directly to the CBOE ticker (retry to beat the async eng-merge).
+    var atm = null, bd = Infinity;
+    (ch.rows || []).forEach(function (r) { var d = Math.abs(r.strike - (anchor || 0)); if (d < bd) { bd = d; atm = r.strike; } });
+    var applyLabels = function () {
+      try {
+        var doc = fr.contentDocument; if (!doc) return;
+        var set = function (id, val) { var el = doc.getElementById(id); if (el && val != null && val !== "") el.textContent = val; };
+        set("m_inst", sym); set("m_anchor", anchor); set("m_atm", atm); set("m_exp", (ch.expiration || "").replace(/^[A-Za-z]{3}\s/, ""));
+      } catch (_) {}
+    };
+    applyLabels(); setTimeout(applyLabels, 500); setTimeout(applyLabels, 1400);
+  }
+  root.__feedHeatmapCboe = feedHeatmapCboe;
+  // the iframe announces readiness with 'quanReady' — (re)feed CBOE when active
+  root.addEventListener("message", function (ev) {
+    var d = ev && ev.data || {};
+    if (d.type === "quanReady" && root.QuanExchange && root.QuanExchange.get() === "CBOE") setTimeout(feedHeatmapCboe, 40);
+  });
 
   // ---- rendering -------------------------------------------------------------
   var COLS = [

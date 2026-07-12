@@ -9,7 +9,9 @@
       if(dv&&dv.value==='report'){ secs.detector.classList.remove('on'); secs.report.classList.add('on'); window.__reportRender&&window.__reportRender(); }
       else { setTimeout(()=>{window.__detResize&&window.__detResize();},40); } }
     else if(t==='strike'){ setTimeout(()=>{window.__skResize&&window.__skResize();},40); }
-    else if(t==='heat'){ window.__heatBoot&&window.__heatBoot(); setTimeout(function(){ if(window.__feedHeatmap)window.__feedHeatmap(); },350); }
+    else if(t==='heat'){ window.__heatBoot&&window.__heatBoot(); setTimeout(function(){
+        if(window.QuanExchange&&window.QuanExchange.get()==='CBOE'){ window.__feedHeatmapCboe&&window.__feedHeatmapCboe(); }   // CBOE Golden Reference into the Deep Strike surface
+        else if(window.__feedHeatmap){ window.__feedHeatmap(); } },350); }
     else if(t==='chart'){ window.__chartBoot&&window.__chartBoot(); setTimeout(function(){window.__chartResize&&window.__chartResize();},40); }
     else if(t==='compass'){ window.__compassBoot&&window.__compassBoot(); setTimeout(function(){window.__compassResize&&window.__compassResize();},40); }
     else if(t==='sim'){ window.__simBoot&&window.__simBoot(); window.__simRender&&window.__simRender(); }
@@ -20,15 +22,14 @@
   const xbtns=document.querySelectorAll('.xchgbtn');
   function applyExchange(ex, activate){
     xbtns.forEach(b=>b.classList.toggle('on', b.dataset.xchg===ex));
-    // show only tabs scoped to this exchange (or unscoped tabs, which apply to both)
-    tabs.forEach(b=>{ const scope=b.dataset.xchgScope; if(scope) b.style.display = (scope===ex)?'':'none'; });
+    // Only exchange-EXCLUSIVE tabs toggle (the CBOE Portfolio). Analytical tabs
+    // exist in BOTH exchanges — the toggle swaps their DATA SOURCE, not their
+    // presence (directive: every CME analytic must exist under CBOE).
+    tabs.forEach(b=>{ if(b.dataset.xchgScope==='CBOE') b.style.display=(ex==='CBOE')?'':'none'; });
     if(activate){
-      // if the currently-active tab is now hidden, jump to this exchange's default tab
       const cur=document.querySelector('.tabbtn.on');
-      if(!cur || cur.style.display==='none' || (cur.dataset.xchgScope && cur.dataset.xchgScope!==ex)){
-        const def = ex==='CBOE' ? document.querySelector('[data-tab="cboe"]') : document.querySelector('[data-tab="detector"]');
-        if(def) def.click();
-      }
+      if(ex==='CBOE'){ const def=document.querySelector('[data-tab="cboe"]'); if(def) def.click(); }         // land on the portfolio board
+      else if(cur && cur.dataset.tab==='cboe'){ const def=document.querySelector('[data-tab="detector"]'); if(def) def.click(); }   // leaving CBOE: off the now-hidden board
     }
   }
   xbtns.forEach(b=>b.addEventListener('click',()=>{ const ex=b.dataset.xchg;
