@@ -140,7 +140,15 @@
     var T=curT(cell,date,ddays);
     var key=inst+'|'+date+'|'+anchor+'|'+T;
     if(briefCache[key]!==undefined) return briefCache[key];
-    var raw=null; try{ raw=window.__engBrief(cell.chain, cell.greeks||'', anchor, T); }catch(_){ raw=null; }
+    // ---- pipeline observability: this cache-miss path is where a valid dataset
+    // either produces a brief or silently fails; report the outcome explicitly ----
+    var pipe=window.__qPipe?window.__qPipe.run('brief',{instrument:inst,session:date,exp:cell.fn||null}):null;
+    var raw=null, engErr=null; try{ raw=window.__engBrief(cell.chain, cell.greeks||'', anchor, T); }catch(e){ raw=null; engErr=e; }
+    if(pipe){
+      if(engErr) pipe.stage('Brief Report').fail('engine threw: '+String(engErr&&engErr.message||engErr), {stack:engErr&&engErr.stack});
+      else if(!raw) pipe.stage('Brief Report').fail('engine returned no brief object (null) for a loaded chain');
+      else pipe.stage('Brief Report').ok({anchor:anchor,T:T});
+    }
     if(raw){ if(ddays!=null) raw.dteDays=ddays; raw.tUsed=T; }
     var _d=raw?mapBrief(raw,inst,date,anchor):null; if(_d) _d.__raw=raw;
     briefCache[key]=_d;

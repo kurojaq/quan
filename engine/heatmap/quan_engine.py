@@ -43,15 +43,70 @@ def _clean(series: pd.Series) -> pd.Series:
          .replace({"N/A": np.nan, "": np.nan, "nan": np.nan, "None": np.nan}))
     return pd.to_numeric(s, errors="coerce")
 
+import re as _re
+
+def _classify_header(h):
+    """(field, side) for one header cell. side: 'c' | 'p' | None."""
+    n = _re.sub(r'"', '', str(h)).strip().lower()
+    side = 'c' if _re.search(r'\bcall\b|\(c\)|^c[\s_-]', n) else ('p' if _re.search(r'\bput\b|\(p\)|^p[\s_-]', n) else None)
+    field = None
+    if _re.search(r'strike', n): field = 'strike'
+    elif _re.search(r'open\s*int|(^|[^a-z])oi([^a-z]|$)', n): field = 'oi'
+    elif _re.search(r'volume|(^|[^a-z])vol([^a-z]|$)', n): field = 'vol'
+    elif _re.search(r'premium|(^|[^a-z])prem([^a-z]|$)', n): field = 'prem'
+    elif _re.search(r'latest|(^|[^a-z])last([^a-z]|$)', n): field = 'latest'
+    return field, side
+
+def _resolve_chain_columns(raw: pd.DataFrame) -> dict:
+    """Header-driven column resolver for Barchart chains whose layout differs from
+    the canonical equity-futures export (e.g. ZN / Treasury options, or exports
+    carrying extra Bid/Ask/Change columns). Mirrors js/barchart-parse.js:
+    side-by-side duplicate names -> first (left of Strike) = call, second = put."""
+    cols = list(raw.columns)
+    meta = [(i, *_classify_header(c)) for i, c in enumerate(cols)]  # (idx, field, side)
+    strike_idxs = [i for (i, f, s) in meta if f == 'strike']
+    if not strike_idxs:
+        raise KeyError("no Strike column found in chain CSV")
+    strike_idx = strike_idxs[(len(strike_idxs) - 1) // 2]
+    def pick(field):
+        lst = [(i, s) for (i, f, s) in meta if f == field]
+        c = next((i for (i, s) in lst if s == 'c'), None)
+        p = next((i for (i, s) in lst if s == 'p'), None)
+        if c is None:
+            left = [i for (i, s) in lst if i < strike_idx and s is None]
+            c = left[0] if left else None
+        if p is None:
+            right = [i for (i, s) in lst if i > strike_idx and s is None]
+            p = right[-1] if right else None
+        if c is None or p is None:
+            un = [i for (i, s) in lst if s is None]
+            if c is None and un: c = un[0]
+            if p is None and len(un) > 1: p = un[1]
+        return c, p
+    coi, poi = pick('oi'); cvol, pvol = pick('vol'); cprem, pprem = pick('prem'); clat, plat = pick('latest')
+    def ser(i):
+        return raw.iloc[:, i] if i is not None else pd.Series([np.nan] * len(raw))
+    return {
+        "strike": raw.iloc[:, strike_idx],
+        "callPrem": ser(cprem), "putPrem": ser(pprem),
+        "callOI": ser(coi),     "putOI": ser(poi),
+        "callVol": ser(cvol),   "putVol": ser(pvol),
+        "callLatest": ser(clat), "putLatest": ser(plat),
+    }
+
 def ingest_chain(csv_path: str) -> pd.DataFrame:
     raw = pd.read_csv(csv_path)
-    out = pd.DataFrame({
-        "strike": _clean(raw["Strike"]),
-        "callPrem": _clean(raw["Premium"]),   "putPrem": _clean(raw["Premium.1"]),
-        "callOI": _clean(raw["Open Int"]),     "putOI": _clean(raw["Open Int.1"]),
-        "callVol": _clean(raw["Volume"]),      "putVol": _clean(raw["Volume.1"]),
-        "callLatest": _clean(raw["Latest"]),   "putLatest": _clean(raw["Latest.1"]),
-    })
+    # Exact canonical names first (zero-drift for standard equity-futures exports);
+    # fall back to the fuzzy header resolver only when a required column is absent.
+    _CANON = [("strike", "Strike"), ("callPrem", "Premium"), ("putPrem", "Premium.1"),
+              ("callOI", "Open Int"), ("putOI", "Open Int.1"), ("callVol", "Volume"),
+              ("putVol", "Volume.1"), ("callLatest", "Latest"), ("putLatest", "Latest.1")]
+    _REQ = {"strike", "callPrem", "putPrem", "callOI", "putOI", "callVol", "putVol"}
+    if all(name in raw.columns for key, name in _CANON if key in _REQ):
+        cols = {key: (raw[name] if name in raw.columns else pd.Series([np.nan] * len(raw))) for key, name in _CANON}
+    else:
+        cols = _resolve_chain_columns(raw)
+    out = pd.DataFrame({key: _clean(val) for key, val in cols.items()})
     return out.dropna(subset=["strike"]).sort_values("strike").reset_index(drop=True)
 
 

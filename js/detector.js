@@ -5,8 +5,11 @@
   function num(s){ if(s==null) return null; s=String(s).trim().replace(/^"|"$/g,'').replace(/,/g,'');
     if(s===''||s==='N/A'||s==='n/a'||s==='--') return null; var v=parseFloat(s); return isFinite(v)?v:null; }
 
-  // Barchart side-by-side: Type,Last,Volume,"Open Int","Daily Premium",Strike,Type,Last,Volume,"Open Int","Daily Premium"
-  function parseChain(text){
+  // Barchart side-by-side chain. Delegates to the shared header-driven ingestion
+  // layer (js/barchart-parse.js) when present; otherwise uses the legacy fixed
+  // positional layout: Type,Last,Volume,"Open Int","Daily Premium",Strike,Type,Last,Volume,"Open Int","Daily Premium"
+  function parseChain(text, ctx){
+    if(typeof QuanBarchart!=='undefined' && QuanBarchart.parseChain) return QuanBarchart.parseChain(text, ctx);
     var lines=text.replace(/\r/g,'').split('\n').filter(function(l){return l.trim()!=='';});
     function splitCSV(line){ var out=[],cur='',q=false;
       for(var i=0;i<line.length;i++){var ch=line[i];
@@ -185,13 +188,26 @@ const BAKED_PRICE={};  /* demo price dataset removed — back dates now show onl
     }catch(_hol){}
   })();
 
-  function parseCSV(text){ text=(typeof __qnorm==='function')?__qnorm(text):text; const lines=text.trim().split('\n'); const head=lines[0].replace(/^\ufeff/,'').split(',').map(h=>h.trim());
+  function parseCSV(text, ctx){ text=(typeof __qnorm==='function')?__qnorm(text):text; const lines=text.trim().split('\n'); const head=lines[0].replace(/^\ufeff/,'').split(',').map(h=>h.trim());
     const ix=head.indexOf(COL_X),im=head.indexOf(COL_M),is=head.indexOf(COL_S); const out=[];
     if(ix<0 && typeof QuanTension!=='undefined' && /strike/i.test(head.join(',')) && /^"?type"?$/i.test(head[0]||'')){
       // raw Barchart options chain -> compute Chronometer Watch + dual-phase tension from the reference closure
-      try{ const _er=(window.__engTensionRows?window.__engTensionRows(text):null); if(_er&&_er.length){ for(const _row of _er) out.push(_row); return out; } const t=QuanTension.computeTension(QuanTension.parseChain(text));
-           for(let w=0;w<t.CI.length;w++) out.push([t.CI[w],t.CL[w],t.CM[w]]); return out; }
-      catch(e){ console.warn('Qu\'an tension compute failed:',e); return []; }
+      var pipe=window.__qPipe?window.__qPipe.run('detector',ctx):null;
+      try{
+        var chainRows=QuanTension.parseChain(text, ctx);
+        if(pipe) (pipe.stage('CSV Parsing'))[(chainRows&&chainRows.length)?'ok':'fail']((chainRows&&chainRows.length)?{strikes:chainRows.length}:'0 strikes parsed from raw Barchart chain', {strikes:(chainRows||[]).length});
+        if(window.__qPipe) window.__qPipe.validateChain(chainRows, ['k','coi','poi','cprem','pprem'], ctx);
+        const _er=(window.__engTensionRows?window.__engTensionRows(text):null);
+        if(_er&&_er.length){ for(const _row of _er) out.push(_row); if(pipe) pipe.stage('Breach Tension (engine)').ok({rows:_er.length}); return out; }
+        const t=QuanTension.computeTension(chainRows);
+        for(let w=0;w<t.CI.length;w++) out.push([t.CI[w],t.CL[w],t.CM[w]]);
+        if(pipe){ var _nz=out.filter(function(r){return (r[1]||r[2]);}).length;
+          if(!out.length) pipe.stage('Breach Tension (closure)').fail('tension closure produced 0 rows');
+          else if(!_nz) pipe.stage('Breach Tension (closure)').warn('closure returned all-zero CL/CM \u2014 the fixed 21-row watch grid may not fit this chain shape (check strike count / ATM window)', {rows:out.length});
+          else pipe.stage('Breach Tension (closure)').ok({rows:out.length}); }
+        return out;
+      }
+      catch(e){ if(pipe) pipe.stage('Breach Tension').fail('tension compute threw: '+String(e&&e.message||e), {stack:e&&e.stack}); else console.warn('Qu\'an tension compute failed:',e); return []; }
     }
     for(let i=1;i<lines.length;i++){ const v=lines[i].split(','); const cw=parseFloat(v[ix]),m=parseFloat(v[im]),s=parseFloat(v[is]);
       if(!isNaN(cw)&&!isNaN(m)&&!isNaN(s)) out.push([cw,m,s]); } return out; }
@@ -200,7 +216,8 @@ const BAKED_PRICE={};  /* demo price dataset removed — back dates now show onl
       if((d1<=0&&d2>0)||(d1>0&&d2<=0)){ const t=-d1/(d2-d1); out.push({cw:c1+t*(c2-c1),val:m1+t*(m2-m1)}); } }
     return out.sort((a,b)=>a.cw-b.cw); }
   function onCSV(file, inst, fnEl){ const r=new FileReader();
-    r.onload=ev=>{ const rows=parseCSV(ev.target.result); if(!rows.length) return;
+    r.onload=ev=>{ const _d=(dayDate&&dayDate.value)||date; const rows=parseCSV(ev.target.result,{inst:inst,date:_d});
+      if(!rows.length){ if(window.__qPipe) window.__qPipe.log('Detector Ingest','fail','parser returned 0 usable rows from '+file.name,{inst:inst,date:_d}); return; }
       const rc=window.__qRec?window.__qRec(inst):null;
       if(rc){ date=(dayDate&&dayDate.value)||date; rc.det=rc.det||{}; rc.det[date]={rows}; if(window.__qPersist)window.__qPersist(inst); }
       if(window.__detHydrate){ window.__detHydrate(); } else { entry(inst,true).rows=rows; show(); } };
