@@ -138,6 +138,11 @@
     });
     var obsList=Object.keys(byExp).map(function(k){ return byExp[k]; });
 
+    // Measure time-to-expiry from the common asOf (NOT each observation's own
+    // session date) so the whole term structure shares one coherent axis —
+    // otherwise expirations observed on different days can't be ordered together.
+    obsList.forEach(function(o){ if(o.expiryDate){ var tt=daysBetween(asOf,o.expiryDate); if(tt!=null) o.ttxDays=tt; } });
+
     // Parse chains, tag each observation with its own totals (needed by OI weighting).
     obsList.forEach(function(o){
       o._rows=parseChain(o.chainText);
@@ -145,6 +150,14 @@
       o._totalOI=t;
     });
     obsList.forEach(function(o){ o._weight=weightOf(o, weighting); });
+
+    // Current anchor (spot reference) for the asOf session — for the viz's price delineation.
+    var anchor=null;
+    try{ var _c=(opts.store||root.__qStore||{})[inst]; _c=_c&&_c.sess&&_c.sess[asOf];
+         if(_c&&_c.anchor!=null&&_c.anchor!=='') anchor=+_c.anchor; }catch(_a){}
+    if(anchor==null){ var _cand=obsList.filter(function(o){return o.anchor!=null;})
+        .sort(function(a,b){ return a.sessionDate<b.sessionDate?-1:1; });
+      if(_cand.length) anchor=_cand[_cand.length-1].anchor; }
 
     // Per-strike term structure: accumulate weighted + raw dealer interest across expirations.
     var strikeMap={};
@@ -172,12 +185,12 @@
 
     var expirations=obsList.map(function(o){
       return { key:(o.expiryDate||(o.bucket+':'+o.sessionDate)), sessionDate:o.sessionDate,
-               bucket:o.bucket, expiryDate:o.expiryDate, ttxDays:o.ttxDays,
+               bucket:o.bucket, expiryDate:o.expiryDate, ttxDays:o.ttxDays, anchor:o.anchor,
                weight:o._weight, totalOI:o._totalOI,
                oiShare: totalOI>0?(o._totalOI/totalOI):0 };
     }).sort(function(a,b){ return (a.ttxDays==null?1e9:a.ttxDays)-(b.ttxDays==null?1e9:b.ttxDays); });
 
-    return { inst:inst, asOf:asOf, weighting:weighting,
+    return { inst:inst, asOf:asOf, weighting:weighting, anchor:anchor,
              expirations:expirations, strikes:strikes,
              totalOI:totalOI, totalWeightedOI:totalW,
              expirationCount:obsList.length, strikeCount:strikes.length };

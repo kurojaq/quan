@@ -99,6 +99,32 @@
     return {w:w,h:h};
   }
 
+  // Map an underlying price to a y-coordinate on the (index-spaced, descending) strike ladder,
+  // interpolating between adjacent strikes so anchor/OHLC land precisely between rows.
+  function priceToY(p, strikes, plot){
+    var n=strikes.length; if(!n||p==null||!isFinite(p)) return null;
+    var rowH=plot.h/n;
+    if(p>=strikes[0].strike) return plot.y+0.5*rowH;
+    if(p<=strikes[n-1].strike) return plot.y+(n-0.5)*rowH;
+    for(var i=1;i<n;i++){ if(strikes[i].strike<=p){
+      var hi=strikes[i-1].strike, lo=strikes[i].strike, frac=(hi-lo)>0?(hi-p)/(hi-lo):0;
+      var yHi=plot.y+(i-1+0.5)*rowH, yLo=plot.y+(i+0.5)*rowH;
+      return yHi+frac*(yLo-yHi);
+    }}
+    return plot.y+(n-0.5)*rowH;
+  }
+  // ET calendar date of a bar; matches the chart-tab session date used as an expiration's observation day.
+  function barDate(t){ try{ return new Date(t*1000).toLocaleDateString('en-CA',{timeZone:'America/New_York'}); }catch(_){ return null; } }
+  // Per-day OHLC of the underlying, folded from window.__chartBars (works for daily or intraday bars).
+  function dayOHLC(){
+    var bars=window.__chartBars; if(!bars||!bars.length) return null;
+    var map={};
+    for(var i=0;i<bars.length;i++){ var b=bars[i], d=barDate(b.time); if(!d) continue;
+      var m=map[d]; if(!m) map[d]={o:b.open,h:b.high,l:b.low,c:b.close};
+      else { if(b.high>m.h)m.h=b.high; if(b.low<m.l)m.l=b.low; m.c=b.close; } }
+    return map;
+  }
+
   function draw(){
     if(!built||!ctx) return;
     var dim=sizeCanvas(); ctx.clearRect(0,0,dim.w,dim.h);
@@ -115,6 +141,39 @@
 
     // frame
     ctx.strokeStyle=LINE; ctx.lineWidth=1; ctx.strokeRect(plot.x+0.5, plot.y+0.5, plot.w, plot.h);
+
+    // per-expiration OHLC of the underlying (whisker = high-low, ticks = open left / close right),
+    // positioned on the strike ladder so dealer interest reads against where price actually traded.
+    var ohlc=dayOHLC();
+    if(ohlc){
+      var colW=plot.w/exps.length, tick=Math.min(colW*0.3,7);
+      for(var jo=0;jo<exps.length;jo++){
+        var d=exps[jo].sessionDate, b=d&&ohlc[d]; if(!b) continue;
+        var cx=plot.x+(jo+0.5)*colW;
+        var yH=priceToY(b.h,strikes,plot), yL=priceToY(b.l,strikes,plot), yO=priceToY(b.o,strikes,plot), yC=priceToY(b.c,strikes,plot);
+        if(yH==null||yL==null) continue;
+        var col=(b.c>=b.o)?'rgba(120,220,170,0.85)':'rgba(240,120,120,0.85)';
+        ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(cx,yH); ctx.lineTo(cx,yL); ctx.stroke();
+        if(yO!=null){ ctx.beginPath(); ctx.moveTo(cx-tick,yO); ctx.lineTo(cx,yO); ctx.stroke(); }
+        if(yC!=null){ ctx.beginPath(); ctx.moveTo(cx,yC); ctx.lineTo(cx+tick,yC); ctx.stroke(); }
+        ctx.restore();
+      }
+    }
+
+    // current anchor (spot) price delineation across the whole field
+    var anchor=last.agg&&last.agg.anchor;
+    if(anchor!=null&&isFinite(anchor)){
+      var ay=priceToY(anchor,strikes,plot);
+      if(ay!=null){
+        ctx.save(); ctx.strokeStyle='rgba(240,200,90,0.9)'; ctx.lineWidth=1; ctx.setLineDash([5,4]);
+        ctx.beginPath(); ctx.moveTo(plot.x,ay); ctx.lineTo(plot.x+plot.w,ay); ctx.stroke();
+        ctx.setLineDash([]); ctx.fillStyle='rgba(240,200,90,0.95)';
+        ctx.font='9px "SF Mono",Menlo,monospace'; ctx.textAlign='left'; ctx.textBaseline='bottom';
+        ctx.fillText('anchor '+Math.round(anchor), plot.x+3, ay-1);
+        ctx.restore();
+      }
+    }
 
     // strike (y) labels — thin out to ~12 ticks
     ctx.fillStyle=LABEL; ctx.font='10px "SF Mono",Menlo,monospace'; ctx.textAlign='right'; ctx.textBaseline='middle';
