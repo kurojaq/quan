@@ -177,6 +177,12 @@ export function siteOrigin(env, request) {
    precise upgrade (Phase 4). If KV isn't bound the limiter fails open.
    ========================================================================== */
 
+// Tier granted to a signed-in account with no active paid subscription: every
+// registered login gets a standing full-terminal trial (Operator = all
+// analytical views; Prime/Desk-only features still require a paid upgrade).
+// Set to 'scout' to restore the old Detector+Chart-only free tier.
+export const TRIAL_PLAN = 'operator';
+
 // requests/minute per tier. trialing == a paid-plan trial (full access).
 export const RATE_LIMITS = { desk: 300, prime: 240, operator: 120, trialing: 240, scout: 20, client: 40 };
 // edge-cache TTL (seconds) for /quote per tier — paid tiers get fresher data.
@@ -188,7 +194,9 @@ const ACTIVE_STATUS = new Set(['active', 'trialing']);
 // look up a user's plan ('operator' | 'prime' | 'desk' | 'scout'), cached ~60s in KV.
 export async function planForUser(env, userId) {
   try { const c = env.QUAN_PUBLISH && await env.QUAN_PUBLISH.get(`plan:${userId}`); if (c) return c; } catch (_) {}
-  let plan = 'scout';
+  // No active paid sub → standing trial tier (mirrors /api/subscription), so a
+  // signed-in trial user isn't throttled down to Scout's data-plane limits.
+  let plan = TRIAL_PLAN;
   try {
     const rows = await supaAdmin(env, `subscriptions?user_id=eq.${userId}&select=plan,status&limit=1`);
     const s = Array.isArray(rows) && rows[0];

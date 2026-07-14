@@ -5,7 +5,7 @@
    unlock:  { authenticated, active, plan, status, current_period_end, cancel_at_period_end }
    "active" is true for trialing or active subscriptions.
 */
-import { json, unauthorized, serverError, getUserFromRequest, supaAdmin } from './_shared.js';
+import { json, unauthorized, serverError, getUserFromRequest, supaAdmin, TRIAL_PLAN } from './_shared.js';
 
 const ACTIVE = new Set(['trialing', 'active']);
 
@@ -29,13 +29,25 @@ export async function onRequestGet({ request, env }) {
       `&select=plan,status,current_period_end,cancel_at_period_end&limit=1`);
     const sub = Array.isArray(rows) && rows[0] ? rows[0] : null;
 
+    // Never-subscribed account → standing full-terminal trial so every
+    // registered login can evaluate the whole analytical terminal (Operator
+    // tier). Paid checkout upgrades past this to unlock Prime (Execution) /
+    // Desk (team + export); an existing sub row keeps its real status so the
+    // billing-fix prompt still shows when a plan lapses.
+    if (!sub) {
+      return json({
+        authenticated: true, active: true, plan: TRIAL_PLAN, status: 'trialing',
+        current_period_end: null, cancel_at_period_end: false, trial: true
+      });
+    }
+
     return json({
       authenticated: true,
-      active: !!(sub && ACTIVE.has(sub.status)),
-      plan: sub ? sub.plan : null,
-      status: sub ? sub.status : 'none',
-      current_period_end: sub ? sub.current_period_end : null,
-      cancel_at_period_end: sub ? !!sub.cancel_at_period_end : false
+      active: !!ACTIVE.has(sub.status),
+      plan: sub.plan,
+      status: sub.status,
+      current_period_end: sub.current_period_end,
+      cancel_at_period_end: !!sub.cancel_at_period_end
     });
   } catch (err) {
     return serverError(err.message);

@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Qu'an · Admin — user access</title>
+<style>
+  :root{
+    --bg:#07090d; --panel:#0b0f14; --panel2:#10151c; --line:rgba(232,227,214,.12);
+    --ink:#e8e3d6; --dim:#a6a299; --accent:#7fd1e0; --good:#7ec8a0; --warn:#e8b53a; --bad:#e85c5c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;}
+  a{color:var(--accent)}
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:16px 22px;border-bottom:1px solid var(--line);background:var(--panel);}
+  header h1{margin:0;font-size:15px;font-weight:650;letter-spacing:.02em}
+  header .sub{color:var(--dim);font-size:12px}
+  header .spacer{flex:1}
+  .who{color:var(--dim);font-size:12px}
+  .btn{font:inherit;font-weight:600;font-size:12.5px;padding:7px 14px;border-radius:8px;
+    border:1px solid var(--line);background:var(--panel2);color:var(--ink);cursor:pointer}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);color:#04222a;border-color:var(--accent)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  main{padding:22px;max-width:1100px;margin:0 auto}
+
+  /* sign-in */
+  #signin{max-width:360px;margin:12vh auto;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:26px}
+  #signin h2{margin:0 0 4px;font-size:16px}
+  #signin p{margin:0 0 18px;color:var(--dim);font-size:12.5px}
+  #signin input{width:100%;margin-bottom:10px;padding:11px 12px;border-radius:9px;
+    border:1px solid var(--line);background:var(--panel2);color:var(--ink);font:inherit}
+  #signin .btn{width:100%;justify-content:center}
+  .hint{min-height:18px;font-size:12px;color:var(--dim);margin-top:6px}
+
+  /* toolbar */
+  .toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .toolbar input[type=search]{flex:1;min-width:200px;padding:9px 12px;border-radius:9px;
+    border:1px solid var(--line);background:var(--panel2);color:var(--ink);font:inherit}
+  .count{color:var(--dim);font-size:12px}
+
+  /* table */
+  .tablewrap{border:1px solid var(--line);border-radius:12px;overflow:auto;background:var(--panel)}
+  table{width:100%;border-collapse:collapse;min-width:760px}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);font-weight:600;
+    position:sticky;top:0;background:var(--panel2);z-index:1}
+  tr:last-child td{border-bottom:none}
+  td.email{font-weight:550}
+  td .meta{color:var(--dim);font-size:11.5px}
+  .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:650;
+    border:1px solid var(--line)}
+  .badge.trial{color:var(--accent);border-color:rgba(127,209,224,.4)}
+  .badge.operator{color:#cda8ff;border-color:rgba(205,168,255,.4)}
+  .badge.prime{color:var(--good);border-color:rgba(126,200,160,.4)}
+  .badge.desk{color:var(--warn);border-color:rgba(232,181,58,.4)}
+  .src{font-size:11px;color:var(--dim)}
+  .src.stripe{color:var(--good)}
+  .src.manual{color:var(--accent)}
+  select{padding:7px 9px;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--ink);font:inherit;font-size:12.5px}
+  .rowact{display:flex;gap:8px;align-items:center}
+  .stripe-note{color:var(--dim);font-size:11.5px;font-style:italic}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
+    background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+    padding:10px 16px;font-size:13px;box-shadow:0 8px 30px rgba(0,0,0,.5);
+    opacity:0;pointer-events:none;transition:opacity .2s}
+  .toast.show{opacity:1}
+  .toast.good{border-color:rgba(126,200,160,.5)}
+  .toast.bad{border-color:rgba(232,92,92,.5)}
+  .empty{padding:40px;text-align:center;color:var(--dim)}
+  .legend{margin-top:14px;color:var(--dim);font-size:12px;line-height:1.7}
+  .legend code{background:var(--panel2);padding:1px 6px;border-radius:5px;color:var(--ink)}
+</style>
+</head>
+<body>
+
+<div id="signin" style="display:none">
+  <h2>Admin sign-in</h2>
+  <p>Sign in with the operator account to manage user access.</p>
+  <input id="email" type="email" placeholder="email" autocomplete="username">
+  <input id="pw" type="password" placeholder="password" autocomplete="current-password">
+  <button class="btn primary" id="doSignin">Sign in</button>
+  <div class="hint" id="signinHint"></div>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <h1>Qu'an Admin</h1>
+    <span class="sub">user access control</span>
+    <span class="spacer"></span>
+    <span class="who" id="who"></span>
+    <button class="btn" id="refresh">Refresh</button>
+    <button class="btn" id="signout">Sign out</button>
+  </header>
+  <main>
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Filter by email…">
+      <span class="count" id="count"></span>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>User</th><th>Joined</th><th>Current access</th><th>Source</th><th>Set tier</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty" id="empty" style="display:none">No users yet.</div>
+    </div>
+    <div class="legend">
+      <b>Trial</b> = no grant; the user gets the standing full-terminal trial (<span id="trialPlan">operator</span> tier).
+      <b>Operator / Prime / Desk</b> = a manual comp grant you control here.
+      <code>stripe</code> rows are live paid subscriptions — manage those in Stripe (editing is disabled here to avoid clobbering billing).
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/auth-config.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var CFG = window.__SUPA || {};
+  var client = null, token = null, users = [], filter = '';
+
+  function toast(msg, kind) {
+    var t = $('toast'); t.textContent = msg;
+    t.className = 'toast show ' + (kind || '');
+    clearTimeout(toast._t); toast._t = setTimeout(function () { t.className = 'toast'; }, 2600);
+  }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function fmtDate(s) { if (!s) return '—'; var d = new Date(s); return isNaN(d) ? '—'
+    : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
+
+  // ---- auth ----
+  function loadSupabase() {
+    return new Promise(function (resolve, reject) {
+      if (window.supabase && window.supabase.createClient) return resolve(window.supabase);
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+      s.onload = function () { resolve(window.supabase); };
+      s.onerror = function () { reject(new Error('could not load auth library')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function showSignin(msg) {
+    $('app').style.display = 'none';
+    $('signin').style.display = '';
+    if (msg) $('signinHint').textContent = msg;
+  }
+  function showApp() { $('signin').style.display = 'none'; $('app').style.display = ''; }
+
+  function signIn() {
+    var email = $('email').value.trim(), pw = $('pw').value;
+    if (!email || !pw) { $('signinHint').textContent = 'email and password required'; return; }
+    $('signinHint').textContent = 'signing in…';
+    client.auth.signInWithPassword({ email: email, password: pw }).then(function (res) {
+      if (res.error) { $('signinHint').textContent = res.error.message || 'sign-in failed'; return; }
+      token = res.data.session && res.data.session.access_token;
+      boot();
+    }).catch(function (e) { $('signinHint').textContent = String(e && e.message || e); });
+  }
+
+  // ---- data ----
+  function api(path, opts) {
+    opts = opts || {};
+    opts.headers = Object.assign({ Authorization: 'Bearer ' + token }, opts.headers || {});
+    return fetch(path, opts).then(function (r) {
+      return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; })
+                     .catch(function () { return { ok: r.ok, status: r.status, d: {} }; });
+    });
+  }
+
+  function load() {
+    $('rows').innerHTML = '<tr><td colspan="5" class="meta" style="padding:20px">Loading…</td></tr>';
+    api('/api/admin/users').then(function (res) {
+      if (res.status === 401) return showSignin('Session expired — sign in again.');
+      if (res.status === 403) return showSignin('That account is not the operator. Sign in with the admin account.');
+      if (!res.ok) { toast((res.d && res.d.error) || 'Failed to load users', 'bad'); return; }
+      users = (res.d && res.d.users) || [];
+      $('who').textContent = res.d.operator || '';
+      $('trialPlan').textContent = res.d.trial_plan || 'operator';
+      render();
+    });
+  }
+
+  function render() {
+    var list = users.filter(function (u) {
+      return !filter || (u.email || '').toLowerCase().indexOf(filter) !== -1;
+    });
+    $('count').textContent = list.length + ' of ' + users.length + ' user' + (users.length === 1 ? '' : 's');
+    $('empty').style.display = list.length ? 'none' : '';
+    $('rows').innerHTML = list.map(rowHtml).join('');
+    // wire per-row controls
+    list.forEach(function (u) {
+      var sel = $('sel_' + u.id), save = $('save_' + u.id);
+      if (!sel || !save) return;
+      var initial = sel.value;
+      sel.addEventListener('change', function () { save.disabled = (sel.value === initial); });
+      save.addEventListener('click', function () { grant(u.id, sel.value, save); });
+    });
+  }
+
+  function rowHtml(u) {
+    var eff = u.effective_plan || 'operator';
+    var badgeClass = u.active ? eff : 'trial';
+    var badgeText = u.active ? cap(eff) : 'Trial';
+    var current = u.source === 'manual' ? eff : (u.active ? u.plan : 'trial');
+    var isStripe = u.source === 'stripe';
+
+    var setCell;
+    if (isStripe) {
+      setCell = '<span class="stripe-note">Stripe · ' + esc(u.status) + '</span>';
+    } else {
+      var opts = [['trial', 'Trial (no grant)'], ['operator', 'Operator'], ['prime', 'Prime'], ['desk', 'Desk']]
+        .map(function (o) {
+          return '<option value="' + o[0] + '"' + (o[0] === current ? ' selected' : '') + '>' + o[1] + '</option>';
+        }).join('');
+      setCell = '<div class="rowact">' +
+        '<select id="sel_' + u.id + '">' + opts + '</select>' +
+        '<button class="btn" id="save_' + u.id + '" disabled>Save</button>' +
+        '</div>';
+    }
+
+    return '<tr>' +
+      '<td class="email">' + esc(u.email || '—') +
+        '<div class="meta">' + esc(u.id.slice(0, 8)) + '…</div></td>' +
+      '<td>' + fmtDate(u.created_at) + '</td>' +
+      '<td><span class="badge ' + badgeClass + '">' + esc(badgeText) + '</span></td>' +
+      '<td><span class="src ' + esc(u.source) + '">' + esc(u.source) + '</span></td>' +
+      '<td>' + setCell + '</td>' +
+    '</tr>';
+  }
+  function cap(s) { return String(s).charAt(0).toUpperCase() + String(s).slice(1); }
+
+  function grant(userId, value, btn) {
+    btn.disabled = true; btn.textContent = '…';
+    var plan = (value === 'trial') ? 'revoke' : value;
+    api('/api/admin/grant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, plan: plan, status: 'active' })
+    }).then(function (res) {
+      btn.textContent = 'Save';
+      if (!res.ok) { toast((res.d && res.d.error) || 'Update failed', 'bad'); btn.disabled = false; return; }
+      toast(plan === 'revoke' ? 'Reverted to trial' : ('Granted ' + cap(plan)), 'good');
+      load();   // refresh so the badge + source reflect the new state
+    });
+  }
+
+  // ---- boot ----
+  function boot() {
+    if (!token) return showSignin();
+    showApp();
+    load();
+  }
+
+  $('doSignin').addEventListener('click', signIn);
+  $('pw').addEventListener('keydown', function (e) { if (e.key === 'Enter') signIn(); });
+  $('refresh').addEventListener('click', load);
+  $('signout').addEventListener('click', function () {
+    if (client) client.auth.signOut().finally(function () { token = null; showSignin('Signed out.'); });
+  });
+  $('search').addEventListener('input', function (e) { filter = e.target.value.trim().toLowerCase(); render(); });
+
+  if (!CFG.url || !CFG.anonKey) {
+    showSignin('Auth is not configured (js/auth-config.js is empty).');
+    return;
+  }
+  loadSupabase().then(function (supa) {
+    client = supa.createClient(CFG.url, CFG.anonKey, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+    });
+    // reuse an existing signed-in session (e.g. you're already logged into /app)
+    client.auth.getSession().then(function (res) {
+      var sess = res && res.data && res.data.session;
+      if (sess && sess.access_token) { token = sess.access_token; boot(); }
+      else showSignin();
+    });
+  }).catch(function (e) { showSignin(String(e && e.message || e)); });
+})();
+</script>
+</body>
+</html>
