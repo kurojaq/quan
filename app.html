@@ -66,6 +66,7 @@
     <button class="tabbtn" data-tab="heat">Heat Map</button>
     <button class="tabbtn" data-tab="chart">Chart</button>
     <button class="tabbtn" data-tab="compass">Compass</button>
+    <button class="tabbtn" data-tab="rolling">Rolling</button>
     <button class="tabbtn" data-tab="sim">Account Sim</button>
     <button class="tabbtn" data-tab="exec">Execution</button>
     <button class="tabbtn splitplus" data-tab="split" id="splitTab" title="Split view — show two tabs at once">+</button>
@@ -434,6 +435,7 @@
    </div>
   </div>
   </section>
+  <section class="tabsec" id="tabRolling"><div id="rollingMount" style="flex:1 1 auto;min-height:0;display:flex;width:100%;background:var(--bg);border-radius:var(--radius-lg);overflow:hidden;"></div></section>
   <section class="tabsec" id="tabSim">
   <header>
     <div class="brand">
@@ -597,6 +599,8 @@
 <script src="js/lock-screen.js" defer></script>
 <script src="js/warehouse.js" defer></script>
 <script src="js/rolling-engine.js" defer></script>
+<script src="js/scalar-field.js" defer></script>
+<script src="js/rolling-viz.js" defer></script>
 <script src="js/instrument-adapter.js" defer></script>
 <script src="js/strike-compass.js" defer></script>
 
