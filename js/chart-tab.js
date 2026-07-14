@@ -66,7 +66,7 @@
     this._xC =(s._tC !=null)?ts.timeToCoordinate(s._tC ):null;
     this._xHi=(s._tHi!=null)?ts.timeToCoordinate(s._tHi):null; };
   VertBandPaneView.prototype.renderer=function(){ return new VertBandPaneRenderer(this._xLo,this._xC,this._xHi,this._source._rgb,this._source._peak); };
-  VertBandPaneView.prototype.zOrder=function(){ return 'bottom'; };   // sit behind the candles
+  VertBandPaneView.prototype.zOrder=function(){ return 'normal'; };   // translucent highlight over the candles (matches VertLine, which renders; 'bottom' is hidden by the pane background in this build)
   function VertBand(chart,tLo,tC,tHi,rgb,peak){ this._chart=chart; this._tLo=tLo; this._tC=tC; this._tHi=tHi; this._rgb=rgb; this._peak=peak||0.28; this._paneViews=[new VertBandPaneView(this)]; }
   VertBand.prototype.updateAllViews=function(){ this._paneViews.forEach(function(v){ v.update(); }); };
   VertBand.prototype.paneViews=function(){ return this._paneViews; };
@@ -205,6 +205,8 @@
     ev.forEach(function(e){
       var conv=0; ev.forEach(function(o){ if(o!==e && o.type!==e.type && Math.abs(o.cw-e.cw)<=CHRONO_CONV_WIN) conv++; });
       e.conv=conv; e.mag=Math.max(1,Math.min(2.2,1+0.45*conv));
+      // per-event standard deviation: base sigma, widened by convergence so intersection events span a broader temporal zone
+      e.sigma=Math.min(0.06,CHRONO_SIGMA*(1+0.25*conv));
     });
     return ev;
   }
@@ -212,8 +214,8 @@
     clearChronoBands();
     if(!series||!chart||!chronoOn||curInterval==='1d'||!date) return;   // bands are a session-time overlay: intraday only
     chronoEvents=collectChronoEvents(raw,date);
-    var reach=2.5*CHRONO_SIGMA;                                          // draw the Gaussian out to ±2.5σ
     chronoEvents.forEach(function(e){
+      var reach=2.5*(e.sigma||CHRONO_SIGMA);                             // draw each Gaussian out to ±2.5σ (per-event σ)
       var tC=cwToUnix(e.cw,date); if(tC==null) return;
       var tLo=cwToUnix(e.cw-reach,date), tHi=cwToUnix(e.cw+reach,date);
       var rgb=CHRONO_COL[e.type]||CHRONO_COL.def;
@@ -245,8 +247,9 @@
   function onChronoCrosshair(param){
     var tip=ensureChronoTip(); if(!tip) return;
     if(!chronoOn||!param||param.time==null||!param.point||!chronoEvents.length){ tip.style.display='none'; return; }
-    var reachSec=2.5*CHRONO_SIGMA*82800, best=null, bestD=Infinity;
+    var best=null, bestD=Infinity;
     chronoBands.forEach(function(b){ if(b._tC==null) return; var d=Math.abs(param.time-b._tC); if(d<bestD){ bestD=d; best=b; } });
+    var reachSec=2.5*((best&&best._ev&&best._ev.sigma)||CHRONO_SIGMA)*82800;
     if(!best||bestD>reachSec){ tip.style.display='none'; return; }
     var e=best._ev, rgb=CHRONO_COL[e.type]||CHRONO_COL.def;
     var clock=window.__cwClock?window.__cwClock(e.cw):null;
@@ -254,7 +257,7 @@
     tip.innerHTML='<div style="color:rgb('+rgb+');letter-spacing:.04em;margin-bottom:2px;">'+e.label+'</div>'+
       '<div style="opacity:.85;">session&nbsp;t&nbsp;<b>'+(+e.cw).toFixed(3)+'</b>'+(clock?('&nbsp;·&nbsp;'+clock):'')+'</div>'+
       convLine+
-      '<div style="opacity:.6;">σ&nbsp;'+CHRONO_SIGMA.toFixed(3)+'&nbsp;·&nbsp;mag&nbsp;'+(+e.mag).toFixed(2)+'</div>';
+      '<div style="opacity:.6;">σ&nbsp;'+(e.sigma||CHRONO_SIGMA).toFixed(3)+'&nbsp;·&nbsp;mag&nbsp;'+(+e.mag).toFixed(2)+'</div>';
     tip.style.display='block';
     var wrap=document.getElementById('chartWrap'), ww=(wrap&&wrap.clientWidth)||600, wh=(wrap&&wrap.clientHeight)||400;
     var x=Math.min(param.point.x+14, ww-tip.offsetWidth-8), y=Math.min(param.point.y+12, wh-tip.offsetHeight-8);
