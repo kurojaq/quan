@@ -145,8 +145,13 @@
     if(series) series.applyOptions({});
   }
 
+  var _chronoEngHooked=false;
   function refreshLevels(){
     if(!series) return;
+    // the Pyodide brief engine loads async; if it isn't ready yet, __reportData returns no __raw
+    // (so no chrono events to draw) — kick it off and self-heal once it resolves (matches report.js).
+    if(!window.__engBrief){ try{ if(window.__qEnsureEngine) window.__qEnsureEngine(); }catch(_){}
+      if(!_chronoEngHooked && window.__engReady){ _chronoEngHooked=true; window.__engReady.then(function(){ try{ refreshLevels(); }catch(_){} }); } }
     var inst=(document.getElementById('instA')||{}).value||'', date=(document.getElementById('dayDate')||{}).value||'';
     var data=null; try{ data=window.__reportData?window.__reportData(inst,date):null; }catch(_){}
     drawLevels(data&&data.__raw);
