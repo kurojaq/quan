@@ -164,6 +164,8 @@ try:
             _zcf=[float(_z) for _z in (_W.get('crossings_cw') or [])]
             _zct=_times(_zcf); _o['zc_t']=(' \u00b7 '.join(_zct[:6])) if _zct else None
             _o['zc_n']=int(_W.get('totalZC') or len(_zcf))
+            # structured (cw, clock time) per coherence-break, for chart-tab chronometric event bands
+            _o['zc']=[{'cw':float(_z),'time':_cwc(_z)} for _z in _zcf] if _zcf else None
             # 9th-order intersections — degree-9 fit of the CL tension, real roots inside the open window
             try:
                 _msk=np.isfinite(_cl)
@@ -176,7 +178,8 @@ try:
                     _o['p9']=[{'cw':_r,'time':_cwc(_r),'dir':('up' if np.polyval(_dco,_r)>0 else 'down')} for _r in _p9]
             except Exception: _o['p9_t']=None; _o['p9']=None
             # Tension intersections — where the CL and CM lobes cross
-            _txt=_times(_zc(_cl-_cm)); _o['tx_t']=(' \u00b7 '.join(_txt[:6])) if _txt else None
+            _txz=_zc(_cl-_cm); _txt=_times(_txz); _o['tx_t']=(' \u00b7 '.join(_txt[:6])) if _txt else None
+            _o['tx']=[{'cw':float(_z),'time':_cwc(_z)} for _z in _txz] if _txz else None
 except Exception as _ew: _o['_twerr']=str(_ew)
 
 json.dumps(_o)`); return JSON.parse(js); }catch(e){ console.warn('engBrief',e); return null; } };

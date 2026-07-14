@@ -36,6 +36,41 @@
   VertLine.prototype.updateAllViews=function(){ this._paneViews.forEach(function(v){ v.update(); }); };
   VertLine.prototype.paneViews=function(){ return this._paneViews; };
 
+  // ---- vertical-band primitive: a Gaussian-weighted highlight along the time axis ----
+  // Renders a soft session-time highlight for a chronometric event: opacity follows a
+  // Gaussian centered on the event, so the visual literally is "±sigma in normalized session time".
+  function VertBandPaneRenderer(xLo,xC,xHi,rgb,peak){ this._xLo=xLo; this._xC=xC; this._xHi=xHi; this._rgb=rgb; this._peak=peak; }
+  VertBandPaneRenderer.prototype.draw=function(target){
+    var s=this;
+    target.useBitmapCoordinateSpace(function(scope){
+      if(s._xC===null) return;
+      var ctx=scope.context, R=scope.horizontalPixelRatio, H=scope.bitmapSize.height;
+      var xC=s._xC*R;
+      var xLo=(s._xLo!=null?s._xLo:s._xC)*R, xHi=(s._xHi!=null?s._xHi:s._xC)*R;
+      if(xHi-xLo<2){ xLo=xC-1; xHi=xC+1; }                          // degenerate span: draw a hairline
+      var g=ctx.createLinearGradient(xLo,0,xHi,0), col=s._rgb, pk=s._peak;
+      // Gaussian-ish alpha profile across ±2.5σ (band edges), peak at the event centre.
+      var stops=[[0,0],[0.12,0.06],[0.27,0.28],[0.4,0.72],[0.5,1],[0.6,0.72],[0.73,0.28],[0.88,0.06],[1,0]];
+      stops.forEach(function(st){ g.addColorStop(st[0],'rgba('+col+','+(pk*st[1]).toFixed(3)+')'); });
+      ctx.save();
+      ctx.fillStyle=g; ctx.fillRect(xLo,0,xHi-xLo,H);
+      ctx.strokeStyle='rgba('+col+','+Math.min(0.9,pk*1.7).toFixed(3)+')';
+      ctx.lineWidth=Math.max(1,Math.floor(R));
+      ctx.beginPath(); ctx.moveTo(Math.round(xC),0); ctx.lineTo(Math.round(xC),H); ctx.stroke();
+      ctx.restore();
+    });
+  };
+  function VertBandPaneView(source){ this._source=source; this._xLo=null; this._xC=null; this._xHi=null; }
+  VertBandPaneView.prototype.update=function(){ var ts=this._source._chart.timeScale(), s=this._source;
+    this._xLo=(s._tLo!=null)?ts.timeToCoordinate(s._tLo):null;
+    this._xC =(s._tC !=null)?ts.timeToCoordinate(s._tC ):null;
+    this._xHi=(s._tHi!=null)?ts.timeToCoordinate(s._tHi):null; };
+  VertBandPaneView.prototype.renderer=function(){ return new VertBandPaneRenderer(this._xLo,this._xC,this._xHi,this._source._rgb,this._source._peak); };
+  VertBandPaneView.prototype.zOrder=function(){ return 'bottom'; };   // sit behind the candles
+  function VertBand(chart,tLo,tC,tHi,rgb,peak){ this._chart=chart; this._tLo=tLo; this._tC=tC; this._tHi=tHi; this._rgb=rgb; this._peak=peak||0.28; this._paneViews=[new VertBandPaneView(this)]; }
+  VertBand.prototype.updateAllViews=function(){ this._paneViews.forEach(function(v){ v.update(); }); };
+  VertBand.prototype.paneViews=function(){ return this._paneViews; };
+
   function ensureChart(){
     if(chart) return true;
     if(typeof LightweightCharts==='undefined') return false;
@@ -61,6 +96,7 @@
       }
     });
     new ResizeObserver(function(){ if(chart&&container) chart.applyOptions({width:container.clientWidth,height:container.clientHeight}); }).observe(container);
+    try{ chart.subscribeCrosshairMove(onChronoCrosshair); }catch(_){}
     return true;
   }
 
@@ -111,7 +147,8 @@
     var inst=(document.getElementById('instA')||{}).value||'', date=(document.getElementById('dayDate')||{}).value||'';
     var data=null; try{ data=window.__reportData?window.__reportData(inst,date):null; }catch(_){}
     drawLevels(data&&data.__raw);
-    drawP9Markers(data&&data.__raw, date);
+    if(chronoOn){ clearP9Lines(); drawChronoBands(data&&data.__raw, date); }   // bands carry a centre hairline — supersede the plain p9 lines
+    else{ clearChronoBands(); drawP9Markers(data&&data.__raw, date); }
   }
   window.__chartRefreshLevels=refreshLevels;
 
@@ -141,6 +178,78 @@
       var col=root.dir==='up'?'rgba(70,200,120,0.55)':'rgba(220,90,90,0.55)';
       try{ var vl=new VertLine(chart,t,col); series.attachPrimitive(vl); p9Lines.push(vl); }catch(_){}
     });
+  }
+
+  // ---- chronometric session highlights: event bands along the normalized-session-time axis ----
+  // Each chronometric event (keyed on chronometer-watch cw) is painted as a Gaussian highlight of
+  // width sigma in normalized session time. cw -> seconds-of-day (__cwToSec) -> unix (etSecToUnix) -> chart x.
+  var chronoBands=[], chronoEvents=[], chronoOn=true, CHRONO_SIGMA=0.025;   // sigma in normalized session-time units
+  var CHRONO_COL={ p9:'168,124,223', zc:'111,211,255', tx:'230,150,70', ext:'120,200,150', def:'200,200,210' };
+  var CHRONO_NAME={ p9:'9th-order intersection', zc:'coherence-break (ZC)', tx:'tension intersection', ext:'extremum', def:'chronometric event' };
+  function cwToUnix(cw,date){ if(cw==null||!date) return null; var sod=window.__cwToSec?window.__cwToSec(cw,date):null; if(sod==null) return null; return etSecToUnix(date,sod); }
+  window.__cwToUnix=cwToUnix;
+  function clearChronoBands(){ chronoBands.forEach(function(p){ try{ series.detachPrimitive(p); }catch(_){} }); chronoBands=[]; }
+  function collectChronoEvents(raw,date){
+    var ev=[];
+    function pushArr(arr,type,namer){ if(!arr||!arr.length) return; arr.forEach(function(r){ if(r&&r.cw!=null) ev.push({cw:+r.cw,type:type,label:(namer?namer(r):CHRONO_NAME[type]),mag:1}); }); }
+    if(raw){
+      pushArr(raw.p9,'p9',function(r){ return CHRONO_NAME.p9+(r.dir?' ('+r.dir+')':''); });   // 9th-order intersections
+      pushArr(raw.zc,'zc');                                                                     // coherence-break zero-crossings
+      pushArr(raw.tx,'tx');                                                                     // CL×CM tension intersections
+    }
+    // extensible hook — further producers (extrema, cross-sheet convergence) register here without touching this file
+    try{ var hook=window.__chronoEvents&&window.__chronoEvents(date); if(hook&&hook.length) hook.forEach(function(e){ if(e&&e.cw!=null) ev.push({cw:+e.cw,type:e.type||'def',label:e.label||CHRONO_NAME[e.type]||CHRONO_NAME.def,mag:(e.mag!=null?e.mag:1)}); }); }catch(_){}
+    return ev;
+  }
+  function drawChronoBands(raw,date){
+    clearChronoBands();
+    if(!series||!chart||!chronoOn||curInterval==='1d'||!date) return;   // bands are a session-time overlay: intraday only
+    chronoEvents=collectChronoEvents(raw,date);
+    var reach=2.5*CHRONO_SIGMA;                                          // draw the Gaussian out to ±2.5σ
+    chronoEvents.forEach(function(e){
+      var tC=cwToUnix(e.cw,date); if(tC==null) return;
+      var tLo=cwToUnix(e.cw-reach,date), tHi=cwToUnix(e.cw+reach,date);
+      var rgb=CHRONO_COL[e.type]||CHRONO_COL.def;
+      var peak=Math.max(0.10,Math.min(0.42,0.24*(e.mag||1)));
+      try{ var b=new VertBand(chart,tLo,tC,tHi,rgb,peak); b._ev=e; b._tC=tC; series.attachPrimitive(b); chronoBands.push(b); }catch(_){}
+    });
+  }
+  window.__chronoRefresh=function(){
+    var inst=(document.getElementById('instA')||{}).value||'', date=(document.getElementById('dayDate')||{}).value||'';
+    var data=null; try{ data=window.__reportData?window.__reportData(inst,date):null; }catch(_){}
+    drawChronoBands(data&&data.__raw,date);
+  };
+  window.__chronoSetOn=function(v){ chronoOn=!!v; if(chronoOn){ window.__chronoRefresh(); } else { clearChronoBands(); } };
+  window.__chronoIsOn=function(){ return chronoOn; };
+  window.__chronoSetSigma=function(s){ CHRONO_SIGMA=Math.max(0.005,Math.min(0.2,+s||0.025)); if(chronoOn) window.__chronoRefresh(); };
+
+  // ---- chronometric inspection: hover a highlight to read the event's mathematical state ----
+  var chronoTip=null;
+  function ensureChronoTip(){
+    if(chronoTip) return chronoTip;
+    var wrap=document.getElementById('chartWrap'); if(!wrap) return null;
+    chronoTip=document.createElement('div'); chronoTip.id='chronoTip';
+    chronoTip.style.cssText='position:absolute;z-index:6;pointer-events:none;display:none;max-width:230px;'+
+      'padding:7px 9px;border-radius:7px;font:11px "SF Mono",Menlo,monospace;line-height:1.5;'+
+      'background:rgba(18,18,22,0.94);border:.5px solid rgba(255,255,255,0.14);color:#e8e3d6;'+
+      'box-shadow:0 6px 20px rgba(0,0,0,0.45);';
+    wrap.appendChild(chronoTip); return chronoTip;
+  }
+  function onChronoCrosshair(param){
+    var tip=ensureChronoTip(); if(!tip) return;
+    if(!chronoOn||!param||param.time==null||!param.point||!chronoEvents.length){ tip.style.display='none'; return; }
+    var reachSec=2.5*CHRONO_SIGMA*82800, best=null, bestD=Infinity;
+    chronoBands.forEach(function(b){ if(b._tC==null) return; var d=Math.abs(param.time-b._tC); if(d<bestD){ bestD=d; best=b; } });
+    if(!best||bestD>reachSec){ tip.style.display='none'; return; }
+    var e=best._ev, rgb=CHRONO_COL[e.type]||CHRONO_COL.def;
+    var clock=window.__cwClock?window.__cwClock(e.cw):null;
+    tip.innerHTML='<div style="color:rgb('+rgb+');letter-spacing:.04em;margin-bottom:2px;">'+e.label+'</div>'+
+      '<div style="opacity:.85;">session&nbsp;t&nbsp;<b>'+(+e.cw).toFixed(3)+'</b>'+(clock?('&nbsp;·&nbsp;'+clock):'')+'</div>'+
+      '<div style="opacity:.6;">σ&nbsp;'+CHRONO_SIGMA.toFixed(3)+'&nbsp;·&nbsp;mag&nbsp;'+(+e.mag).toFixed(2)+'</div>';
+    tip.style.display='block';
+    var wrap=document.getElementById('chartWrap'), ww=(wrap&&wrap.clientWidth)||600, wh=(wrap&&wrap.clientHeight)||400;
+    var x=Math.min(param.point.x+14, ww-tip.offsetWidth-8), y=Math.min(param.point.y+12, wh-tip.offsetHeight-8);
+    tip.style.left=Math.max(6,x)+'px'; tip.style.top=Math.max(6,y)+'px';
   }
 
   // ---- CME daily session vertical markers: open 17:00 CT, close 16:00 CT (America/Chicago, DST-aware) ----
@@ -212,6 +321,8 @@
       });
     });
     var refreshBtn=document.getElementById('chartRefreshBtn'); if(refreshBtn) refreshBtn.addEventListener('click',loadHistory);
+    var chronoBtn=document.getElementById('chartChronoBtn');
+    if(chronoBtn) chronoBtn.addEventListener('click',function(){ chronoBtn.classList.toggle('on'); window.__chronoSetOn(chronoBtn.classList.contains('on')); });
     window.addEventListener('quan:instr',loadHistory);
     window.addEventListener('quan:date',loadHistory);
     window.addEventListener('quan:cell',refreshLevels);

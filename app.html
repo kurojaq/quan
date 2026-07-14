@@ -335,6 +335,7 @@
         <span id="chartGranWrap" style="display:none;align-items:center;gap:5px;"><span class="tag">Gran</span><input type="range" id="chartGran" min="0" max="3" step="1" value="0" style="width:64px"><span class="expnote" id="chartGranV">&times;1</span></span>
         <button class="ctool" id="chartCandlesBtn" type="button" style="display:none" title="Show / hide the candlesticks">Candles</button>
         <button class="ctool" id="chartMonoBtn" type="button" style="display:none" title="Grayscale the heat field">Mono</button>
+        <button class="ctool on" id="chartChronoBtn" type="button" title="Chronometric session highlights — event bands (&sigma; in normalized session time) along the Bookmap timeline">Chrono</button>
       </div>
       <div class="slot" id="chartTfRow">
         <button class="ctool chart-tf" data-range="5d" data-interval="1m" type="button">1m</button>
@@ -572,6 +573,7 @@
   <div class="splitDiv" id="splitDiv"></div>
   </div>
 </div>
+<script src="js/pipeline-status.js" defer></script>
 <script src="js/cloud-storage.js" defer></script>
 <script src="js/chart-zoom.js" defer></script>
 <script src="js/detector.js" defer></script>
