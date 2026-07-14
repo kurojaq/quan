@@ -15,24 +15,25 @@
   }
 
   // ---- vertical-line primitive (lightweight-charts has no built-in vertical line) ----
-  function VertLinePaneRenderer(x,color){ this._x=x; this._color=color; }
+  function VertLinePaneRenderer(x,color,w,dash){ this._x=x; this._color=color; this._w=w||1; this._dash=dash; }
   VertLinePaneRenderer.prototype.draw=function(target){
     var self=this;
     target.useBitmapCoordinateSpace(function(scope){
       if(self._x===null) return;
-      var ctx=scope.context;
-      var x=Math.round(self._x*scope.horizontalPixelRatio);
+      var ctx=scope.context, R=scope.horizontalPixelRatio;
+      var x=Math.round(self._x*R);
       ctx.save();
-      ctx.lineWidth=Math.max(1,Math.floor(scope.horizontalPixelRatio));
+      ctx.lineWidth=Math.max(1,Math.floor(R*self._w));
       ctx.strokeStyle=self._color;
+      if(self._dash&&self._dash.length){ ctx.setLineDash(self._dash.map(function(d){ return d*R; })); }
       ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,scope.bitmapSize.height); ctx.stroke();
       ctx.restore();
     });
   };
   function VertLinePaneView(source){ this._source=source; this._x=null; }
   VertLinePaneView.prototype.update=function(){ this._x=this._source._chart.timeScale().timeToCoordinate(this._source._time); };
-  VertLinePaneView.prototype.renderer=function(){ return new VertLinePaneRenderer(this._x,this._source._color); };
-  function VertLine(chart,time,color){ this._chart=chart; this._time=time; this._color=color; this._paneViews=[new VertLinePaneView(this)]; }
+  VertLinePaneView.prototype.renderer=function(){ var s=this._source; return new VertLinePaneRenderer(this._x,(s._hot?s._hotColor:s._color)||s._color,(s._hot?(s._w*1.8):s._w),s._dash); };
+  function VertLine(chart,time,color,w,dash,hotColor){ this._chart=chart; this._time=time; this._color=color; this._w=w||1; this._dash=dash; this._hotColor=hotColor; this._hot=false; this._paneViews=[new VertLinePaneView(this)]; }
   VertLine.prototype.updateAllViews=function(){ this._paneViews.forEach(function(v){ v.update(); }); };
   VertLine.prototype.paneViews=function(){ return this._paneViews; };
 
@@ -80,7 +81,9 @@
       layout:{background:{color:'transparent'},textColor:'#cccccc'},
       grid:{vertLines:{visible:false},horzLines:{visible:false}},
       rightPriceScale:{borderColor:'#2a2a2a'},
-      timeScale:{borderColor:'#2a2a2a',timeVisible:true,secondsVisible:false}
+      timeScale:{borderColor:'#2a2a2a',timeVisible:true,secondsVisible:false},
+      // free cursor for accurate annotation placement — no snap-to-price magnet (CrosshairMode.Normal=0)
+      crosshair:{mode:(LightweightCharts.CrosshairMode&&LightweightCharts.CrosshairMode.Normal!=null)?LightweightCharts.CrosshairMode.Normal:0}
     });
     series=chart.addSeries(LightweightCharts.CandlestickSeries,{
       upColor:'#26a69a', downColor:'#ef5350', borderUpColor:'#26a69a', borderDownColor:'#ef5350', wickUpColor:'#26a69a', wickDownColor:'#ef5350',
@@ -212,15 +215,14 @@
   }
   function drawChronoBands(raw,date){
     clearChronoBands();
-    if(!series||!chart||!chronoOn||curInterval==='1d'||!date) return;   // bands are a session-time overlay: intraday only
+    if(!series||!chart||!chronoOn||curInterval==='1d'||!date) return;   // session-time overlay: intraday only
     chronoEvents=collectChronoEvents(raw,date);
     chronoEvents.forEach(function(e){
-      var reach=2.5*(e.sigma||CHRONO_SIGMA);                             // draw each Gaussian out to ±2.5σ (per-event σ)
       var tC=cwToUnix(e.cw,date); if(tC==null) return;
-      var tLo=cwToUnix(e.cw-reach,date), tHi=cwToUnix(e.cw+reach,date);
       var rgb=CHRONO_COL[e.type]||CHRONO_COL.def;
-      var peak=Math.max(0.10,Math.min(0.42,0.24*(e.mag||1)));
-      try{ var b=new VertBand(chart,tLo,tC,tHi,rgb,peak); b._ev=e; b._tC=tC; series.attachPrimitive(b); chronoBands.push(b); }catch(_){}
+      // one dashed vertical line per event, colored by sheet; brightens to solid when the cursor is over it
+      var col='rgba('+rgb+',0.62)', hot='rgba('+rgb+',0.98)';
+      try{ var b=new VertLine(chart,tC,col,1,[5,4],hot); b._ev=e; b._tC=tC; series.attachPrimitive(b); chronoBands.push(b); }catch(_){}
     });
   }
   window.__chronoRefresh=function(){
@@ -238,19 +240,22 @@
     if(chronoTip) return chronoTip;
     var wrap=document.getElementById('chartWrap'); if(!wrap) return null;
     chronoTip=document.createElement('div'); chronoTip.id='chronoTip';
-    chronoTip.style.cssText='position:absolute;z-index:6;pointer-events:none;display:none;max-width:230px;'+
+    chronoTip.style.cssText='position:absolute;z-index:40;pointer-events:none;display:none;max-width:230px;'+
       'padding:7px 9px;border-radius:7px;font:11px "SF Mono",Menlo,monospace;line-height:1.5;'+
       'background:rgba(18,18,22,0.94);border:.5px solid rgba(255,255,255,0.14);color:#e8e3d6;'+
       'box-shadow:0 6px 20px rgba(0,0,0,0.45);';
     wrap.appendChild(chronoTip); return chronoTip;
   }
+  var chronoHot=null;
+  function setChronoHot(b){ if(chronoHot===b) return; if(chronoHot) chronoHot._hot=false; if(b) b._hot=true; chronoHot=b; try{ series.applyOptions({}); }catch(_){} }  // force a repaint so the hovered line brightens
   function onChronoCrosshair(param){
     var tip=ensureChronoTip(); if(!tip) return;
-    if(!chronoOn||!param||param.time==null||!param.point||!chronoEvents.length){ tip.style.display='none'; return; }
-    var best=null, bestD=Infinity;
-    chronoBands.forEach(function(b){ if(b._tC==null) return; var d=Math.abs(param.time-b._tC); if(d<bestD){ bestD=d; best=b; } });
-    var reachSec=2.5*((best&&best._ev&&best._ev.sigma)||CHRONO_SIGMA)*82800;
-    if(!best||bestD>reachSec){ tip.style.display='none'; return; }
+    if(!chronoOn||!param||!param.point||!chronoBands.length){ tip.style.display='none'; setChronoHot(null); return; }
+    // pixel-precise: highlight the line the cursor is actually over (~9px), independent of magnet/snap
+    var ts=chart.timeScale(), px=param.point.x, best=null, bestD=Infinity;
+    chronoBands.forEach(function(b){ if(b._tC==null) return; var x=ts.timeToCoordinate(b._tC); if(x==null) return; var d=Math.abs(px-x); if(d<bestD){ bestD=d; best=b; } });
+    if(!best||bestD>9){ tip.style.display='none'; setChronoHot(null); return; }
+    setChronoHot(best);
     var e=best._ev, rgb=CHRONO_COL[e.type]||CHRONO_COL.def;
     var clock=window.__cwClock?window.__cwClock(e.cw):null;
     var convLine=(e.conv>0)?('<div style="color:rgb('+rgb+');opacity:.9;">⊕&nbsp;'+e.conv+'-way convergence</div>'):'';
