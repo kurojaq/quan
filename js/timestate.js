@@ -4,10 +4,11 @@
    CME terminal or the CBOE app.
 
    A Barchart chain upload is parsed into the Golden Reference closure
-   (QT.realizationWaves) and the breach tension closure (QT.computeTension).
-   The chart plots the Book-sheet derivative stack — PG, PC(=∂PG), ∂²PG, ∂³PG —
-   and the CL/CM dual-phase tension pair against the Chronometer Watch, with
-   breach crossings, coherence breaks and zero-crossings as timestate events.
+   (QT.realizationWaves). That single RIPN-anchored chain yields the whole
+   derivative stack against the Chronometer Watch: Pressure Gradient (cc),
+   Pressure Curvature (cd), and the PG/PC + PC/PG Dual Phase Tension pair
+   (dphase(cc,cd) — CL/CM), matching quan_realization.py cell-for-cell. Breach
+   crossings, coherence breaks and PG/PC zero-crossings are timestate events.
 
    Inherits the terminal's RIPN tuning tool: the handshake table (anchor-row
    selection re-runs the closure) and the global tuning controller
@@ -58,19 +59,20 @@
         dayDate = $('tsDate');
 
   /* ---------------- series model ----------------------------------------
-     key, label, source, group ('deriv' = own scale, 'tension' = shared scale
-     so CL×CM crossings stay geometric under normalize) */
+     The golden-reference derivative stack (quan_realization.py), on the fixed
+     21-cell Chronometer Watch axis. All four come from ONE chain: cc/cd are the
+     Pressure Gradient / Curvature; CL/CM are dphase(cc,cd) — the same inputs.
+     group ('deriv' = own scale, 'tension' = shared scale so CL×CM crossings
+     stay geometric under normalize) */
   const SERIES_DEF = [
-    { key: 'PG',  label: 'PG · pressure gradient',   color: '#e8b53a', group: 'deriv' },
-    { key: 'PC',  label: 'PC · ∂PG',            color: '#6fd3ff', group: 'deriv' },
-    { key: 'D2',  label: '∂²PG',           color: '#c9a0ff', group: 'deriv' },
-    { key: 'D3',  label: '∂³PG',           color: '#5fcf8f', group: 'deriv' },
-    { key: 'CL',  label: 'PG/PC dual-phase tension', color: '#d36b9b', group: 'tension' },
-    { key: 'CM',  label: 'PC/PG dual-phase tension', color: '#5aa0d8', group: 'tension' }
+    { key: 'PG',  label: 'Pressure Gradient',            color: '#e8b53a', group: 'deriv' },
+    { key: 'PC',  label: 'Pressure Curvature',           color: '#6fd3ff', group: 'deriv' },
+    { key: 'CL',  label: 'PG/PC Dual Phase Tension',     color: '#d36b9b', group: 'tension' },
+    { key: 'CM',  label: 'PC/PG Dual Phase Tension',     color: '#5aa0d8', group: 'tension' }
   ];
-  const vis = { PG: true, PC: true, D2: false, D3: false, CL: true, CM: true };
+  const vis = { PG: false, PC: false, CL: true, CM: true };
 
-  let rw = null, tens = null;            // raw closures for the loaded chain
+  let rw = null;                         // golden realization stack for the loaded chain
   let P = null;                          // plotted model {cw, series:{key:{ys,scale}}, breaches, events}
   let highlight = null, rafId = null, t0 = 0, screenPts = [];
   let viewLo = -1, viewHi = 1, yScale = 1, yPan = 0, GEO = null, cursor = null;
@@ -78,11 +80,10 @@
 
   /* ---------------- compute pipeline ------------------------------------- */
   function recompute() {
-    rw = null; tens = null;
+    rw = null;
     const cell = store[date];
     if (cell && cell.chain) {
       try { const rows = QT.ingestChain(cell.chain); if (rows) rw = QT.realizationWaves(rows, (date in ripnSel) ? ripnSel[date] : null); } catch (_) { rw = null; }
-      try { const trows = QT.parseTensionChain(cell.chain); if (trows && trows.length >= 17) tens = QT.computeTension(trows); } catch (_) { tens = null; }
     }
     buildPlot();
     renderInfo(); renderRipn(); buildLegend(); renderEvents(); renderTexts(); draw();
@@ -95,13 +96,9 @@
     function maxAbs(a) { let m = 0; for (const v of a) { const x = Math.abs(v); if (isFinite(x) && x > m) m = x; } return m; }
     function put(key, ys) { P.series[key] = { raw: ys, tuned: QT.Tuning.apply(ys, cfg), scale: 1 }; }
     if (rw) {
+      // whole golden stack from the single RIPN-anchored chain: cc/cd + dphase(cc,cd)
       P.cw = rw.cw;
-      const d2 = QT.bookDeriv(rw.cd, rw.cw), d3 = QT.bookDeriv(d2, rw.cw);
-      put('PG', rw.cc); put('PC', rw.cd); put('D2', d2); put('D3', d3);
-    }
-    if (tens) {
-      P.cw = P.cw || tens.CI;
-      put('CL', tens.CL); put('CM', tens.CM);
+      put('PG', rw.cc); put('PC', rw.cd); put('CL', rw.CL); put('CM', rw.CM);
     }
     // scaling: derivative series each to unit max-abs; CL/CM share one factor
     if (doNorm) {
@@ -126,12 +123,10 @@
 
   /* ---------------- header info / legend / events ------------------------ */
   function renderInfo() {
-    if (!rw && !tens) { infoLine.textContent = 'No session loaded — upload a Barchart options chain CSV for ' + date + '.'; return; }
+    if (!rw) { infoLine.textContent = 'No session loaded — upload a Barchart options chain CSV for ' + date + '.'; return; }
     const bits = [];
-    if (rw) { bits.push('golden · anchor ' + rw.anchor_strike + (rw.manual_anchor ? ' (handshake)' : ' (auto)'));
-      bits.push(rw.n_strikes + ' strikes'); if (!rw.covered) bits.push('⚠ window not fully covered'); }
-    else bits.push('golden closure unavailable (named Strike/Premium/Open Int columns not found)');
-    if (!tens) bits.push('tension closure unavailable (side-by-side layout not detected)');
+    bits.push('golden · anchor ' + rw.anchor_strike + (rw.manual_anchor ? ' (handshake)' : ' (auto)'));
+    bits.push(rw.n_strikes + ' strikes'); if (!rw.covered) bits.push('⚠ window not fully covered');
     if (P.breaches.length) bits.push(P.breaches.length + ' breach' + (P.breaches.length > 1 ? 'es' : ''));
     if (rw && rw.cross.length) bits.push('coherence breaks CW ' + rw.cross.join(', '));
     infoLine.textContent = bits.join(' · ');

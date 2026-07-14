@@ -141,14 +141,42 @@
     var pG = pairs(cc), pC = pairs(cd);
     var sopG = pG.sop, sopC = pC.sop; var fold = sopG.map(function (g, i2) { return g * sopC[i2]; });
     var cross = []; for (i = 1; i < PAIR_ROWS; i++) { if (fold[i] === 0) continue; var sc = Math.sign(fold[i]), sp = Math.sign(fold[i - 1]); if (sc !== 0 && sp !== 0 && sc !== sp) cross.push(Math.round(cw[i] * 100) / 100); }
+    // Dual-phase tensions — the GOLDEN metric: dphase on the SAME Pressure Gradient (cc) and
+    // Pressure Curvature (cd), exactly as _dual_phase_tensions(cc,cd) in quan_realization.py.
+    var dpt = goldenDualPhase(cc, cd);
     // RIPN inspection rows for the handshake panel: [idx, strike, RIPN[0,1], AP, tuning(BR)]
     var ripn_rows = []; for (var r = 0; r < n; r++) ripn_rows.push([r, strikes[r], (isFinite(bi[r]) ? bi[r] : null), (isFinite(ap[r]) ? ap[r] : null), (r < br.length && isFinite(br[r]) ? br[r] : null)]);
     return { cw: cw, cc: cc, cd: cd, sopG: sopG, sopC: sopC, fold: fold, cross: cross,
+      CL: dpt.CL, CM: dpt.CM, dpGradient: dpt.CU, dpCurvature: dpt.CV,
       anchor_strike: strikes[ai], n_strikes: n, covered: covered,
       ripn_rows: ripn_rows, auto_idx: auto_ai, used_idx: ai, manual_anchor: manual, method: 'golden' };
   }
+  // Book CL/CM (the Breach Detector's discrete comparison metric), verbatim port of
+  // quan_realization.py::_dual_phase_tensions. dphase(A,B)[k] = ((A[k+1]-A[k])/(A[k]+A[k+1]))
+  // / ((B[k+1]-B[k])/(B[k]+B[k+1])), IFERROR->0.  CL=CU+CUnext, CM=CV+CVnext.
+  // CL hard-zeroed at template rows 3,4,5,6,21,22 (idx 1,2,3,4,19,20).
+  function goldenDualPhase(cc, cd) {
+    var n = cc.length;
+    function dphase(A, B) {
+      var out = [];
+      for (var k = 0; k < n - 1; k++) {
+        var s1 = A[k] + A[k + 1], s2 = B[k] + B[k + 1];
+        var num = s1 !== 0 ? (A[k + 1] - A[k]) / s1 : 0.0;
+        var den = s2 !== 0 ? (B[k + 1] - B[k]) / s2 : 0.0;
+        out.push(den !== 0 ? num / den : 0.0);
+      }
+      out.push(0.0);
+      return out;
+    }
+    var CU = dphase(cc, cd), CV = dphase(cd, cc);
+    var CL = [], CM = [];
+    for (var k = 0; k < n; k++) { CL.push((k + 1 < n) ? CU[k] + CU[k + 1] : 0.0); CM.push((k + 1 < n) ? CV[k] + CV[k + 1] : 0.0); }
+    [1, 2, 3, 4, 19, 20].forEach(function (idx) { if (idx < n) CL[idx] = 0.0; });
+    return { CL: CL, CM: CM, CU: CU, CV: CV };
+  }
   QT.ingestChain = ingestChain;
   QT.realizationWaves = realizationWaves;
+  QT.goldenDualPhase = goldenDualPhase;
 
   /* ---------------- Breach tension closure (detector.js port) ------------ */
   function num(s) { if (s == null) return null; s = String(s).trim().replace(/^"|"$/g, '').replace(/,/g, '');
