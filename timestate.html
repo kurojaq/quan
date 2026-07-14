@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<!-- ==========================================================================
+     THE QU'AN — ZN TIMESTATE (standalone terminal). Separate page, separate
+     globals: nothing here can touch the CME terminal (app.html) or the CBOE
+     app. Dedicated graphical engine for the Promissory Notes (ZN):
+     a Barchart chain upload is parsed into the Golden Reference, and the
+     Book-sheet derivatives of the pressure gradient are drawn against the
+     Chronometer Watch — the breach-detector graph, extended with advanced
+     data-anchored annotation tools and the terminal's RIPN tuning tool.
+     ========================================================================== -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506" media="(prefers-color-scheme: dark)">
+<title>The Qu'an — ZN Timestate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/theme.css">
+<style>
+  html,body{height:100%;margin:0;}
+  .tsApp{display:flex;flex-direction:column;height:100vh;min-height:0;}
+  .tsApp .brand{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:600;color:var(--cream);margin-right:6px;}
+  .tsApp .brand .inf{opacity:.55;font-size:18px;}
+  .tsApp .brand .tsSub{font:600 10px/1 var(--font-mono);letter-spacing:.12em;color:var(--cream-dim);padding:3px 7px;background:var(--fill);border-radius:999px;}
+  .tsInfo{flex:0 0 auto;padding:7px 16px;font:500 10.5px/1.5 var(--font-mono);color:var(--cream-dim);border-bottom:0.5px solid var(--glass-line);white-space:nowrap;overflow:auto;}
+  .tsMain{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;padding:10px 14px 12px;gap:8px;}
+
+  /* toolbar */
+  .tsBar{flex:0 0 auto;display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+  .tsBar .ctool{font-size:12px;padding:5px 9px;}
+  .tsBar .ctool.on{color:var(--gold,#e8b53a);filter:none;background:var(--fill-2);}
+  .tsBar .sep{width:0.5px;height:18px;background:var(--glass-line);margin:0 4px;}
+  .tspal{display:flex;align-items:center;gap:4px;}
+  .tspal .swb{width:16px;height:16px;border-radius:50%;border:1.5px solid transparent;cursor:pointer;padding:0;}
+  .tspal .swb.on{border-color:var(--cream);}
+  .tsBar .wctl{display:flex;align-items:center;gap:5px;font:500 9.5px var(--font-mono);color:var(--cream-dim);}
+  .tsBar input[type=range]{width:70px;accent-color:#e8b53a;}
+  .tsBar .fitctl{display:flex;align-items:center;gap:6px;font:500 9.5px var(--font-mono);color:var(--cream-dim);background:var(--fill);border-radius:var(--radius-sm);padding:4px 8px;}
+  .tsBar .fitctl select{background:transparent;border:none;color:var(--cream);font:600 10px var(--font-mono);outline:none;cursor:pointer;}
+  .tsBar .fitctl select option{background:var(--panel);color:var(--cream);}
+  .tsBar label.tg{display:flex;align-items:center;gap:5px;font:500 9.5px var(--font-mono);color:var(--cream-dim);cursor:pointer;background:var(--fill);border-radius:var(--radius-sm);padding:4px 8px;}
+
+  /* chart */
+  .tsChartwrap{flex:1 1 auto;min-height:0;position:relative;background:#07090d;border-radius:var(--radius-md);overflow:hidden;}
+  #tsChart,#tsOverlay{position:absolute;inset:0;width:100%;height:100%;display:block;}
+  #tsOverlay{pointer-events:none;}
+  #tsTip{display:none;position:absolute;transform:translate(-50%,-140%);background:rgba(18,18,22,0.94);border:0.5px solid #4c4c54;border-radius:8px;padding:5px 9px;font:500 10.5px var(--font-mono);color:var(--cream);pointer-events:none;white-space:nowrap;z-index:8;}
+
+  /* legend + events */
+  .tsLegend{flex:0 0 auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap;font:500 10px var(--font-mono);color:var(--cream-dim);padding:0 2px;}
+  .tsLegend .sw{display:inline-block;width:14px;border-top:2.5px solid;vertical-align:middle;margin-right:5px;}
+  .tsLegend .dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:5px;}
+  .tsLegend .ltog{cursor:pointer;user-select:none;}
+  .tsLegend .ltog.off{opacity:0.35;}
+  .tsLegend .scl{color:#6f675a;font-size:9px;}
+  .tsEvents{flex:0 0 auto;display:flex;gap:6px;overflow-x:auto;padding:2px;font:500 10px var(--font-mono);}
+  .tsEvents .chip{flex:0 0 auto;background:var(--fill);border-radius:7px;padding:5px 10px;white-space:nowrap;cursor:pointer;}
+  .tsEvents .chip:hover{background:var(--fill-2);}
+  .tsEvents .empty{color:#6f675a;padding:5px 2px;}
+
+  /* RIPN panel */
+  #ripnPanel{display:none;position:absolute;top:8px;left:8px;z-index:6;width:296px;max-height:calc(100% - 16px);background:var(--glass-strong);border:0.5px solid var(--glass-line);border-radius:var(--radius-md);box-shadow:var(--shadow);flex-direction:column;font-size:11px;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);}
+  #ripnPanel .rp-top{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:0.5px solid var(--glass-line);}
+  #ripnPanel .rp-title{font-weight:600;letter-spacing:.4px;color:var(--cream);}
+  #ripnHead{padding:5px 10px;border-bottom:0.5px solid var(--glass-line);color:var(--cream-dim);font-size:10px;line-height:1.5;}
+  #ripnTblWrap{overflow:auto;flex:1 1 auto;min-height:0;max-height:280px;}
+  #ripnTbl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;}
+  #ripnTbl th{position:sticky;top:0;background:#26262d;text-align:right;padding:3px 7px;color:#8f8c82;font-weight:600;font-size:9.5px;border-bottom:0.5px solid #3a3a42;}
+  #ripnTbl td{text-align:right;padding:2px 7px;color:var(--cream-dim);font-size:10px;}
+  #ripnTbl .ripnRow{cursor:pointer;}
+  #ripnTbl .ripnRow:hover{background:var(--fill);}
+  #ripnTbl .ripnRow.used{background:#3a3320;}
+  .rp-foot{display:flex;align-items:center;gap:6px;padding:7px 10px;border-top:0.5px solid var(--glass-line);color:var(--cream-dim);font-size:10px;}
+  .rp-foot input{width:52px;background:var(--fill);border:none;outline:none;border-radius:6px;color:var(--cream);padding:3px 6px;font-size:10px;}
+  .rp-tune{padding:7px 10px 10px;border-top:0.5px solid var(--glass-line);display:flex;flex-direction:column;gap:5px;}
+  .rp-tune .row{display:flex;align-items:center;gap:7px;font:500 9.5px var(--font-mono);color:var(--cream-dim);}
+  .rp-tune .row label{flex:0 0 92px;}
+  .rp-tune .row input[type=range]{flex:1 1 auto;accent-color:#e8b53a;}
+  .rp-tune .row .v{flex:0 0 32px;text-align:right;color:var(--cream);}
+
+  /* text notes */
+  .tsnote{position:absolute;z-index:7;width:150px;background:rgba(18,18,22,0.94);border:0.5px solid #4c4c54;border-radius:8px;overflow:hidden;box-shadow:var(--shadow);}
+  .tsnote .tsn-head{height:16px;background:var(--fill-2);cursor:move;display:flex;justify-content:flex-end;align-items:center;padding:0 4px;}
+  .tsnote .tsn-x{cursor:pointer;color:var(--cream-dim);font-size:9px;line-height:1;}
+  .tsnote .tsn-x:hover{color:#e85c5c;}
+  .tsnote textarea{display:block;width:100%;box-sizing:border-box;height:52px;background:transparent;border:none;outline:none;resize:vertical;color:#ffe14d;font:500 10.5px var(--font-mono);padding:5px 7px;}
+</style>
+</head>
+<body>
+<div class="wrap tsApp">
+  <nav class="tabbar">
+    <span class="brand"><span class="inf">&#8734;</span> The Qu'an <span class="tsSub">ZN TIMESTATE</span></span>
+    <button class="tabbtn on">Timestate</button>
+    <div class="gctrls">
+      <div class="datebar"><span class="k">Session</span><input type="date" id="tsDate"></div>
+      <label class="upload" title="Barchart options chain CSV — parsed into the Golden Reference">&#8682; Chain CSV<input type="file" id="tsFile" accept=".csv,.txt" hidden></label>
+      <span id="tsFn" style="font:500 10px var(--font-mono);color:var(--cream-dim);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">none</span>
+      <button class="ctool" id="ripnToggle" title="RIPN handshake &amp; tuning — anchor row + signal shaping" style="font-size:11px">&#9678; RIPN</button>
+      <div class="sessbar"><span class="k">SESSION T</span><span class="v" id="sessT">0.0000</span></div>
+    </div>
+  </nav>
+
+  <div class="tsInfo" id="tsInfo">No session loaded.</div>
+
+  <div class="tsMain">
+    <div class="tsBar">
+      <button class="ctool" id="tool_free"   title="Freehand draw">&#9998;</button>
+      <button class="ctool" id="tool_line"   title="Line">&#9585;</button>
+      <button class="ctool" id="tool_arrow"  title="Arrow">&#10230;</button>
+      <button class="ctool" id="tool_rect"   title="Rectangle zone">&#9645;</button>
+      <button class="ctool" id="tool_ellipse" title="Ellipse zone">&#9711;</button>
+      <button class="ctool" id="tool_hline"  title="Horizontal level (tagged with value)">&#8213;</button>
+      <button class="ctool" id="tool_vline"  title="Vertical time marker (tagged with ET clock)">&#124;</button>
+      <button class="ctool" id="tool_measure" title="Measure — ΔCW / Δtime / Δvalue">&#8614;</button>
+      <button class="ctool" id="tool_text"   title="Text note">T</button>
+      <button class="ctool" id="tool_erase"  title="Eraser — click an annotation to remove it">&#9003;</button>
+      <span class="sep"></span>
+      <span class="tspal">
+        <button class="swb on" data-c="#ffe14d" style="background:#ffe14d" title="gold"></button>
+        <button class="swb" data-c="#7fd1e0" style="background:#7fd1e0" title="cyan"></button>
+        <button class="swb" data-c="#e85c5c" style="background:#e85c5c" title="red"></button>
+        <button class="swb" data-c="#5fcf8f" style="background:#5fcf8f" title="green"></button>
+        <button class="swb" data-c="#d36b9b" style="background:#d36b9b" title="pink"></button>
+        <button class="swb" data-c="#f5f5f7" style="background:#f5f5f7" title="white"></button>
+      </span>
+      <span class="wctl">w<input type="range" id="penW" min="1" max="8" step="0.2" value="2.4"></span>
+      <button class="ctool" id="undoBtn" title="Undo last annotation">&#8630;</button>
+      <button class="ctool" id="clearDraw" title="Clear all annotations for this session">&#10006;</button>
+      <span class="sep"></span>
+      <label class="tg" title="Scale each derivative series to unit max — comparable shapes for timestate reading. CL/CM share one factor so breach crossings stay put."><input type="checkbox" id="normToggle" checked> normalize</label>
+      <div class="fitctl">
+        <label class="tg" style="background:transparent;padding:0"><input type="checkbox" id="fitToggle"> fit ladder</label>
+        <select id="fitTarget" title="Series the polynomial ladder is fitted to"></select>
+        <span>P<span id="fitOrderV">4</span></span>
+        <input type="range" id="fitOrder" min="1" max="9" step="1" value="4">
+      </div>
+      <button class="ctool" id="resetView" title="Reset zoom/pan (or double-click the chart)" style="margin-left:auto">reset view</button>
+    </div>
+
+    <div class="tsChartwrap">
+      <canvas id="tsChart"></canvas>
+      <canvas id="tsOverlay"></canvas>
+      <div id="tsTip"></div>
+      <div id="ripnPanel">
+        <div class="rp-top">
+          <div class="rp-title">RIPN handshake</div>
+          <div style="display:flex;gap:6px">
+            <button id="ripnAutoBtn" class="ctool" title="Reset to the auto-suggested anchor" style="font-size:10px;padding:2px 7px">auto</button>
+            <button id="ripnClose" class="ctool" title="Hide" style="font-size:12px;padding:1px 7px">&times;</button>
+          </div>
+        </div>
+        <div id="ripnHead"></div>
+        <div id="ripnTblWrap"><table id="ripnTbl"></table></div>
+        <div class="rp-foot">
+          <span>row</span><input id="ripnIdxInput" inputmode="numeric" placeholder="#"><button id="ripnGo" class="ctool" style="font-size:10px;padding:2px 7px">go</button>
+        </div>
+        <div class="rp-tune">
+          <div class="row"><label>responsiveness</label><input type="range" id="tsTune_responsiveness" min="0" max="2" step="0.01" value="1"><span class="v" id="tsTune_responsiveness_v">1.00</span></div>
+          <div class="row"><label>sensitivity</label><input type="range" id="tsTune_sensitivity" min="0" max="1" step="0.01" value="0"><span class="v" id="tsTune_sensitivity_v">0.00</span></div>
+          <div class="row"><label>smoothing</label><input type="range" id="tsTune_smoothing" min="0" max="1" step="0.01" value="0"><span class="v" id="tsTune_smoothing_v">0.00</span></div>
+          <div class="row"><label>weighting</label><input type="range" id="tsTune_weighting" min="0" max="1" step="0.01" value="1"><span class="v" id="tsTune_weighting_v">1.00</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tsLegend" id="tsLegend"></div>
+    <div class="tsEvents" id="tsEvents"></div>
+  </div>
+</div>
+<script src="js/timestate-core.js" defer></script>
+<script src="js/timestate.js" defer></script>
+</body>
+</html>
