@@ -184,6 +184,7 @@
   // Each chronometric event (keyed on chronometer-watch cw) is painted as a Gaussian highlight of
   // width sigma in normalized session time. cw -> seconds-of-day (__cwToSec) -> unix (etSecToUnix) -> chart x.
   var chronoBands=[], chronoEvents=[], chronoOn=true, CHRONO_SIGMA=0.025;   // sigma in normalized session-time units
+  var CHRONO_CONV_WIN=0.02;   // cross-type convergence window (normalized session time) for magnitude reinforcement
   var CHRONO_COL={ p9:'168,124,223', zc:'111,211,255', tx:'230,150,70', ext:'120,200,150', def:'200,200,210' };
   var CHRONO_NAME={ p9:'9th-order intersection', zc:'coherence-break (ZC)', tx:'tension intersection', ext:'extremum', def:'chronometric event' };
   function cwToUnix(cw,date){ if(cw==null||!date) return null; var sod=window.__cwToSec?window.__cwToSec(cw,date):null; if(sod==null) return null; return etSecToUnix(date,sod); }
@@ -199,6 +200,12 @@
     }
     // extensible hook — further producers (extrema, cross-sheet convergence) register here without touching this file
     try{ var hook=window.__chronoEvents&&window.__chronoEvents(date); if(hook&&hook.length) hook.forEach(function(e){ if(e&&e.cw!=null) ev.push({cw:+e.cw,type:e.type||'def',label:e.label||CHRONO_NAME[e.type]||CHRONO_NAME.def,mag:(e.mag!=null?e.mag:1)}); }); }catch(_){}
+    // magnitude by cross-type convergence (Obj 4/5): events of *different* sheets near the same session
+    // time reinforce one another — intersection events glow brighter than isolated crossings.
+    ev.forEach(function(e){
+      var conv=0; ev.forEach(function(o){ if(o!==e && o.type!==e.type && Math.abs(o.cw-e.cw)<=CHRONO_CONV_WIN) conv++; });
+      e.conv=conv; e.mag=Math.max(1,Math.min(2.2,1+0.45*conv));
+    });
     return ev;
   }
   function drawChronoBands(raw,date){
@@ -243,8 +250,10 @@
     if(!best||bestD>reachSec){ tip.style.display='none'; return; }
     var e=best._ev, rgb=CHRONO_COL[e.type]||CHRONO_COL.def;
     var clock=window.__cwClock?window.__cwClock(e.cw):null;
+    var convLine=(e.conv>0)?('<div style="color:rgb('+rgb+');opacity:.9;">⊕&nbsp;'+e.conv+'-way convergence</div>'):'';
     tip.innerHTML='<div style="color:rgb('+rgb+');letter-spacing:.04em;margin-bottom:2px;">'+e.label+'</div>'+
       '<div style="opacity:.85;">session&nbsp;t&nbsp;<b>'+(+e.cw).toFixed(3)+'</b>'+(clock?('&nbsp;·&nbsp;'+clock):'')+'</div>'+
+      convLine+
       '<div style="opacity:.6;">σ&nbsp;'+CHRONO_SIGMA.toFixed(3)+'&nbsp;·&nbsp;mag&nbsp;'+(+e.mag).toFixed(2)+'</div>';
     tip.style.display='block';
     var wrap=document.getElementById('chartWrap'), ww=(wrap&&wrap.clientWidth)||600, wh=(wrap&&wrap.clientHeight)||400;
