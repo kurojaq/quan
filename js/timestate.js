@@ -189,7 +189,7 @@
   /* ---------------- main draw -------------------------------------------- */
   function draw(now) {
     if (!W || !H) return; now = (typeof now === 'number') ? now : 0;
-    ctx.clearRect(0, 0, W, H); ctx.fillStyle = '#07090d'; ctx.fillRect(0, 0, W, H);
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = '#050506'; ctx.fillRect(0, 0, W, H);
     const pW = W - PAD_L - PAD_R, pH = H - PAD_T - PAD_B;
     const ex = extent();
     const c0 = (ex[0] + ex[1]) / 2 - yPan * (ex[1] - ex[0]); const hh = (ex[1] - ex[0]) / 2 / yScale;
@@ -202,28 +202,27 @@
     const clampY = y => Math.max(PAD_T, Math.min(PAD_T + pH, y));
     const cx = mapX(0), baseY = clampY(mapY(0));
 
-    ctx.fillStyle = '#0b0f14'; ctx.fillRect(PAD_L, PAD_T, pW, pH);
-
+    // BD-style flat field: no inner panel, dotted zero line, near-invisible grid
     const ti0 = Math.ceil(viewLo * 10 - 1e-9), ti1 = Math.floor(viewHi * 10 + 1e-9);
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 0.5;
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 0.5;
     for (let i = ti0; i <= ti1; i++) { const x = mapX(i / 10); ctx.beginPath(); ctx.moveTo(x, PAD_T); ctx.lineTo(x, PAD_T + pH); ctx.stroke(); }
 
-    ctx.strokeStyle = 'rgba(232,227,214,0.80)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(PAD_L, baseY); ctx.lineTo(PAD_L + pW, baseY); ctx.stroke();
-    if (cx >= PAD_L && cx <= PAD_L + pW) { ctx.beginPath(); ctx.moveTo(cx, PAD_T); ctx.lineTo(cx, PAD_T + pH); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(232,227,214,0.30)'; ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
+    ctx.beginPath(); ctx.moveTo(PAD_L, baseY); ctx.lineTo(PAD_L + pW, baseY); ctx.stroke(); ctx.setLineDash([]);
+    if (cx >= PAD_L && cx <= PAD_L + pW) { ctx.strokeStyle = 'rgba(232,227,214,0.14)';
+      ctx.beginPath(); ctx.moveTo(cx, PAD_T); ctx.lineTo(cx, PAD_T + pH); ctx.stroke(); }
 
-    // watch ticks + CW labels, ET clock on the even ticks
-    ctx.font = '10px -apple-system,Segoe UI,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    for (let i = ti0; i <= ti1; i++) { const v = i / 10, x = mapX(v), maj = (i % 2 === 0);
-      ctx.strokeStyle = 'rgba(232,227,214,' + (maj ? 0.65 : 0.4) + ')'; ctx.lineWidth = maj ? 1 : 0.5;
-      ctx.beginPath(); ctx.moveTo(x, baseY - (maj ? 5 : 3)); ctx.lineTo(x, baseY + (maj ? 5 : 3)); ctx.stroke();
-      ctx.fillStyle = '#a6a299'; ctx.fillText(v.toFixed(1).replace('-0.0', '0.0'), x, baseY + 7);
-      if (maj) { ctx.fillStyle = '#5f6b72'; ctx.fillText(QT.cwClock(v), x, PAD_T + pH + 18); } }
+    // watch ticks on the zero line; CW labels only at the 0.5 majors (BD axis)
+    ctx.font = '10px SF Mono,Menlo,monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (let i = ti0; i <= ti1; i++) { const v = i / 10, x = mapX(v), maj = (i % 5 === 0);
+      ctx.strokeStyle = 'rgba(232,227,214,' + (maj ? 0.35 : 0.15) + ')'; ctx.lineWidth = maj ? 1 : 0.5;
+      ctx.beginPath(); ctx.moveTo(x, baseY - (maj ? 4 : 2)); ctx.lineTo(x, baseY + (maj ? 4 : 2)); ctx.stroke();
+      if (maj) { ctx.fillStyle = '#5a574f'; ctx.fillText(v.toFixed(1).replace('-0.0', '0.0'), x, PAD_T + pH + 6); } }
 
     // y labels
-    ctx.textBaseline = 'middle'; ctx.fillStyle = '#a6a299'; ctx.font = '9px SF Mono,Menlo,monospace';
+    ctx.textBaseline = 'middle'; ctx.fillStyle = '#5a574f'; ctx.font = '9px SF Mono,Menlo,monospace';
     for (let i = 0; i <= 4; i++) { const val = zA[0] + (i / 4) * (zA[1] - zA[0]), y = PAD_T + (1 - i / 4) * pH;
-      ctx.strokeStyle = 'rgba(232,227,214,0.30)'; ctx.lineWidth = 0.5; ctx.textAlign = 'right';
+      ctx.strokeStyle = 'rgba(232,227,214,0.18)'; ctx.lineWidth = 0.5; ctx.textAlign = 'right';
       ctx.beginPath(); ctx.moveTo(PAD_L - 4, y); ctx.lineTo(PAD_L, y); ctx.stroke(); ctx.fillText(fmt(val), PAD_L - 7, y); }
 
     ctx.save(); ctx.beginPath(); ctx.rect(PAD_L, PAD_T, pW, pH); ctx.clip();
@@ -231,14 +230,13 @@
     // live chronometer position (current session)
     const st = sessionT();
     if (st > 0 && st < 1) { const sx = mapX(st);
-      if (sx >= PAD_L && sx <= PAD_L + pW) { ctx.strokeStyle = 'rgba(127,209,224,0.35)'; ctx.lineWidth = 1; ctx.setLineDash([2, 5]);
+      if (sx >= PAD_L && sx <= PAD_L + pW) { ctx.strokeStyle = 'rgba(232,227,214,0.22)'; ctx.lineWidth = 1; ctx.setLineDash([2, 5]);
         ctx.beginPath(); ctx.moveTo(sx, PAD_T); ctx.lineTo(sx, PAD_T + pH); ctx.stroke(); ctx.setLineDash([]); } }
 
     // series
     if (P) for (const def of SERIES_DEF) { const s = P.series[def.key]; if (!s || !vis[def.key]) continue;
       const pts = P.cw.map((cw, i) => ({ x: mapX(cw), y: mapY(s.ys[i]) }));
-      ctx.save(); ctx.strokeStyle = def.color; ctx.lineWidth = 2; ctx.lineJoin = 'round';
-      ctx.shadowColor = def.color; ctx.shadowBlur = 4;
+      ctx.save(); ctx.strokeStyle = def.color; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
       if (fitOn()) ctx.globalAlpha = 0.26;
       ctx.beginPath(); smooth(ctx, pts); ctx.stroke(); ctx.restore(); }
 
@@ -247,24 +245,30 @@
       if (s && P.cw && P.cw.length >= 8) { const maxO = fitMaxO(), N = 160, x0 = P.cw[0], x1 = P.cw[P.cw.length - 1];
         for (let deg = 1; deg <= maxO; deg++) { if (P.cw.length < deg + 1) break;
           const c = QT.Poly.fit(P.cw, s.ys, deg);
-          ctx.save(); ctx.strokeStyle = FITC[deg] || '#fff'; ctx.lineWidth = Math.max(1.0, 2.4 - (deg - 1) * 0.15);
-          ctx.shadowColor = FITC[deg] || '#fff'; ctx.shadowBlur = 3; ctx.lineJoin = 'round'; ctx.beginPath();
+          ctx.save(); ctx.strokeStyle = FITC[deg] || '#fff'; ctx.lineWidth = Math.max(0.8, 1.8 - (deg - 1) * 0.1);
+          ctx.lineJoin = 'round'; ctx.beginPath();
           for (let i = 0; i <= N; i++) { const xv = x0 + (x1 - x0) * i / N, X = mapX(xv), Y = mapY(QT.Poly.evalAt(c, xv)); i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
           ctx.stroke(); ctx.restore(); } } }
 
-    // breach dots
+    // PG/PC zero crossings: open circles pinned to the zero line (BD style)
+    if (P) for (const ev of P.events) { if (ev.kind !== 'pg0' && ev.kind !== 'pc0') continue;
+      const x = mapX(ev.cw); if (x < PAD_L || x > PAD_L + pW) continue;
+      ctx.strokeStyle = 'rgba(232,227,214,0.8)'; ctx.lineWidth = 1.2; ctx.fillStyle = '#050506';
+      ctx.beginPath(); ctx.arc(x, baseY, 3.8, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+
+    // breach markers: open triangles on the CL curve (BD style)
     screenPts = [];
     if (P && vis.CL && vis.CM) P.breaches.forEach(bp => { const x = mapX(bp.cw), y = mapY(bp.val);
       drawDot(x, y, highlight && highlight.cw === bp.cw, now); screenPts.push({ x, y, cw: bp.cw }); });
 
     // coherence break markers (golden fold sign flips)
     if (rw) for (const c of rw.cross) { const x = mapX(c); if (x < PAD_L || x > PAD_L + pW) continue;
-      ctx.strokeStyle = 'rgba(232,181,58,0.55)'; ctx.lineWidth = 1; ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = 'rgba(232,181,58,0.35)'; ctx.lineWidth = 1; ctx.setLineDash([6, 4]);
       ctx.beginPath(); ctx.moveTo(x, PAD_T); ctx.lineTo(x, PAD_T + pH); ctx.stroke(); ctx.setLineDash([]); }
 
     // event-chip flash
     if (flashCW != null) { const ph = Math.min(1, (now - flashT0) / 1600); const x = mapX(flashCW);
-      ctx.fillStyle = 'rgba(127,209,224,' + (0.28 * (1 - ph)).toFixed(3) + ')';
+      ctx.fillStyle = 'rgba(232,227,214,' + (0.18 * (1 - ph)).toFixed(3) + ')';
       ctx.fillRect(x - 14 * (1 - ph) - 1, PAD_T, 28 * (1 - ph) + 2, pH); }
 
     // crosshair + mirror guide + clock label
@@ -276,14 +280,23 @@
           if (P) for (const def of SERIES_DEF) { const s = P.series[def.key]; if (!s || !vis[def.key]) continue;
             const v = interpAt(P.cw, s.ys, cwv); if (v == null) continue;
             ctx.fillStyle = def.color; ctx.beginPath(); ctx.arc(gx, mapY(v), 3.4, 0, Math.PI * 2); ctx.fill(); }
-          const lab = QT.cwClock(cwv) + ' ET'; ctx.font = '11px SF Mono,Menlo,monospace'; const tw = ctx.measureText(lab).width + 14;
+          const lab = 'τ ' + cwv.toFixed(3) + ' · ' + QT.cwClock12(cwv) + ' ET'; ctx.font = '10px SF Mono,Menlo,monospace'; const tw = ctx.measureText(lab).width + 14;
           const lx = Math.max(PAD_L, Math.min(PAD_L + pW - tw, gx - tw / 2));
-          ctx.fillStyle = 'rgba(18,18,22,0.94)'; ctx.fillRect(lx, PAD_T + 2, tw, 18); ctx.strokeStyle = '#4c4c54'; ctx.lineWidth = 0.5; ctx.strokeRect(lx, PAD_T + 2, tw, 18);
-          ctx.fillStyle = '#7fd1e0'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(lab, lx + tw / 2, PAD_T + 11); };
+          ctx.fillStyle = 'rgba(10,10,11,0.94)'; ctx.fillRect(lx, PAD_T + 2, tw, 18); ctx.strokeStyle = '#3a3a42'; ctx.lineWidth = 0.5; ctx.strokeRect(lx, PAD_T + 2, tw, 18);
+          ctx.fillStyle = '#e8e3d6'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(lab, lx + tw / 2, PAD_T + 11); };
         guide(cw, 0.5);
         if (Math.abs(cw) > 0.012) guide(-cw, 0.3);
       } }
     ctx.restore();
+
+    // BD corner furniture
+    ctx.font = '10px SF Mono,Menlo,monospace'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = 'rgba(232,227,214,0.30)'; ctx.textAlign = 'left';
+    ctx.fillText('ZN Timestate', 8, H - 8);
+    ctx.fillStyle = 'rgba(232,227,214,0.20)'; ctx.textAlign = 'right';
+    ctx.fillText('scroll: zoom · shift+scroll: y · dbl-click: reset', W - 8, H - 8);
+    if (P && P.breaches.length) { ctx.fillStyle = 'rgba(232,227,214,0.5)';
+      ctx.fillText('Breach · ' + P.breaches.length, W - 8, 16); }
 
     drawAnnots(now);
     positionTexts();
@@ -292,8 +305,11 @@
   function interpAt(cw, ys, x) { if (!cw || !cw.length || x < cw[0] || x > cw[cw.length - 1]) return null;
     for (let i = 0; i < cw.length - 1; i++) { if (x >= cw[i] && x <= cw[i + 1]) { const t = (cw[i + 1] === cw[i]) ? 0 : (x - cw[i]) / (cw[i + 1] - cw[i]);
       return ys[i] + t * (ys[i + 1] - ys[i]); } } return ys[ys.length - 1]; }
-  function drawDot(x, y, hl, now) { if (hl) { const ph = ((now - t0) % 900) / 900; ctx.strokeStyle = 'rgba(232,92,92,' + (0.85 * (1 - ph)).toFixed(3) + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 5.5 + ph * 16, 0, Math.PI * 2); ctx.stroke(); }
-    ctx.save(); ctx.shadowColor = '#e85c5c'; ctx.shadowBlur = hl ? 16 : 10; ctx.fillStyle = '#e85c5c'; ctx.beginPath(); ctx.arc(x, y, hl ? 5.5 : 4.5, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+  // BD marker: open triangle, no glow; hover = thin expanding ring
+  function drawDot(x, y, hl, now) { if (hl) { const ph = ((now - t0) % 900) / 900; ctx.strokeStyle = 'rgba(232,227,214,' + (0.7 * (1 - ph)).toFixed(3) + ')'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, 6 + ph * 14, 0, Math.PI * 2); ctx.stroke(); }
+    const r = hl ? 5.5 : 4.5;
+    ctx.save(); ctx.strokeStyle = '#e8e3d6'; ctx.lineWidth = 1.4; ctx.fillStyle = '#050506';
+    ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r * 0.87, y + r * 0.5); ctx.lineTo(x - r * 0.87, y + r * 0.5); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
 
   const FITC = { 1: '#e8b53a', 2: '#6fd3ff', 3: '#c9a0ff', 4: '#f06a6a', 5: '#5fcf8f', 6: '#ff9a4d', 7: '#9fb0ff', 8: '#ff7fd0', 9: '#d4c47a' };
   function fitOn() { return $('fitToggle').checked; }
@@ -460,7 +476,7 @@
     cursor = { x: mx, y: my };
     let hit = null, bestD = 12; for (const p of screenPts) { const d = Math.hypot(mx - p.x, my - p.y); if (d < bestD) { bestD = d; hit = p; } }
     if (hit) { canvas.style.cursor = 'pointer'; if (!highlight || highlight.cw !== hit.cw) { highlight = { cw: hit.cw }; t0 = performance.now(); startLoop(); }
-      dotTip.innerHTML = '<b>' + QT.cwClock(hit.cw) + ' ET</b> &middot; ZN breach &middot; CW ' + hit.cw.toFixed(3);
+      dotTip.innerHTML = '<b>τ ' + hit.cw.toFixed(3) + '</b> &middot; ' + QT.cwClock12(hit.cw) + ' ET &middot; ZN breach';
       dotTip.style.left = hit.x + 'px'; dotTip.style.top = hit.y + 'px'; dotTip.style.display = 'block'; }
     else { canvas.style.cursor = 'crosshair'; dotTip.style.display = 'none'; if (highlight) { highlight = null; stopLoop(); } else draw(); } });
   canvas.addEventListener('mousedown', e => { if (tool) return; const r = canvas.getBoundingClientRect();

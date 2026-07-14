@@ -42,17 +42,19 @@
   .tsBar label.tg{display:flex;align-items:center;gap:5px;font:500 9.5px var(--font-mono);color:var(--cream-dim);cursor:pointer;background:var(--fill);border-radius:var(--radius-sm);padding:4px 8px;}
 
   /* chart */
-  .tsChartwrap{flex:1 1 auto;min-height:0;position:relative;background:#07090d;border-radius:var(--radius-md);overflow:hidden;}
+  .tsChartwrap{flex:1 1 auto;min-height:0;position:relative;background:#050506;border-radius:var(--radius-md);overflow:hidden;}
   #tsChart,#tsOverlay{position:absolute;inset:0;width:100%;height:100%;display:block;}
   #tsOverlay{pointer-events:none;}
   #tsTip{display:none;position:absolute;transform:translate(-50%,-140%);background:rgba(18,18,22,0.94);border:0.5px solid #4c4c54;border-radius:8px;padding:5px 9px;font:500 10.5px var(--font-mono);color:var(--cream);pointer-events:none;white-space:nowrap;z-index:8;}
 
-  /* legend + events */
-  .tsLegend{flex:0 0 auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap;font:500 10px var(--font-mono);color:var(--cream-dim);padding:0 2px;}
-  .tsLegend .sw{display:inline-block;width:14px;border-top:2.5px solid;vertical-align:middle;margin-right:5px;}
-  .tsLegend .dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:5px;}
-  .tsLegend .ltog{cursor:pointer;user-select:none;}
-  .tsLegend .ltog.off{opacity:0.35;}
+  /* legend: BD-style toggle chips overlaid top-left of the chart */
+  .tsLegend{position:absolute;top:8px;left:8px;z-index:5;display:flex;align-items:center;gap:4px;flex-wrap:wrap;font:600 9.5px var(--font-mono);color:var(--cream-dim);max-width:calc(100% - 140px);}
+  .tsLegend .sw{display:inline-block;width:11px;border-top:2px solid;vertical-align:middle;margin-right:5px;}
+  .tsLegend .dot{display:inline-block;width:7px;height:7px;border-radius:50%;vertical-align:middle;margin-right:5px;}
+  .tsLegend .ltog{cursor:pointer;user-select:none;background:rgba(18,18,22,0.85);border:0.5px solid #26262d;border-radius:6px;padding:3px 8px;}
+  .tsLegend .ltog:not(.off){background:#232329;color:var(--cream);}
+  .tsLegend .ltog.off{opacity:0.45;}
+  .tsLegend>span:not(.ltog){background:rgba(18,18,22,0.6);border-radius:6px;padding:3px 8px;}
   .tsLegend .scl{color:#6f675a;font-size:9px;}
   .tsEvents{flex:0 0 auto;display:flex;gap:6px;overflow-x:auto;padding:2px;font:500 10px var(--font-mono);}
   .tsEvents .chip{flex:0 0 auto;background:var(--fill);border-radius:7px;padding:5px 10px;white-space:nowrap;cursor:pointer;}
@@ -60,7 +62,7 @@
   .tsEvents .empty{color:#6f675a;padding:5px 2px;}
 
   /* RIPN panel */
-  #ripnPanel{display:none;position:absolute;top:8px;left:8px;z-index:6;width:296px;max-height:calc(100% - 16px);background:var(--glass-strong);border:0.5px solid var(--glass-line);border-radius:var(--radius-md);box-shadow:var(--shadow);flex-direction:column;font-size:11px;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);}
+  #ripnPanel{display:none;position:absolute;top:36px;left:8px;z-index:6;width:296px;max-height:calc(100% - 16px);background:var(--glass-strong);border:0.5px solid var(--glass-line);border-radius:var(--radius-md);box-shadow:var(--shadow);flex-direction:column;font-size:11px;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);}
   #ripnPanel .rp-top{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:0.5px solid var(--glass-line);}
   #ripnPanel .rp-title{font-weight:600;letter-spacing:.4px;color:var(--cream);}
   #ripnHead{padding:5px 10px;border-bottom:0.5px solid var(--glass-line);color:var(--cream-dim);font-size:10px;line-height:1.5;}
@@ -141,6 +143,7 @@
     <div class="tsChartwrap">
       <canvas id="tsChart"></canvas>
       <canvas id="tsOverlay"></canvas>
+      <div class="tsLegend" id="tsLegend"></div>
       <div id="tsTip"></div>
       <div id="ripnPanel">
         <div class="rp-top">
@@ -164,7 +167,6 @@
       </div>
     </div>
 
-    <div class="tsLegend" id="tsLegend"></div>
     <div class="tsEvents" id="tsEvents"></div>
   </div>
 </div>
