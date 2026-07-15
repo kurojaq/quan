@@ -222,8 +222,36 @@
     clearChronoBands();
     if(!series||!chart||!chronoOn||curInterval==='1d'||!date) return;   // session-time overlay: intraday only
     chronoEvents=collectChronoEvents(raw,date);
+    if(!chronoEvents.length) return;
+    // lightweight-charts' timeToCoordinate ONLY resolves times that lie exactly on the
+    // scale (a real bar time or a whitespace slot); cwToUnix produces arbitrary times
+    // between bars, which resolve to null and draw nothing. Snap each event to the nearest
+    // scale slot. Events past the last bar (crossings that haven't happened yet) get
+    // whitespace slots appended so the axis extends and they still render — this is what
+    // makes forward intersections visible "before they happen".
+    var bars=window.__chartBars||[];
+    chronoEvents.forEach(function(e){ e._t=cwToUnix(e.cw,date); });
+    var evT=chronoEvents.map(function(e){ return e._t; }).filter(function(t){ return t!=null; });
+    var scaleTimes=bars.map(function(b){ return b.time; });
+    if(bars.length && evT.length){
+      var iv=(bars.length>=2)?((bars[bars.length-1].time-bars[bars.length-2].time)||300):300;
+      var lastBar=bars[bars.length-1].time, maxEv=Math.max.apply(null,evT);
+      if(maxEv>lastBar){                                                // future in-session events: extend the axis
+        var ext=[], t=lastBar+iv, guard=0;
+        while(t<=maxEv+iv && guard<3000){ ext.push({time:t}); scaleTimes.push(t); t+=iv; guard++; }
+        if(ext.length){ try{ series.setData(bars.map(function(b){ return {time:b.time,open:b.open,high:b.high,low:b.low,close:b.close}; }).concat(ext)); }catch(_){} }
+      }
+    }
+    function snap(tt){
+      if(tt==null||!scaleTimes.length) return tt;
+      if(tt<=scaleTimes[0]) return scaleTimes[0];
+      if(tt>=scaleTimes[scaleTimes.length-1]) return scaleTimes[scaleTimes.length-1];
+      var lo=0,hi=scaleTimes.length-1;
+      while(hi-lo>1){ var mid=(lo+hi)>>1; if(scaleTimes[mid]<tt) lo=mid; else hi=mid; }
+      return (Math.abs(scaleTimes[lo]-tt)<=Math.abs(scaleTimes[hi]-tt))?scaleTimes[lo]:scaleTimes[hi];
+    }
     chronoEvents.forEach(function(e){
-      var tC=cwToUnix(e.cw,date); if(tC==null) return;
+      var tC=snap(e._t); if(tC==null) return;
       var rgb=CHRONO_COL[e.type]||CHRONO_COL.def;
       // one dashed vertical line per event, colored by sheet; brightens to solid when the cursor is over it
       var col='rgba('+rgb+',0.62)', hot='rgba('+rgb+',0.98)';
