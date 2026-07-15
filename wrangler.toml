@@ -29,6 +29,18 @@ id = "88472c90139149dea44668ce0c0a7d8a"
 binding = "QUAN_STATE"
 bucket_name = "quan-state"
 
+# Google Drive auto-ingest results (see workers/ingest-worker.js, functions/api/ingest-list.js,
+# functions/api/ingest-file.js). NOTE: add both by hand too, same as QUAN_PUBLISH/QUAN_STATE above:
+# Pages -> Settings -> Functions -> D1 database bindings / R2 bucket bindings.
+[[d1_databases]]
+binding = "QUAN_INGEST_DB"
+database_name = "quan-ingest"
+database_id = "5e15afc4-9ba2-48cb-9fd9-8194531b5b89"
+
+[[r2_buckets]]
+binding = "QUAN_INGEST_BUCKET"
+bucket_name = "quan-ingest"
+
 # Service binding to the Barchart auto-pull Worker (Phase 5). Lets /api/autopull's
 # "Pull today" call the Worker privately (env.BARCHART.fetch), with no public URL.
 # The Worker is deployed separately (workers/wrangler-barchart.toml); this just

@@ -161,6 +161,44 @@
   window.addEventListener('quan:date',function(){ setTimeout(function(){feedHeatmap();},0); });
   window.addEventListener('quan:cell',function(){ setTimeout(function(){feedHeatmap();},0); });
   window.addEventListener('quan:instr',function(){ setTimeout(function(){feedHeatmap();},0); });
+
+  // ---- Google Drive auto-ingest auto-load (functions/api/ingest-list.js, ingest-file.js) ----
+  // On date/instrument selection, if this cell has no chain loaded yet, check whether the
+  // Drive auto-pull worker already ingested a file for it and load it automatically — the
+  // whole point being the user never has to manually upload what's already in Drive.
+  var _ingestCache={}, _ingestInflight={};
+  function ingestHeaders(){ var t=window.__authToken&&window.__authToken(); var h={}; if(t)h.Authorization='Bearer '+t; return h; }
+  async function ingestListFor(inst){
+    if(_ingestCache[inst]) return _ingestCache[inst];
+    if(_ingestInflight[inst]) return _ingestInflight[inst];
+    _ingestInflight[inst]=fetch('/api/ingest-list?inst='+encodeURIComponent(inst),{headers:ingestHeaders()})
+      .then(function(r){ return r.ok?r.json():{files:[]}; })
+      .catch(function(){ return {files:[]}; })
+      .then(function(d){ _ingestCache[inst]=d.files||[]; delete _ingestInflight[inst]; return _ingestCache[inst]; });
+    return _ingestInflight[inst];
+  }
+  function synthName(row){ var ex=row.expiration||'', p=ex.split('-'); var mm=p[1]||'01', dd=p[2]||'01', yy=(p[0]||'2026').slice(2);
+    return row.instrument+'-exp-'+mm+'_'+dd+'_'+yy+'-'+row.session_date.replace(/-/g,'')+'.csv'; }
+  async function autoLoadFromIngest(){ try{
+    if(!window.__authToken || !window.__authToken()) return;   // operator-only endpoints; skip quietly if signed out
+    var inst=curInst, date=gDate(); if(!inst||!date) return;
+    var cell=curCell(false); var b=cell?activeOf(cell):null; var e=(cell&&cell.exp)?cell.exp[b]:null;
+    if(e&&e.chain) return;   // already has data (manual upload or prior auto-load) — never overwrite
+    var files=await ingestListFor(inst);
+    var chainRow=files.find(function(f){return f.session_date===date&&f.data_type==='optionPrices';});
+    var greeksRow=files.find(function(f){return f.session_date===date&&f.data_type==='greeks';});
+    if(!chainRow) return;
+    if(curInst!==inst||gDate()!==date) return;   // selection changed while we were fetching
+    var cr=await fetch('/api/ingest-file?key='+encodeURIComponent(chainRow.storage_key),{headers:ingestHeaders()});
+    if(!cr.ok) return; var chainText=await cr.text();
+    if(curInst!==inst||gDate()!==date) return;
+    window.__qLoadChain(chainText, synthName(Object.assign({instrument:inst},chainRow)));
+    if(greeksRow){ var gr=await fetch('/api/ingest-file?key='+encodeURIComponent(greeksRow.storage_key),{headers:ingestHeaders()});
+      if(gr.ok){ var greeksText=await gr.text(); if(curInst===inst&&gDate()===date) window.__qLoadGreeks(greeksText, synthName(Object.assign({instrument:inst},greeksRow)), null); } }
+  }catch(_e){} }
+  window.__autoLoadFromIngest=autoLoadFromIngest;
+  window.addEventListener('quan:date',function(){ setTimeout(autoLoadFromIngest,50); });
+  window.addEventListener('quan:instr',function(){ setTimeout(autoLoadFromIngest,50); });
   if($('upKind')) $('upKind').addEventListener('change',upSyncFn);
   gA.addEventListener('change',()=>window.__qSetAnchor(gA.value));
   gL.addEventListener('click',()=>{ const cell=curCell(true); cell.locked=!cell.locked; applyLockUI(cell.locked); persistMeta(curInst); });

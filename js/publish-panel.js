@@ -27,17 +27,32 @@
   }
 
   // ---- request the currently-computed heatmap grid from the (possibly not-yet-open) Heat Map iframe ----
+  // Force-feeds the frame with the current inst/date chain first (a freshly-booted or
+  // stale frame otherwise still holds the baked default), then rejects a mismatched
+  // instrument instead of silently publishing the wrong grid to the client.
   function requestHeatmapData(){
     return new Promise(function(resolve){
       if(!window.__heatBoot){ resolve(null); return; }
       window.__heatBoot();
       var frame=document.getElementById('heatFrame');
       if(!frame){ resolve(null); return; }
+      var wantInst=curInst();
+      try{ if(window.__feedHeatmap) window.__feedHeatmap(true); }catch(_){}
       var reqId=Math.random().toString(36).slice(2);
       var done=false;
       function onMsg(ev){
         if(ev.data && ev.data.type==='quanHeatmapData' && ev.data.reqId===reqId){
-          done=true; window.removeEventListener('message',onMsg); resolve(ev.data.data||null);
+          done=true; window.removeEventListener('message',onMsg);
+          var data=ev.data.data||null;
+          var gotInst=data&&data.meta&&data.meta.inst;
+          if(data && wantInst && gotInst && gotInst!==wantInst){
+            if(window.__qPipe) window.__qPipe.log('Publish Capture','fail','heat map iframe held '+gotInst+' but publishing '+wantInst+' — grid discarded, not sent to client',{instrument:wantInst});
+            resolve(null); return;
+          }
+          if(data && (!data.rows || !data.rows.length)){
+            if(window.__qPipe) window.__qPipe.log('Publish Capture','warn','heat map iframe returned 0 rows for '+wantInst,{instrument:wantInst});
+          }
+          resolve(data);
         }
       }
       window.addEventListener('message',onMsg);
@@ -45,7 +60,9 @@
       var attempts=0;
       var iv=setInterval(function(){
         attempts++; tryReq();
-        if(done || attempts>=10){ clearInterval(iv); if(!done){ window.removeEventListener('message',onMsg); resolve(null); } }
+        if(done || attempts>=14){ clearInterval(iv); if(!done){ window.removeEventListener('message',onMsg);
+          if(window.__qPipe) window.__qPipe.log('Publish Capture','fail','heat map iframe never responded to quanGetHeatmap',{instrument:wantInst});
+          resolve(null); } }
       },400);
       tryReq();
     });

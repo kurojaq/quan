@@ -1,0 +1,25 @@
+name = "quan-ingest"
+main = "ingest-worker.js"
+compatibility_date = "2024-11-01"
+
+# Runs every 15 minutes; adjust as needed.
+[triggers]
+crons = ["*/15 * * * *"]
+
+[[d1_databases]]
+binding = "QUAN_INGEST_DB"
+database_name = "quan-ingest"
+database_id = "5e15afc4-9ba2-48cb-9fd9-8194531b5b89"
+
+[[r2_buckets]]
+binding = "QUAN_INGEST_BUCKET"
+bucket_name = "quan-ingest"
+
+# Not secret — the folder ID is just an address, safe as a plain var.
+# https://drive.google.com/drive/folders/1hNC_tJoilCaoCMy7hq6rC9AMjHLBax30
+[vars]
+GDRIVE_FOLDER_ID = "1hNC_tJoilCaoCMy7hq6rC9AMjHLBax30"
+
+# Secrets (do NOT put here — set via `wrangler secret put NAME -c workers/wrangler-ingest.toml`):
+#   GDRIVE_SA_JSON     Google service-account key JSON, Drive read-only scope
+#   INGEST_ADMIN_TOKEN bearer token to allow manual POST /sync (historical import / troubleshooting)
