@@ -182,12 +182,28 @@ try:
             _o['tx']=[{'cw':float(_z),'time':_cwc(_z)} for _z in _txz] if _txz else None
 except Exception as _ew: _o['_twerr']=str(_ew)
 
-json.dumps(_o)`); return JSON.parse(js); }catch(e){ console.warn('engBrief',e); return null; } };
+# Python json.dumps emits bare NaN/Infinity for non-finite floats, which JS JSON.parse
+# REJECTS -> engBrief returns null for the whole instrument. Currency-scale inputs
+# (tiny prices, degenerate distributions) produce NaN in ratio/correlation/z-score
+# metrics that index instruments never hit. Sanitize non-finite floats to null.
+def _fin(o):
+ if isinstance(o,bool): return o
+ if isinstance(o,float): return o if (o==o and o not in (float('inf'),float('-inf'))) else None
+ if isinstance(o,dict): return {k:_fin(v) for k,v in o.items()}
+ if isinstance(o,(list,tuple)): return [_fin(v) for v in o]
+ return o
+json.dumps(_fin(_o))`); return JSON.parse(js); }catch(e){ console.warn('engBrief',e); return null; } };
       window.__projection=function(payloadObj){ try{ py.globals.set('_proj_pl', JSON.stringify(payloadObj||{})); var _pj=py.runPython(`import json
 import quan_taxonomy_store as _TS, quan_projection as _PJ
 from quan_store_reader import StoreReader as _SR
 _pl=json.loads(_proj_pl); _frag=_TS.build_fragment(_pl); _proj=_PJ.build_projection(_SR(_frag), _pl)
-json.dumps(_proj)`); return JSON.parse(_pj); }catch(e){ console.warn('projection',e); return null; } };
+def _fin(o):
+ if isinstance(o,bool): return o
+ if isinstance(o,float): return o if (o==o and o not in (float('inf'),float('-inf'))) else None
+ if isinstance(o,dict): return {k:_fin(v) for k,v in o.items()}
+ if isinstance(o,(list,tuple)): return [_fin(v) for v in o]
+ return o
+json.dumps(_fin(_proj))`); return JSON.parse(_pj); }catch(e){ console.warn('projection',e); return null; } };
       if(window.__engReadyResolve) window.__engReadyResolve(); }catch(_e){ console.warn('engBrief expose(main)',_e); }
       return true;
     }catch(e){ booting=false; setStatus('engine failed to start'); setErr(String(e&&e.message||e)); return false; }
