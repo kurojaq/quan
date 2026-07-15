@@ -231,33 +231,53 @@
     // makes forward intersections visible "before they happen".
     var bars=window.__chartBars||[];
     chronoEvents.forEach(function(e){ e._t=cwToUnix(e.cw,date); });
-    var evT=chronoEvents.map(function(e){ return e._t; }).filter(function(t){ return t!=null; });
-    var scaleTimes=bars.map(function(b){ return b.time; });
-    if(bars.length && evT.length){
-      var iv=(bars.length>=2)?((bars[bars.length-1].time-bars[bars.length-2].time)||300):300;
-      var lastBar=bars[bars.length-1].time, maxEv=Math.max.apply(null,evT);
-      if(maxEv>lastBar){                                                // future in-session events: extend the axis
-        var ext=[], t=lastBar+iv, guard=0;
-        while(t<=maxEv+iv && guard<3000){ ext.push({time:t}); scaleTimes.push(t); t+=iv; guard++; }
-        if(ext.length){ try{ series.setData(bars.map(function(b){ return {time:b.time,open:b.open,high:b.high,low:b.low,close:b.close}; }).concat(ext)); }catch(_){} }
-      }
+    var dbg={date:date, events:chronoEvents.length, hasRaw:!!raw, p9:(raw&&raw.p9?raw.p9.length:0), zc:(raw&&raw.zc?raw.zc.length:0), tx:(raw&&raw.tx?raw.tx.length:0), bars:bars.length, drawn:0, future:0, note:''};
+    window.__chronoLast=dbg;
+    if(!bars.length){ dbg.note='no chart bars loaded — chrono lines anchor to bars; retrying on quan:bars'; return; }
+    var barTimes=bars.map(function(b){ return b.time; }), lastBar=barTimes[barTimes.length-1];
+    var iv=(bars.length>=2)?((lastBar-barTimes[bars.length-2])||300):300;
+    function nearest(times,tt){ if(tt==null||!times.length) return null;
+      if(tt<=times[0]) return times[0]; if(tt>=times[times.length-1]) return times[times.length-1];
+      var lo=0,hi=times.length-1; while(hi-lo>1){ var m=(lo+hi)>>1; if(times[m]<tt) lo=m; else hi=m; }
+      return (Math.abs(times[lo]-tt)<=Math.abs(times[hi]-tt))?times[lo]:times[hi]; }
+    function drawAt(tC,e){ if(tC==null) return false; var rgb=CHRONO_COL[e.type]||CHRONO_COL.def;
+      try{ var b=new VertLine(chart,tC,'rgba('+rgb+',0.62)',1,[5,4],'rgba('+rgb+',0.98)'); b._ev=e; b._tC=tC; series.attachPrimitive(b); chronoBands.push(b); return true; }catch(_){ return false; } }
+    // 1) in-range events (past/current) — snap to a real bar; ALWAYS drawable, independent of any axis extension
+    var future=[];
+    chronoEvents.forEach(function(e){ if(e._t==null) return;
+      if(e._t<=lastBar){ drawAt(nearest(barTimes,e._t), e); } else { future.push(e); } });
+    dbg.drawn=chronoBands.length; dbg.future=future.length;
+    // 2) future events (crossings that haven't happened yet) — extend the axis with whitespace so they
+    //    resolve, preserving the visible range so the candles are not squished. Best-effort: a failure
+    //    here can never affect the in-range lines already drawn above.
+    if(future.length){
+      try{
+        var maxEv=future.reduce(function(m,e){ return Math.max(m,e._t); }, lastBar);
+        var ext=[], scale=barTimes.slice(), t=lastBar+iv, guard=0;
+        while(t<=maxEv+iv && guard<3000){ ext.push({time:t}); scale.push(t); t+=iv; guard++; }
+        if(ext.length){
+          var vr=chart.timeScale().getVisibleLogicalRange();
+          series.setData(bars.map(function(b){ return {time:b.time,open:b.open,high:b.high,low:b.low,close:b.close}; }).concat(ext));
+          if(vr) try{ chart.timeScale().setVisibleLogicalRange(vr); }catch(_v){}
+          future.forEach(function(e){ drawAt(nearest(scale,e._t), e); });
+          dbg.drawn=chronoBands.length;
+        }
+      }catch(_){}
     }
-    function snap(tt){
-      if(tt==null||!scaleTimes.length) return tt;
-      if(tt<=scaleTimes[0]) return scaleTimes[0];
-      if(tt>=scaleTimes[scaleTimes.length-1]) return scaleTimes[scaleTimes.length-1];
-      var lo=0,hi=scaleTimes.length-1;
-      while(hi-lo>1){ var mid=(lo+hi)>>1; if(scaleTimes[mid]<tt) lo=mid; else hi=mid; }
-      return (Math.abs(scaleTimes[lo]-tt)<=Math.abs(scaleTimes[hi]-tt))?scaleTimes[lo]:scaleTimes[hi];
-    }
-    chronoEvents.forEach(function(e){
-      var tC=snap(e._t); if(tC==null) return;
-      var rgb=CHRONO_COL[e.type]||CHRONO_COL.def;
-      // one dashed vertical line per event, colored by sheet; brightens to solid when the cursor is over it
-      var col='rgba('+rgb+',0.62)', hot='rgba('+rgb+',0.98)';
-      try{ var b=new VertLine(chart,tC,col,1,[5,4],hot); b._ev=e; b._tC=tC; series.attachPrimitive(b); chronoBands.push(b); }catch(_){}
-    });
   }
+  // console diagnostic — pinpoints where the chrono chain breaks (data / bars / coordinate resolution)
+  window.__chronoDebug=function(){
+    var inst=(document.getElementById('instA')||{}).value||'', date=(document.getElementById('dayDate')||{}).value||'';
+    var data=null; try{ data=window.__reportData?window.__reportData(inst,date):null; }catch(e){ return {error:String(e)}; }
+    var raw=data&&data.__raw, bars=window.__chartBars||[], ts=chart&&chart.timeScale();
+    var evs=collectChronoEvents(raw,date), bt=bars.map(function(b){return b.time;});
+    function near(tt){ if(!bt.length||tt==null) return null; if(tt<=bt[0])return bt[0]; if(tt>=bt[bt.length-1])return bt[bt.length-1];
+      var lo=0,hi=bt.length-1; while(hi-lo>1){var m=(lo+hi)>>1; if(bt[m]<tt)lo=m; else hi=m;} return Math.abs(bt[lo]-tt)<=Math.abs(bt[hi]-tt)?bt[lo]:bt[hi]; }
+    return { date:date, chronoOn:chronoOn, engineReady:!!window.__engBrief, hasRaw:!!raw,
+      rawP9:raw&&raw.p9?raw.p9.length:null, rawZC:raw&&raw.zc?raw.zc.length:null, rawTX:raw&&raw.tx?raw.tx.length:null,
+      eventCount:evs.length, barCount:bars.length, curInterval:curInterval, drawnLines:chronoBands.length, lastRun:window.__chronoLast||null,
+      sample:evs.slice(0,6).map(function(e){ var u=cwToUnix(e.cw,date), sn=near(u); return {type:e.type, cw:e.cw, unix:u, snapped:sn, resolvesToX:(ts&&sn!=null)?ts.timeToCoordinate(sn):null}; }) };
+  };
   window.__chronoRefresh=function(){
     var inst=(document.getElementById('instA')||{}).value||'', date=(document.getElementById('dayDate')||{}).value||'';
     var data=null; try{ data=window.__reportData?window.__reportData(inst,date):null; }catch(_){}
