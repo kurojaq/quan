@@ -19,6 +19,10 @@
   //   #heatFrame quanGetHeatmap    — main terminal: the live heat-engine iframe
 
   var on=false, viewMode='price', metric='oi', prim=null, attachedSeries=null, pendingReq=false;
+  // render strategy for the heat field (Price-tab Obj 3-5 / Bookmap item 6): 'cells' = classic
+  // discrete bands; the rest delegate to the ScalarField framework. Rendering-only — the
+  // underlying day grids / bands are computed identically for every mode.
+  var renderMode='cells', heatPalette='thermal', modeSelEl=null, palSelEl=null;
   var DAYGRIDS={};        // 'YYYY-MM-DD' -> {rows,meta}
   var INTRADAY=[];        // [{t,grid}] — today's recaptures, session-lifetime only
   var LATEST=null;
@@ -133,7 +137,7 @@
     }catch(_){}
     return {};
   }
-  function savePrefs(){ try{ localStorage.setItem('quanChartHeat:prefs',JSON.stringify({metric:metric,granIdx:granIdx,mono:mono,candlesOn:candlesOn})); }catch(_){} }
+  function savePrefs(){ try{ localStorage.setItem('quanChartHeat:prefs',JSON.stringify({metric:metric,granIdx:granIdx,mono:mono,candlesOn:candlesOn,renderMode:renderMode,heatPalette:heatPalette})); }catch(_){} }
   function loadPrefs(){
     try{
       var p=JSON.parse(localStorage.getItem('quanChartHeat:prefs')||'{}');
@@ -141,6 +145,8 @@
       if(p.granIdx!=null) granIdx=Math.max(0,Math.min(GRANS.length-1,+p.granIdx||0));
       mono=!!p.mono;
       candlesOn=(p.candlesOn!==false);
+      if(p.renderMode) renderMode=p.renderMode;
+      if(p.heatPalette) heatPalette=p.heatPalette;
     }catch(_){}
   }
 
@@ -226,6 +232,39 @@
     },400);
   }
 
+  // ---- continuous field rendering (scalar / spectral / contour / gradient / density) ----
+  // One 1-column ScalarField PER DAY-SEGMENT, so interpolation can never cross a session
+  // boundary (strict session isolation). The column is rasterized on an offscreen canvas by
+  // the shared ScalarField framework, then stretched across the segment's width with
+  // drawImage — proper alpha compositing over the pane (putImageData would stomp it), and
+  // the canvas' own smoothing supplies the vertical continuity. Rendering-only: bands are
+  // the same objects the classic cell path draws.
+  var _fieldOff=null;
+  function drawSegField(ctx,seg,hr,vr,H){
+    var SF=window.ScalarField; if(!SF) return false;
+    var x0=Math.round(seg.x0*hr), x1=Math.round(seg.x1*hr);
+    if(x1<=x0||!seg.bands.length) return true;
+    var cssH=H/vr, R=Math.max(8,Math.min(420,Math.round(cssH/2)));   // ~2 css px per sample row
+    var f=SF.makeField(R,1,0);
+    for(var i=0;i<seg.bands.length;i++){
+      var b=seg.bands[i];
+      var r0=Math.max(0,Math.floor(b.yTop/cssH*R)), r1=Math.min(R,Math.max(r0+1,Math.ceil(b.yBot/cssH*R)));
+      for(var r2=r0;r2<r1;r2++){ if(b.norm>f.at(r2,0)) f.set(r2,0,b.norm); }
+    }
+    if(!_fieldOff) _fieldOff=document.createElement('canvas');
+    if(_fieldOff.width!==1||_fieldOff.height!==R){ _fieldOff.width=1; _fieldOff.height=R; }
+    var octx=_fieldOff.getContext('2d');
+    octx.clearRect(0,0,1,R);
+    try{ SF.render(octx,f,{ mode:renderMode, colormap:seg.gray?'mono':heatPalette, rect:{x:0,y:0,w:1,h:R}, sigma:3 }); }
+    catch(_){ return false; }
+    ctx.save();
+    ctx.globalAlpha=BAND_ALPHA;
+    ctx.imageSmoothingEnabled=true;
+    ctx.drawImage(_fieldOff,0,0,1,R, x0,0,x1-x0,H);
+    ctx.restore();
+    return true;
+  }
+
   // ---- pane renderer ----
   function HeatRenderer(view){ this._v=view; }
   HeatRenderer.prototype.draw=function(target){
@@ -236,8 +275,10 @@
       var profW=Math.round(W*PROFILE_FRAC);
       ctx.save();
       // 1. time-segmented heat field (selected day in color, the rest grayscale)
+      var useField=(renderMode!=='cells')&&!!window.ScalarField;
       for(var s=0;s<v._segs.length;s++){
         var seg=v._segs[s];
+        if(useField&&drawSegField(ctx,seg,hr,vr,H)) continue;   // continuous strategy; falls through to cells on failure
         var x0=Math.round(seg.x0*hr), x1=Math.round(seg.x1*hr);
         if(x1<=x0) continue;
         var rf=seg.gray?grayRamp:ramp;
@@ -604,6 +645,8 @@
     function syncControls(){
       var bm=(viewMode==='bookmap');
       if(sel) sel.style.display=bm?'':'none';
+      if(modeSelEl) modeSelEl.style.display=bm?'':'none';
+      if(palSelEl) palSelEl.style.display=(bm&&renderMode!=='cells')?'':'none';
       if(granWrap) granWrap.style.display=bm?'inline-flex':'none';
       if(candBtn){ candBtn.style.display=bm?'':'none'; candBtn.classList.toggle('on',candlesOn); }
       if(monoBtn){ monoBtn.style.display=bm?'':'none'; monoBtn.classList.toggle('on',mono); }
@@ -634,6 +677,27 @@
     if(sel){
       sel.style.display='none';
       sel.addEventListener('change',function(){ metric=sel.value; savePrefs(); updateLegend(); nudge(); });
+    }
+    // render-strategy + palette selectors (Price-tab Obj 5: switching visualization modes
+    // only changes rendering — the day grids and bands are never recomputed)
+    if(sel&&sel.parentNode&&!modeSelEl){
+      modeSelEl=document.createElement('select');
+      modeSelEl.id='chartHeatRender'; modeSelEl.className=sel.className; modeSelEl.title='Render strategy';
+      ['cells','scalar','spectral','contour','gradient','density'].forEach(function(m){
+        var o=document.createElement('option'); o.value=m; o.textContent=m; modeSelEl.appendChild(o);
+      });
+      modeSelEl.value=renderMode; if(modeSelEl.value!==renderMode){ renderMode='cells'; modeSelEl.value='cells'; }
+      modeSelEl.addEventListener('change',function(){ renderMode=modeSelEl.value; savePrefs(); syncControls(); nudge(); });
+      sel.parentNode.insertBefore(modeSelEl,sel.nextSibling);
+      palSelEl=document.createElement('select');
+      palSelEl.id='chartHeatPalette'; palSelEl.className=sel.className; palSelEl.title='Field palette';
+      (window.ScalarField?window.ScalarField.COLORMAP_NAMES:['thermal','spectral','viridis','ice']).forEach(function(nm){
+        if(nm==='mono') return;                       // mono is reserved for non-selected sessions
+        var o=document.createElement('option'); o.value=nm; o.textContent=nm; palSelEl.appendChild(o);
+      });
+      palSelEl.value=heatPalette; if(palSelEl.value!==heatPalette){ heatPalette='thermal'; palSelEl.value='thermal'; }
+      palSelEl.addEventListener('change',function(){ heatPalette=palSelEl.value; savePrefs(); nudge(); });
+      modeSelEl.parentNode.insertBefore(palSelEl,modeSelEl.nextSibling);
     }
     if(granIn) granIn.addEventListener('input',function(){
       granIdx=Math.max(0,Math.min(GRANS.length-1,+granIn.value||0));
