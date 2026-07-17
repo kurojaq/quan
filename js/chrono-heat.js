@@ -99,6 +99,7 @@
 
   function schedule(){ if(raf) return; raf=requestAnimationFrame(function(){ raf=0; draw(); }); }
 
+  var retries=0;
   function draw(){
     ensureUI();
     var cv=ensureCanvas(); if(!cv) return;
@@ -106,6 +107,9 @@
     // engine boots async — self-heal once briefs become computable (report.js pattern)
     if(!raw&&!window.__engBrief){ try{ if(window.__qEnsureEngine) window.__qEnsureEngine(); }catch(_){}
       if(!engHooked&&window.__engReady){ engHooked=true; window.__engReady.then(function(){ schedule(); }); } }
+    // boot race: warehouse restore / brief compute can land after our first draws — retry briefly
+    if(!reg&&retries<6){ retries++; setTimeout(schedule,1500); }
+    if(reg) retries=0;
     rebuildOptions(reg);
     if(state.field==='off'||!reg||!reg.length){ cv.style.display='none'; return; }
     var a=api(); if(!a||!a.chart||!a.container){ cv.style.display='none'; return; }
@@ -172,6 +176,27 @@
     cctx.restore();
   }
 
+  // console diagnostic: pinpoints why the chrono-field dropdown is empty
+  // (stale engine JS / no brief / registry emission failed engine-side)
+  window.__chronoHeatDebug=function(){
+    var raw=briefRaw(), reg=raw&&raw.chrono;
+    var src=null;
+    try{ src=Array.prototype.some.call(document.scripts,function(s){ return /payload-panel/.test(s.src||''); }); }catch(_){}
+    return {
+      inst:curInst(), date:curDate(),
+      engineReady:!!window.__engBrief, hasBrief:!!raw,
+      briefHasChronoKey:!!(raw&&('chrono' in raw)),
+      chronoEntries:reg?reg.length:null,
+      chronoIds:reg?reg.map(function(m){ return m&&m.id; }):null,
+      engineErr:raw&&raw._twerr||null,
+      selectValue:fieldSel&&fieldSel.value, optionCount:fieldSel?fieldSel.options.length:null,
+      payloadPanelLoaded:src, retriesUsed:retries,
+      verdict:!raw?'no brief for this inst/date (chain/engine)':
+              (raw&&!('chrono' in raw))?'STALE payload-panel.js — hard reload (Ctrl+Shift+R); brief predates the registry deploy':
+              (reg===null||reg===undefined)?'engine emitted chrono=None — registry block failed in Python':
+              (reg&&reg.length?'registry OK — dropdown should be populated':'registry empty')
+    };
+  };
   window.__chronoHeatRefresh=schedule;
   ['quan:bars','quan:date','quan:instr','quan:cell'].forEach(function(ev){ window.addEventListener(ev,schedule); });
   window.addEventListener('resize',schedule);
