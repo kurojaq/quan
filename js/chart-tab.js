@@ -356,7 +356,55 @@
     });
   }
 
-  var histSeq=0;
+  // ---- feed-source abstraction ------------------------------------------------
+  // The chart draws Yahoo bars (/api/history) by default. A live-bars provider — e.g.
+  // a Tradovate market-data bridge — can register; while it reports isActive() (its own
+  // call, typically window.__tradovate.connected) it SUPERSEDES Yahoo for both history
+  // and, if it streams, live candle updates. Any failure falls back to Yahoo seamlessly,
+  // so the terminal keeps working whether or not a broker feed is connected. Inert until
+  // a provider registers — behavior is identical to before otherwise.
+  //   provider = { id, isActive():bool, loadHistory(sym,range,interval):Promise<{bars}>,
+  //                subscribe?(sym,interval,onBar(bar)):{close} }
+  var feedProvider=null, feedSub=null, histSeq=0, _liveSyncT=0;
+  window.__chartRegisterFeed=function(p){ feedProvider=(p&&p.id&&typeof p.loadHistory==='function')?p:null; if(booted) loadHistory(); return !!feedProvider; };
+  window.__chartActiveFeed=function(){ try{ return (feedProvider&&feedProvider.isActive&&feedProvider.isActive())?feedProvider:null; }catch(_){ return null; } };
+
+  function yahooHistory(sym){
+    var _h={}; var _t=window.__authToken&&window.__authToken(); if(_t) _h['Authorization']='Bearer '+_t;
+    if(window.__viewToken) _h['X-Quan-Token']=window.__viewToken;   // client view (view.html) carries a publish token, no login
+    return fetch(PROXY_BASE+'/history?symbol='+encodeURIComponent(sym)+'&range='+curRange+'&interval='+curInterval,{headers:_h}).then(function(r){ return r.json(); });
+  }
+  function applyBars(d,inst,seq,feed){
+    if(seq!==histSeq||!d||!d.bars||!d.bars.length) return false;
+    series.setData(d.bars.map(function(b){ return {time:b.time,open:b.open,high:b.high,low:b.low,close:b.close}; }));
+    window.__chartBars=d.bars; // chart-heat.js reads these for the volume-bubble layer
+    try{ window.dispatchEvent(new CustomEvent('quan:bars')); }catch(_){}
+    var last=d.bars[d.bars.length-1].close, p=precFor(inst,last);
+    series.applyOptions({priceFormat:{type:'price',precision:p,minMove:Math.pow(10,-p)}});
+    chart.timeScale().fitContent();
+    drawSessionMarkers(d.bars);
+    statusEl.textContent=curSym+' · '+d.bars.length+' bars'+(feed?(' · '+feed.id):'')+' · '+new Date().toLocaleTimeString();
+    refreshLevels();
+    drawDayRange(d.bars,(document.getElementById('dayDate')||{}).value||'');
+    // live streaming: update the forming candle in place (no reload) when the feed streams
+    if(feed&&typeof feed.subscribe==='function'){
+      try{ feedSub=feed.subscribe(curSym,curInterval,function(bar){ applyLiveBar(bar,seq); }); }catch(_){}
+    }
+    return true;
+  }
+  // push a forming/closed candle into the live chart. Public so a streaming provider (or the
+  // realtime WS relay) can drive it directly. Keeps __chartBars in sync; heat/chrono layers
+  // resync on a throttled quan:bars so a fast tick stream doesn't thrash their redraws.
+  function applyLiveBar(bar,seq){
+    if(seq!=null&&seq!==histSeq) return;                    // stale subscription from a superseded load
+    if(!series||!bar||bar.time==null||bar.close==null) return;
+    try{ series.update({time:bar.time,open:bar.open,high:bar.high,low:bar.low,close:bar.close}); }catch(_){ return; }
+    var bars=window.__chartBars||(window.__chartBars=[]);
+    if(bars.length&&bars[bars.length-1].time===bar.time) bars[bars.length-1]=bar; else bars.push(bar);
+    if(!_liveSyncT) _liveSyncT=setTimeout(function(){ _liveSyncT=0; try{ window.dispatchEvent(new CustomEvent('quan:bars')); }catch(_){} },1000);
+  }
+  window.__chartLiveBar=applyLiveBar;
+
   function loadHistory(){
     if(!statusEl) return;
     var inst=(document.getElementById('instA')||{}).value||'', sym=(window.__YF_SYMS||{})[inst];
@@ -364,27 +412,27 @@
     if(!sym){ statusEl.textContent='no Yahoo symbol mapped for '+inst; return; }
     curSym=sym;
     if(titleEl) titleEl.textContent=sym+' · '+curRange+'/'+curInterval;
-    statusEl.textContent='loading '+sym+'…';
-    var _h={}; var _t=window.__authToken&&window.__authToken(); if(_t) _h['Authorization']='Bearer '+_t;
-    if(window.__viewToken) _h['X-Quan-Token']=window.__viewToken;   // client view (view.html) has no login, carries a publish token
     var seq=++histSeq;                                              // stale-response guard: rapid instrument/interval flips race their fetches
-    fetch(PROXY_BASE+'/history?symbol='+encodeURIComponent(sym)+'&range='+curRange+'&interval='+curInterval,{headers:_h})
-      .then(function(r){ return r.json(); }).then(function(d){
-        if(seq!==histSeq) return;                                   // a newer request superseded this one — drop it
-        if(!d||!d.bars||!d.bars.length){ statusEl.textContent=(d&&d.error)?('error: '+d.error):'no bars returned'; return; }
-        series.setData(d.bars.map(function(b){ return {time:b.time,open:b.open,high:b.high,low:b.low,close:b.close}; }));
-        window.__chartBars=d.bars; // chart-heat.js reads these for the volume-bubble layer
-        try{ window.dispatchEvent(new CustomEvent('quan:bars')); }catch(_){}
-        var last=d.bars[d.bars.length-1].close;
-        var p=precFor(inst,last);
-        series.applyOptions({priceFormat:{type:'price',precision:p,minMove:Math.pow(10,-p)}});
-        chart.timeScale().fitContent();
-        drawSessionMarkers(d.bars);
-        statusEl.textContent=sym+' · '+d.bars.length+' bars · '+new Date().toLocaleTimeString();
-        refreshLevels();
-        drawDayRange(d.bars,(document.getElementById('dayDate')||{}).value||'');
-      }).catch(function(){ if(seq===histSeq) statusEl.textContent='proxy unreachable — check your connection'; });
+    if(feedSub){ try{ feedSub.close(); }catch(_){} feedSub=null; }   // drop any prior live subscription
+    var feed=window.__chartActiveFeed();
+    statusEl.textContent='loading '+sym+(feed?(' · '+feed.id):'')+'…';
+    function toYahoo(){ return yahooHistory(sym).then(function(d2){ if(seq!==histSeq) return; if(!applyBars(d2,inst,seq,null)) statusEl.textContent=(d2&&d2.error)?('error: '+d2.error):'no bars returned'; }); }
+    var loader; try{ loader=feed?feed.loadHistory(sym,curRange,curInterval):yahooHistory(sym); }catch(_){ loader=null; }
+    if(!loader||!loader.then) loader=yahooHistory(sym), feed=null;
+    loader.then(function(d){
+      if(seq!==histSeq) return;                                     // a newer request superseded this one — drop it
+      if(applyBars(d,inst,seq,feed)) return;
+      if(feed) return toYahoo();                                    // broker feed returned nothing — fall back to Yahoo
+      statusEl.textContent=(d&&d.error)?('error: '+d.error):'no bars returned';
+    }).catch(function(){
+      if(seq!==histSeq) return;
+      if(feed){ toYahoo().catch(function(){ statusEl.textContent='proxy unreachable — check your connection'; }); }
+      else statusEl.textContent='proxy unreachable — check your connection';
+    });
   }
+  // a broker feed connecting/disconnecting re-runs the loader, which re-picks the active source
+  window.addEventListener('tradovate:connected',function(){ if(booted) loadHistory(); });
+  window.addEventListener('tradovate:disconnected',function(){ if(booted) loadHistory(); });
 
   // js/chart-heat.js (Bookmap-style heat blend) needs the live chart + series to attach its pane primitive
   window.__chartApi=function(){ return {chart:chart,series:series,container:container}; };

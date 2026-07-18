@@ -18,6 +18,17 @@
 (function () {
   var els = {}, booted = false, conn = null, refreshTimer = null, conds = [], liveAllowed = true;
 
+  // Broker connection state, published for other modules (the chart feed-source router reads
+  // window.__tradovate.connected to decide whether to prefer a Tradovate market-data feed).
+  // setConnected fires tradovate:connected / tradovate:disconnected so listeners re-evaluate.
+  if (!window.__tradovate) {
+    window.__tradovate = { connected: false, env: null,
+      setConnected: function (on, env) {
+        var was = this.connected; this.connected = !!on; if (env !== undefined) this.env = env || null;
+        if (was !== this.connected) { try { window.dispatchEvent(new CustomEvent(this.connected ? 'tradovate:connected' : 'tradovate:disconnected', { detail: { env: this.env } })); } catch (_) {} }
+      } };
+  }
+
   /* ── helpers ────────────────────────────────────────────────────────────── */
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -79,6 +90,7 @@
 
   function onConnected(c) {
     conn = c || {};
+    try { window.__tradovate.setConnected(true, conn.env); } catch (_) {}   // let the chart feed router prefer the broker feed
     applyLiveAllowed(conn.liveAllowed);
     setBadge(conn.env);
     renderAccounts(conn.accounts || []);
