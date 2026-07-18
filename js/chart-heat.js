@@ -741,6 +741,18 @@
       if(on) setTimeout(function(){ requestData(); },600); else nudge();
     });
     window.addEventListener('quan:date',function(){ updateLegend(); if(on) setTimeout(function(){ requestData(); },600); else nudge(); });
+    // quan:cell fires when the selected cell's chain/anchor is actually applied — synchronously
+    // for an already-loaded date, and again when the async ingest auto-load lands. Without this
+    // the Bookmap only redrew on the fixed 600ms quan:date timer, which usually fired BEFORE the
+    // data arrived, so a new date rendered stale until another event ("clicking around") forced it.
+    // Debounced so the burst of cell events (anchor + chain + greeks) coalesces into one pull, and
+    // so warehouse.feedHeatmap posts the new chain to the heat frame before we poll it.
+    var _cellReqT=0;
+    window.addEventListener('quan:cell',function(){ updateLegend();
+      if(!on){ nudge(); return; }
+      clearTimeout(_cellReqT);
+      _cellReqT=setTimeout(function(){ requestData(function(){ nudge(); }); },180);
+    });
     window.addEventListener('quan:bars',function(){ setLineData(); if(on) nudge(); });
   });
 })();
