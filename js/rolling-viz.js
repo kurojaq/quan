@@ -237,6 +237,13 @@
 
   window.__rollingBoot=function(){ build(); refresh(); };
   window.__rollingResize=function(){ if(built) draw(); };
+  // follow the global control bar like every other tab: re-aggregate on instrument / date /
+  // anchor+chain change. Only while active (aggregation reads the warehouse); a hidden Rolling
+  // re-aggregates on its next tab-open, since __rollingBoot always calls refresh().
+  function rollingActive(){ var s=document.getElementById('tabRolling'); return !!(s&&s.classList.contains('on')); }
+  ['quan:instr','quan:date','quan:cell'].forEach(function(ev){
+    window.addEventListener(ev,function(){ if(built&&rollingActive()) refresh(); });
+  });
   if(typeof ResizeObserver!=='undefined'){
     var ro=new ResizeObserver(function(){ if(built&&document.getElementById('tabRolling')&&document.getElementById('tabRolling').classList.contains('on')) draw(); });
     document.addEventListener('DOMContentLoaded', function(){ var m=document.getElementById('rollingMount'); if(m) ro.observe(m); });
