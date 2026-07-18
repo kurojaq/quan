@@ -749,6 +749,9 @@ async function initDefault(){ try{ const D=JSON.parse(atob(DEFAULT_B64)); STORE=
    
    { const _cs=sessLabel(Date.now()/1000); const _ds=weeklyDates();   // futures-session awareness: same clock as session T; weekly chains only (horizons excluded)
      if(_ds.includes(_cs)) $('cp_day').value=_cs; else if(_ds.length) $('cp_day').value=_ds[_ds.length-1]; }
+   // the global control bar governs instrument + date — open on the terminal's current selection
+   { const _gi=($('instA')||{}).value; if(_gi){ inst=_gi; if($('cp_inst'))$('cp_inst').value=inst; }
+     const _gd=($('dayDate')||{}).value; if(_gd) $('cp_day').value=_gd; }
    refresh(); loadAnchor(); updateLogN();
    const _sel=$('cp_day').value;
    if(DATA && DATA._curDate===_sel){ applyView(); boot(); }   // embedded compute already matches the selected session -> fast paint
@@ -760,5 +763,27 @@ async function initDefault(){ try{ const D=JSON.parse(atob(DEFAULT_B64)); STORE=
 window.addEventListener('resize',render);
 window.__compassBoot=function(){ if(window.__compassBooted) return; window.__compassBooted=true; initDefault(); };
 window.__compassResize=render;
+
+// ---- global control bar governs the Compass (instrument / date / live price) ----
+// Chain + anchor data already flow in via warehouse loadChainToTabs->__compassLoadChain and
+// pushAnchorToTabs->__compassSetAnchor; these listeners keep the Compass's OWN instrument/date
+// pointer synced to the main bar so the view follows the terminal instead of the now-hidden
+// local cp_ controls. Live price rides the global anchor (Live -> #gAnchor -> quan:cell ->
+// __compassSetAnchor), so nothing Compass-local drives it anymore.
+let _cpSyncT=0;
+function _cpSyncFromGlobal(){
+  if(!window.__compassBooted) return;
+  const gi=($('instA')||{}).value, gd=($('dayDate')||{}).value; let changed=false;
+  if(gi && gi!==inst){ inst=gi; if($('cp_inst')) $('cp_inst').value=inst; changed=true; }
+  if(gd && $('cp_day') && $('cp_day').value!==gd) changed=true;
+  if(!changed) return;
+  refresh();                                        // rebuild this instrument's session-date list
+  if(gd && $('cp_day')) $('cp_day').value=gd;        // re-assert the global date after refresh repopulates options
+  loadAnchor(); refreshUpUI();
+  clearTimeout(_cpSyncT);
+  _cpSyncT=setTimeout(function(){ autorun(); try{ fetchDayRange(inst,$('cp_day').value); }catch(_e){} }, 60);
+}
+window.addEventListener('quan:instr', _cpSyncFromGlobal);
+window.addEventListener('quan:date',  _cpSyncFromGlobal);
 
 })();

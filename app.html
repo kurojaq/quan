@@ -363,12 +363,14 @@
       <span class="sub">Compass</span>
     </div>
     <div class="hdr-right">
-      <div class="instrbar"><span class="k">Inst</span><select id="cp_inst"></select></div>
-      <div class="datebar"><span class="k">Date</span><input type="date" id="cp_day"></div>
-      <div class="slot"><span class="tag">Anchor</span><input type="number" step="any" id="cp_anc" class="panchor" placeholder="strike"><button class="ctool" id="cp_lock" title="Lock anchor for this date (stop price auto-fill)">&#128275;</button></div>
+      <!-- instrument / date / anchor / live price are governed by the global control bar (.gctrls);
+           these local duplicates are kept hidden as state-holders that compass.js reads + syncs -->
+      <div class="instrbar" style="display:none"><span class="k">Inst</span><select id="cp_inst"></select></div>
+      <div class="datebar" style="display:none"><span class="k">Date</span><input type="date" id="cp_day"></div>
+      <div class="slot" style="display:none"><span class="tag">Anchor</span><input type="number" step="any" id="cp_anc" class="panchor" placeholder="strike"><button class="ctool" id="cp_lock" title="Lock anchor for this date (stop price auto-fill)">&#128275;</button></div>
       <div class="slot"><select class="field" id="cp_upKind"><option value="chain">Chain</option><option value="price">Price</option><option value="greeks">Greeks</option></select><select class="field" id="cp_upSeries" title="Series bucket: Daily (sessions) / EOM / Quarterly (horizons)"><option value="weekly">Daily</option><option value="eom">EOM</option><option value="quarterly">Quarterly</option></select><label class="upload">CSV<span class="fn" id="cp_gFn">none</span><input type="file" id="cp_gFile" accept=".csv" multiple></label><button class="ctool" id="cp_clrPrice" title="Clear stored price for this date (memory + cache) so a fresh price upload re-maps correctly">&#9851;</button></div>
       <div class="sessbar"><span class="k">Session T</span><span class="v SessT" id="cp_sessT">0.0000</span></div>
-      <button class="ctool" id="cp_pullPrice" type="button" title="Pull live intraday price from the same feed as the Chart tab">&#128200; Live Price</button>
+      <button class="ctool" id="cp_pullPrice" type="button" style="display:none" title="Pull live intraday price from the same feed as the Chart tab">&#128200; Live Price</button>
       <button class="ctool" id="compassPriceLink" type="button" title="Price now lives on the Chart tab" onclick="document.querySelector('[data-tab=&quot;chart&quot;]').click();">&#128200; Price</button>
     </div>
   </header>
