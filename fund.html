@@ -1,0 +1,1185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hūs Rihtlǣefan — Fund Portal</title>
+<style>
+/* Palette matched to the site's global theme (css/theme.css): monochrome,
+   dark-first with a light toggle; --sup green / --res orange for P&L semantics. */
+:root{
+  color-scheme:dark;
+  --accent:#f5f5f7;--ink:#f5f5f7;--muted:rgba(235,235,245,0.60);--rule:rgba(255,255,255,0.09);
+  --bg:#050506;--card:#121214;--pos:#3fb98f;--neg:#e0663a;--warn:#d9c476;
+  --field:rgba(255,255,255,0.06);--btn-ink:#0a0a0b;
+  --chart-line:#e8e8ec;--chart-fill:rgba(245,245,247,.08);
+  --radius-sm:10px;--radius-md:14px;--radius-lg:20px;
+  --font-sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Inter',system-ui,'Segoe UI Variable Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --font-mono:ui-monospace,'SF Mono','Cascadia Code',Menlo,Consolas,monospace;
+}
+html[data-theme="light"]{
+  color-scheme:light;
+  --accent:#1d1d1f;--ink:#1d1d1f;--muted:rgba(60,60,67,0.70);--rule:rgba(0,0,0,0.10);
+  --bg:#f5f5f7;--card:#ffffff;--pos:#1aa179;--neg:#c0491a;--warn:#8a6d1f;
+  --field:#ffffff;--btn-ink:#f5f5f7;
+  --chart-line:#1d1d1f;--chart-fill:rgba(29,29,31,.06);}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font-sans);background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1000px;margin:0 auto;padding:24px 20px 70px}
+.brand{font-family:Georgia,'Times New Roman',serif;font-weight:bold;font-size:26px;letter-spacing:.3px}
+.brand small{display:block;font-size:11px;color:var(--muted);font-family:Helvetica,Arial,sans-serif;
+ font-weight:normal;letter-spacing:1.4px;text-transform:uppercase;margin-top:2px}
+header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;
+ border-bottom:2px solid var(--accent);padding-bottom:14px;margin-bottom:18px}
+.iconbtn{background:var(--card);border:1px solid var(--rule);border-radius:8px;
+ width:40px;height:36px;padding:0;display:inline-flex;align-items:center;justify-content:center;
+ font-size:16px;cursor:pointer;color:var(--ink);line-height:1;flex:0 0 auto}
+.menu{position:relative}
+.menu-list{position:absolute;right:0;top:115%;background:var(--card);border:1px solid var(--rule);
+ border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);min-width:210px;z-index:60;display:none;overflow:hidden}
+.menu-list.open{display:block}
+.menu-list button{display:block;width:100%;text-align:left;background:none;border:0;
+ padding:11px 16px;font-size:13px;color:var(--ink);cursor:pointer}
+.menu-list button:hover{background:var(--bg)}
+.menu-list button.active{color:var(--accent);font-weight:bold}
+.menu-list hr{border:none;border-top:1px solid var(--rule);margin:4px 0}
+.chip{background:var(--card);color:var(--muted);border:1px solid var(--rule);border-radius:16px;
+ padding:6px 14px;font-size:12px;cursor:pointer}
+.chip.active{background:var(--accent);color:var(--btn-ink);border-color:var(--accent)}
+.secrow{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+.secrow h2{margin:0}
+.secrow .btns{display:flex;gap:8px}
+tr.click{cursor:pointer}
+tr.click:hover td{background:var(--bg)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:90}
+.overlay.open{display:flex;align-items:flex-start;justify-content:center;padding:70px 16px}
+.modal{background:var(--card);border:1px solid var(--rule);border-radius:12px;
+ max-width:540px;width:100%;padding:20px 22px;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+.modal .mhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.modal .mhead h3{margin:0;font-size:14px;color:var(--accent)}
+.modal .mhead button{background:none;border:0;font-size:18px;color:var(--muted);cursor:pointer}
+h2{font-size:15px;color:var(--accent);margin:24px 0 10px}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:18px 20px;margin-bottom:16px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.tile{background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:14px 16px}
+.tile .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.tile .v{font-size:20px;font-weight:bold;margin-top:4px;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:var(--bg);color:var(--muted);text-align:left;font-size:11px;text-transform:uppercase;
+ letter-spacing:.6px;padding:8px 10px;border-bottom:2px solid var(--accent)}
+td{padding:8px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-family:var(--font-mono)}
+.pos{color:var(--pos)}.neg{color:var(--neg)}
+.badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;background:var(--bg);
+ color:var(--muted);border:1px solid var(--rule)}
+.small{font-size:11px;color:var(--muted);line-height:1.5}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;align-items:end}
+label{font-size:11px;color:var(--muted);display:block;margin-bottom:3px}
+input,select{width:100%;padding:8px;border:1px solid var(--rule);border-radius:6px;font-size:13px;
+ background:var(--field);color:var(--ink)}
+button.act{background:var(--accent);color:var(--btn-ink);border:0;border-radius:6px;padding:9px 16px;font-size:13px;cursor:pointer}
+button.ghost{background:var(--card);color:var(--accent);border:1px solid var(--accent);border-radius:6px;
+ padding:8px 14px;font-size:12px;cursor:pointer}
+button.danger{background:var(--card);color:var(--neg);border:1px solid var(--rule);border-radius:6px;
+ padding:4px 10px;font-size:11px;cursor:pointer}
+.flash{background:rgba(63,185,143,0.13);border:1px solid rgba(63,185,143,0.32);color:var(--pos);border-radius:var(--radius-sm);padding:10px 14px;
+ margin-bottom:14px;font-size:13px;display:none}
+.flash.err{background:rgba(224,102,58,0.13);border-color:rgba(224,102,58,0.34);color:var(--neg)}
+.note{background:rgba(217,196,118,0.12);border:1px solid rgba(217,196,118,0.30);color:var(--warn);border-radius:var(--radius-sm);padding:10px 14px;
+ font-size:12px;margin-bottom:14px}
+hr.soft{border:none;border-top:1px solid var(--rule);margin:14px 0}
+@media print{.menu,.iconbtn,.overlay,.grid,button,.note,#dataTab,.secrow .btns{display:none!important}body{background:#fff}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="brand">Hūs Rihtlǣefan<small>Fund Portal</small></div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span id="syncStatus" class="badge" title="Server sync status" style="cursor:default">local only</span>
+    <a class="iconbtn" href="/app.html" title="Back to the trading terminal" style="text-decoration:none">⌂</a>
+    <button class="iconbtn" id="themeBtn" onclick="toggleTheme()" title="Switch light / dark">☾</button>
+    <div class="menu">
+      <button class="iconbtn" onclick="toggleMenu(event,'addList')" title="Add" aria-label="Add">＋</button>
+      <div class="menu-list" id="addList">
+        <button onclick="closeMenu();openModal('pnlModal')">PnL</button>
+        <button onclick="closeMenu();openModal('flowModal')">Deposit</button>
+        <button onclick="closeMenu();openModal('clientModal')">Client</button>
+      </div>
+    </div>
+    <div class="menu">
+      <button class="iconbtn" onclick="toggleMenu(event,'menuList')" title="Menu" aria-label="Menu">☰</button>
+      <div class="menu-list" id="menuList">
+        <button id="menu-dash" class="active" onclick="showTab('dash')">Dashboard</button>
+        <button id="menu-daily" onclick="showTab('daily')">Daily Trading</button>
+        <button id="menu-stmt" onclick="showTab('stmt')">Client Portal</button>
+        <button id="menu-log" onclick="showTab('log')">Log</button>
+        <hr>
+        <button onclick="openSettings()">Settings</button>
+        <button onclick="closeMenu();openModal('dataModal')">Data Warehouse</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div id="flash" class="flash"></div>
+
+<!-- ======================= DASHBOARD ======================= -->
+<div id="tab-dash">
+  <div id="dashTiles" class="tiles"></div>
+  <h2>Investors</h2>
+  <div class="card" style="overflow-x:auto"><table id="invTable"></table></div>
+  <h2>Company Profit</h2>
+  <div class="card"><table id="memberTable"></table></div>
+  <h2>Activity</h2>
+  <div class="card" style="overflow-x:auto"><table id="activityTable"></table><p class="small" id="activityMore"></p></div>
+  <h2>Fee Assessment History</h2>
+  <div class="card" style="overflow-x:auto"><table id="feeTable"></table></div>
+</div>
+
+<!-- ======================= DAILY TRADING ======================= -->
+<div id="tab-daily" style="display:none">
+  <div class="secrow"><h2 style="margin-top:0">Daily Trading Upload</h2></div>
+  <div class="note">Upload the day's executed trades (CSV). The portal totals the net P&amp;L per trading day and lets you post it as the fund's P&amp;L — the single number every investor's share is calculated from. Trades are also filed in the Log for the record.</div>
+  <div class="card">
+    <div class="grid">
+      <div><label>Trades CSV (day or multi-day)</label>
+        <input id="dailyInput" type="file" accept=".csv" onchange="stageDailyTrades(this)"></div>
+      <div><button class="ghost" onclick="clearStaged()">Clear staged</button></div>
+    </div>
+    <div id="dailyPreview"></div>
+    <p class="small" style="margin-bottom:0">Expected columns (any order, case-insensitive): <b>date</b>, time, symbol, side, qty, entry, exit, <b>pnl</b>. The day's P&amp;L is the sum of each ticket's realized P&amp;L.</p>
+  </div>
+  <h2>Trading Days on Record</h2>
+  <div class="card" style="overflow-x:auto"><table id="dailyHistTable"></table>
+    <p class="small" id="dailyHistNote"></p></div>
+</div>
+
+<!-- ======================= CLIENT PORTAL ======================= -->
+<div id="tab-stmt" style="display:none">
+  <div id="clientListWrap">
+    <div class="secrow"><h2 style="margin-top:0">Client Portal</h2>
+      <button class="ghost" onclick="openStatements()">Daily Statements</button></div>
+    <div class="card"><input id="clientSearch" placeholder="Search clients…" oninput="render()"></div>
+    <div class="card" style="overflow-x:auto"><table id="clientTable"></table></div>
+  </div>
+  <div id="stmtWrap" style="display:none">
+    <button class="ghost" onclick="closeClient()">← All clients</button>
+    <div id="stmtBody" style="margin-top:14px"></div>
+  </div>
+</div>
+
+<!-- ======================= TRADE LOG ======================= -->
+<div id="tab-log" style="display:none">
+  <div class="secrow"><h2 style="margin-top:0">Log</h2>
+    <button class="ghost" onclick="document.getElementById('tradesInput').click()">Trade Log Upload</button>
+    <input id="tradesInput" type="file" accept=".csv" style="display:none" onchange="importTrades(this)">
+  </div>
+  <div class="card"><div class="btns">
+    <button class="chip active" id="chip-ALL" onclick="setLogFilter('ALL')">All</button>
+    <button class="chip" id="chip-PNL" onclick="setLogFilter('PNL')">P&amp;L</button>
+    <button class="chip" id="chip-DEPOSIT" onclick="setLogFilter('DEPOSIT')">Deposits</button>
+    <button class="chip" id="chip-WITHDRAWAL" onclick="setLogFilter('WITHDRAWAL')">Withdrawals</button>
+    <button class="chip" id="chip-TRADES" onclick="setLogFilter('TRADES')">Trades</button>
+  </div></div>
+  <div class="card" style="overflow-x:auto"><table id="logTable"></table><p class="small" id="logNote"></p></div>
+</div>
+
+</div>
+
+<!-- ======================= MODALS ======================= -->
+<div class="overlay" id="pnlModal" onclick="if(event.target===this)closeModals()">
+  <div class="modal">
+    <div class="mhead"><h3>Record fund P&amp;L</h3><button onclick="closeModals()" aria-label="Close">✕</button></div>
+    <div class="grid">
+      <div><label>Date</label><input type="date" id="pnlDate"></div>
+      <div><label>Fund day P&amp;L (minus = loss)</label><input id="pnlAmt" placeholder="1200 or -450"></div>
+      <div><button class="act" onclick="addPnl()">Record P&amp;L</button></div>
+    </div>
+    <p class="small" style="margin-bottom:0">One number for the whole fund — split by each investor's % of the pool that day. Deposits made the same day are excluded; they participate from the next trading day.</p>
+  </div>
+</div>
+<div class="overlay" id="stmtsModal" onclick="if(event.target===this)closeModals()">
+  <div class="modal" style="max-width:640px">
+    <div class="mhead"><h3>Daily Statements</h3><button onclick="closeModals()" aria-label="Close">✕</button></div>
+    <p class="small" style="margin-top:0">Full-detail statements for every client, dated as of the latest entry.
+    <b>Download</b> saves a branded statement file (attach it to an email or print to PDF);
+    <b>Mail draft</b> opens your mail app pre-addressed with a summary — attach the downloaded file.
+    Fully automatic daily sending runs on the hosted version (see the mailer in your package).</p>
+    <div style="overflow-x:auto"><table id="stmtsTable"></table></div>
+    <div style="height:12px"></div>
+    <button class="act" onclick="downloadAllStatements()">Download all statements</button>
+  </div>
+</div>
+<div class="overlay" id="settingsModal" onclick="if(event.target===this)closeModals()">
+  <div class="modal">
+    <div class="mhead"><h3>Settings</h3><button onclick="closeModals()" aria-label="Close">✕</button></div>
+    <div class="grid">
+      <div><label>Management fee %</label><input id="cfgMgmt"></div>
+      <div><label>Performance fee %</label><input id="cfgPerf"></div>
+      <div><label>Lock-up days</label><input id="cfgLock"></div>
+    </div>
+    <div style="height:10px"></div>
+    <div class="grid">
+      <div><label>Member 1 name</label><input id="cfgM1"></div>
+      <div><label>Member 2 name</label><input id="cfgM2"></div>
+      <div><button class="act" onclick="saveCfg()">Apply</button></div>
+    </div>
+    <p class="small" style="margin-bottom:0">Member fee split is 50/50. Defaults: 3% management, 30% performance, 90-day lock-up.</p>
+  </div>
+</div>
+<div class="overlay" id="dataModal" onclick="if(event.target===this)closeModals()">
+  <div class="modal">
+    <div class="mhead"><h3>Data Warehouse</h3><button onclick="closeModals()" aria-label="Close">✕</button></div>
+    <p class="small" id="cacheStatus" style="margin-top:0"></p>
+    <div class="grid">
+      <div><button class="act" onclick="saveFile()">Download backup (.json)</button></div>
+      <div><button class="ghost" onclick="document.getElementById('loadInput').click()">Load backup</button>
+        <input id="loadInput" type="file" accept=".json" style="display:none" onchange="loadFile(this)"></div>
+      <div><button class="ghost" onclick="exportCSVs()">Export CSVs</button></div>
+    </div>
+    <div style="height:10px"></div>
+    <div class="grid">
+      <div><button class="ghost" onclick="loadDemo()">Load demo data</button></div>
+      <div><button class="danger" style="padding:8px 14px;font-size:12px" onclick="wipe()">Clear everything</button></div>
+    </div>
+    <p class="small" style="margin-bottom:0">Backups hold every entry, client record, and setting. CSVs export in the exact format the
+    hosted Python version reads, so nothing entered here is ever stranded.</p>
+  </div>
+</div>
+<div class="overlay" id="clientModal" onclick="if(event.target===this)closeModals()">
+  <div class="modal">
+    <div class="mhead"><h3 id="clientModalTitle">Add Client</h3><button onclick="closeModals()" aria-label="Close">✕</button></div>
+    <div class="grid">
+      <div><label>First Name</label><input id="cFirst" placeholder="Jane"></div>
+      <div><label>Last Name</label><input id="cLast" placeholder="Doe"></div>
+    </div>
+    <div style="height:10px"></div>
+    <div class="grid">
+      <div><label>E-Mail</label><input id="cEmail" placeholder="jane@email.com"></div>
+      <div><label>Phone #</label><input id="cPhone" placeholder="(269) 555-0100"></div>
+    </div>
+    <div style="height:10px"></div>
+    <div><label>Address</label><input id="cAddr" placeholder="822 Elm Street, Saint Joseph, MI 49085"></div>
+    <div style="height:10px"></div>
+    <div class="grid">
+      <div><label>Client Onboarding Date</label><input type="date" id="cOnboard"></div>
+      <div><label>Accredited Investor</label><select id="cAccred"><option> </option><option>Yes</option><option>No</option><option>Pending verification</option></select></div>
+    </div>
+    <div style="height:10px"></div>
+    <div><label>Notes</label><input id="cNotes" placeholder="Referral source, preferences, etc."></div>
+    <hr class="soft">
+    <div class="grid">
+      <div><label>Initial deposit (optional)</label><input id="clientAmt" placeholder="25000"></div>
+      <div><label>Date received</label><input type="date" id="clientDate"></div>
+      <div><button class="act" onclick="addClient()">Save Client</button></div>
+    </div>
+    <p class="small" style="margin-bottom:0">A deposit starts the 90-day lock-up from its date. Re-saving an existing client updates their info.</p>
+  </div>
+</div>
+<div class="overlay" id="flowModal" onclick="if(event.target===this)closeModals()">
+  <div class="modal">
+    <div class="mhead"><h3>Record deposit / withdrawal</h3><button onclick="closeModals()" aria-label="Close">✕</button></div>
+    <div class="grid">
+      <div><label>Type</label><select id="flowType"><option>Deposit</option><option>Withdrawal</option></select></div>
+      <div><label>Investor name (new name = new investor)</label><input id="flowName" list="nameList" placeholder="Jane Doe"><datalist id="nameList"></datalist></div>
+      <div><label>Amount</label><input id="flowAmt" placeholder="25000"></div>
+      <div><label>Date</label><input type="date" id="flowDate"></div>
+      <div><button class="act" onclick="addFlow()">Record</button></div>
+    </div>
+    <p class="small" style="margin-bottom:0">Deposits never share the P&L of the day they arrive — they start participating the next trading day. Withdrawals earn through their final day.</p>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ========================= state ========================= */
+let CFG = {mgmt:0.03, perf:0.30, lockup:90, members:["Spence Sunday","Jaquan Boggan"], cur:"$"};
+let ENTRIES = [];   // {id, date:'YYYY-MM-DD', type:'DEPOSIT'|'WITHDRAWAL'|'PNL', name?, amount}
+let PROFILES = {};  // "First Last" -> {first,last,email,phone,address}
+let NEXT_ID = 1;
+let SELECTED_CLIENT = null;
+let LOG_FILTER = "ALL";
+let ACTIVITY = [];  // linked event log: {ts:"YYYY-MM-DD HH:MM", kind, text}
+let TRADES = [];    // individual trade tickets: {id,date,time,symbol,side,qty,entry,exit,pnl}
+let NEXT_TRADE = 1;
+
+function nowStamp(){
+  const d=new Date(), p=n=>String(n).padStart(2,"0");
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes());
+}
+function logAct(kind, text){
+  ACTIVITY.push({ts:nowStamp(), kind, text});
+  if(ACTIVITY.length>300) ACTIVITY=ACTIVITY.slice(-300);
+}
+
+/* ---- data warehouse (auto-cache in this browser, when the environment allows) ---- */
+const CACHE_KEY = "hus_fund_portal_cache_v1";
+const CACHE_OK = (function(){try{const k="__t";localStorage.setItem(k,"1");localStorage.removeItem(k);return true;}catch(e){return false;}})();
+function persist(){
+  if(!CACHE_OK) return;
+  try{localStorage.setItem(CACHE_KEY, JSON.stringify({cfg:CFG, entries:ENTRIES, profiles:PROFILES, activity:ACTIVITY, trades:TRADES, savedAt:new Date().toISOString()}));}catch(e){}
+}
+function restoreCache(){
+  if(!CACHE_OK) return false;
+  try{
+    const raw=localStorage.getItem(CACHE_KEY); if(!raw) return false;
+    const d=JSON.parse(raw); if(!Array.isArray(d.entries)) return false;
+    ENTRIES=d.entries; PROFILES=d.profiles||{}; ACTIVITY=d.activity||[]; TRADES=d.trades||[];
+    if(d.cfg) CFG=Object.assign(CFG,d.cfg);
+    NEXT_ID=ENTRIES.reduce((m,e)=>Math.max(m,e.id||0),0)+1;
+    NEXT_TRADE=TRADES.reduce((m,t)=>Math.max(m,t.id||0),0)+1;
+    return true;
+  }catch(e){return false;}
+}
+
+/* ========================= utils ========================= */
+const $ = id => document.getElementById(id);
+function money(x){const s = x<0?"-":""; return CFG.cur+s+Math.abs(x).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}
+function pct(x){return x.toFixed(2)+"%";}
+function todayISO(){const d=new Date();return d.toISOString().slice(0,10);}
+function flash(msg,err){const f=$("flash");f.textContent=msg;f.className="flash"+(err?" err":"");f.style.display="block";
+ clearTimeout(flash._t);flash._t=setTimeout(()=>f.style.display="none",4200);}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function addDays(iso,n){const d=new Date(iso+"T00:00:00Z");d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
+
+/* ========================= engine (mirrors fund_tracker.py) ========================= */
+function computeState(){
+  const invs = {};   // name -> investor
+  const get = n => invs[n] || (invs[n] = {name:n, contributed:0, equity:0, hwm:0, fees:0, deposits:[], history:[]});
+  const company = {mgmt:0, perf:0};
+  const feeLog = [];
+  // TIMING RULE: on any given day, the day's P&L is applied FIRST, then deposits,
+  // then withdrawals. New money therefore never shares the P&L of the day it
+  // arrives — it starts participating from the next recorded trading day.
+  const order = {PNL:0, DEPOSIT:1, WITHDRAWAL:2};
+  const ev = [...ENTRIES].sort((a,b)=> a.date===b.date ? order[a.type]-order[b.type] : (a.date<b.date?-1:1));
+  let curMonth = null;
+
+  function assess(charge, label){
+    let cm=0, cp=0; const per={};
+    for(const inv of Object.values(invs)){
+      const gain = inv.equity - inv.hwm;
+      if(gain > 1e-9){
+        const m = gain*CFG.mgmt, p = (gain-m)*CFG.perf, t = m+p;
+        per[inv.name]={gain, mgmt:m, perf:p, total:t};
+        cm+=m; cp+=p;
+        if(charge){
+          inv.equity-=t; inv.hwm=inv.equity; inv.fees+=t;
+          inv.history.push({date:label, kind:"Fees",
+            detail:"monthly fees on new profit of "+money(gain)+" above high-water mark",
+            fundPnl:null, sharePct:null, amount:-t, balance:inv.equity});
+        }
+      } else per[inv.name]={gain, mgmt:0, perf:0, total:0};
+    }
+    return {per, cm, cp};
+  }
+
+  for(const e of ev){
+    const ym = e.date.slice(0,7);
+    if(curMonth===null) curMonth=ym;
+    else if(ym!==curMonth){
+      const r = assess(true, curMonth+" (month-end)");
+      company.mgmt+=r.cm; company.perf+=r.cp;
+      if(r.cm+r.cp>0) feeLog.push({month:curMonth, mgmt:r.cm, perf:r.cp});
+      curMonth=ym;
+    }
+    if(e.type==="DEPOSIT"){
+      const inv=get(e.name);
+      inv.equity+=e.amount; inv.contributed+=e.amount; inv.hwm+=e.amount;
+      inv.deposits.push({date:e.date, amount:e.amount});
+      inv.history.push({date:e.date, kind:"Deposit",
+        detail:"capital contribution — participates in P&L from the next trading day",
+        fundPnl:null, sharePct:null, amount:e.amount, balance:inv.equity});
+    }else if(e.type==="WITHDRAWAL"){
+      const inv=get(e.name);
+      const w=Math.min(e.amount, inv.equity);
+      const f=inv.equity>0 ? (inv.equity-w)/inv.equity : 0;
+      inv.hwm*=f; inv.contributed*=f; inv.equity-=w;
+      inv.history.push({date:e.date, kind:"Withdrawal", detail:"capital withdrawal",
+        fundPnl:null, sharePct:null, amount:-w, balance:inv.equity});
+    }else if(e.type==="PNL"){
+      const total=Object.values(invs).reduce((s,i)=>s+i.equity,0);
+      if(total>1e-9){
+        for(const inv of Object.values(invs)){
+          if(inv.equity<=1e-9) continue;
+          const share=e.amount*inv.equity/total, p=inv.equity/total*100;
+          inv.equity+=share;
+          inv.history.push({date:e.date, kind:"Trading P&L", detail:"share of fund day P&L",
+            fundPnl:e.amount, sharePct:p, amount:share, balance:inv.equity});
+        }
+      }
+    }
+  }
+  const est = assess(false, null);   // current-month estimate, not charged
+  const asof = ev.length ? ev[ev.length-1].date : todayISO();
+  return {invs, company, feeLog, est, asof};
+}
+function lockInfo(inv, asof){
+  let locked=0; const rows=[];
+  for(const d of inv.deposits){
+    const unlock=addDays(d.date, CFG.lockup);
+    const isLocked = asof < unlock;
+    if(isLocked) locked+=d.amount;
+    rows.push({date:d.date, amount:d.amount, unlock, isLocked});
+  }
+  return {locked, rows};
+}
+
+/* ========================= rendering ========================= */
+function showTab(t){
+  for(const k of ["dash","daily","stmt","log"]){
+    $("tab-"+k).style.display = k===t ? "" : "none";
+    const mi=$("menu-"+k); if(mi) mi.className = k===t ? "active" : "";
+  }
+  closeMenu(); render();
+}
+function openSettings(){
+  closeMenu();
+  $("cfgMgmt").value=(CFG.mgmt*100); $("cfgPerf").value=(CFG.perf*100); $("cfgLock").value=CFG.lockup;
+  $("cfgM1").value=CFG.members[0]; $("cfgM2").value=CFG.members[1];
+  openModal("settingsModal");
+}
+function setLogFilter(f){
+  LOG_FILTER=f;
+  for(const k of ["ALL","PNL","DEPOSIT","WITHDRAWAL","TRADES"])
+    $("chip-"+k).className = "chip"+(k===f?" active":"");
+  render();
+}
+/* ---- theme ---- */
+function setTheme(t){
+  document.documentElement.setAttribute("data-theme", t==="dark"?"dark":"light");
+  CFG.theme=t; const b=$("themeBtn"); if(b) b.textContent = t==="dark"?"☀":"☾";
+}
+function toggleTheme(){setTheme(CFG.theme==="dark"?"light":"dark");}
+/* ---- dropdown menus (＋ and ☰) ---- */
+function toggleMenu(e,id){
+  e.stopPropagation();
+  const el=$(id), wasOpen=el.classList.contains("open");
+  closeMenu();
+  if(!wasOpen) el.classList.add("open");
+}
+function closeMenu(){document.querySelectorAll(".menu-list").forEach(m=>m.classList.remove("open"));}
+document.addEventListener("click", e=>{ if(!e.target.closest(".menu")) closeMenu(); });
+/* ---- modals ---- */
+function openModal(id){
+  closeMenu();
+  if(!$("pnlDate").value) $("pnlDate").value=todayISO();
+  if(!$("flowDate").value) $("flowDate").value=todayISO();
+  if(!$("clientDate").value) $("clientDate").value=todayISO();
+  $(id).classList.add("open");
+  const first=$(id).querySelector("input"); if(first) first.focus();
+}
+function closeModals(){for(const id of ["pnlModal","flowModal","clientModal","settingsModal","dataModal","stmtsModal"]) $(id).classList.remove("open");}
+document.addEventListener("keydown", e=>{ if(e.key==="Escape"){closeModals();closeMenu();} });
+function render(){
+  const st = computeState();
+  const names = Object.keys(st.invs).sort();
+  const totalEq = names.reduce((s,n)=>s+st.invs[n].equity,0);
+  const totalC  = names.reduce((s,n)=>s+st.invs[n].contributed,0);
+  /* dashboard tiles */
+  const net = totalEq-totalC, feeInc = st.company.mgmt+st.company.perf;
+  $("dashTiles").innerHTML =
+    tile("Total AUM", money(totalEq)) + tile("Contributed capital", money(totalC)) +
+    tile("Investor net profit", '<span class="'+(net>=0?"pos":"neg")+'">'+money(net)+"</span>") +
+    tile("Company fee income", money(feeInc));
+  /* investor table */
+  let h="<tr><th>Investor</th><th class=num>% of fund</th><th class=num>Contributed</th><th class=num>Balance</th><th class=num>Net profit</th><th class=num>Pending fees<br>(this month)</th><th class=num>Net after fees</th><th class=num>Fees paid</th></tr>";
+  if(!names.length) h+="<tr><td colspan=8 class=small>No investors yet — record a first deposit under “Record activity”.</td></tr>";
+  for(const n of names){
+    const i=st.invs[n], ni=i.equity-i.contributed;
+    const pend=(st.est.per[n]||{}).total||0, nafter=ni-pend;
+    h+="<tr><td>"+esc(n)+"</td><td class=num>"+pct(totalEq?i.equity/totalEq*100:0)+"</td><td class=num>"+money(i.contributed)+
+       "</td><td class=num>"+money(i.equity)+'</td><td class="num '+(ni>=0?"pos":"neg")+'">'+money(ni)+
+       '</td><td class="num">'+(pend>0?money(pend):"&mdash;")+
+       '</td><td class="num '+(nafter>=0?"pos":"neg")+'"><b>'+money(nafter)+"</b></td><td class=num>"+money(i.fees)+"</td></tr>";
+  }
+  $("invTable").innerHTML=h;
+  /* members */
+  const estT = st.est.cm+st.est.cp;
+  let m="<tr><th>Member</th><th class=num>Share</th><th class=num>Earned to date</th><th class=num>Accruing this month</th><th class=num>Total incl. pending</th></tr>";
+  for(const nm of CFG.members)
+    m+="<tr><td>"+esc(nm)+"</td><td class=num>50%</td><td class=num>"+money(feeInc/2)+
+       "</td><td class=num>"+(estT>0?money(estT/2):"&mdash;")+"</td><td class=num><b>"+money((feeInc+estT)/2)+"</b></td></tr>";
+  $("memberTable").innerHTML=m;
+  let fl="<tr><th>Month</th><th class=num>Management Fees</th><th class=num>Performance Fees</th><th class=num>Total</th><th class=num>Per Member (50%)</th></tr>";
+  if(!st.feeLog.length) fl+='<tr><td colspan=5 class=small>None yet — fees are charged at each month-end.</td></tr>';
+  for(const f of [...st.feeLog].reverse()){
+    const t=f.mgmt+f.perf;
+    fl+="<tr><td>"+f.month+"</td><td class=num>"+money(f.mgmt)+"</td><td class=num>"+money(f.perf)+
+        "</td><td class=num><b>"+money(t)+"</b></td><td class=num>"+money(t/2)+"</td></tr>";
+  }
+  $("feeTable").innerHTML=fl;
+  /* datalist, client portal, activity */
+  const allNames=[...new Set([...names, ...Object.keys(PROFILES)])].sort();
+  $("nameList").innerHTML = allNames.map(n=>'<option value="'+esc(n)+'">').join("");
+  renderClientPortal(st, allNames, totalEq);
+  renderActivity();
+  renderTradeLog();
+  renderDailyHist();
+  persist();
+  fundSync.push();
+  if(!$("pnlDate").value) $("pnlDate").value=todayISO();
+  if(!$("flowDate").value) $("flowDate").value=todayISO();
+}
+function tile(k,v){return '<div class=tile><div class=k>'+k+'</div><div class=v>'+v+"</div></div>";}
+
+function openClient(n){SELECTED_CLIENT=n; render(); window.scrollTo(0,0);}
+function closeClient(){SELECTED_CLIENT=null; render();}
+function renderClientPortal(st, allNames, totalEq){
+  const listWrap=$("clientListWrap"), stmtWrap=$("stmtWrap");
+  if(SELECTED_CLIENT && (st.invs[SELECTED_CLIENT]||PROFILES[SELECTED_CLIENT])){
+    listWrap.style.display="none"; stmtWrap.style.display="";
+    renderStatement(st, SELECTED_CLIENT);
+    return;
+  }
+  SELECTED_CLIENT=null;
+  listWrap.style.display=""; stmtWrap.style.display="none";
+  const q=($("clientSearch").value||"").toLowerCase().trim();
+  const match=allNames.filter(n=>{
+    const p=PROFILES[n]||{};
+    return !q || n.toLowerCase().includes(q) ||
+           (p.email||"").toLowerCase().includes(q) || (p.phone||"").toLowerCase().includes(q);
+  });
+  let h="<tr><th>Client</th><th>E-Mail</th><th>Phone #</th><th class=num>% of Fund</th><th class=num>Balance</th><th class=num>Net Profit</th></tr>";
+  if(!match.length)
+    h+='<tr><td colspan=6 class=small>'+(allNames.length?"No clients match that search.":"No clients yet — add one with the ＋ button.")+"</td></tr>";
+  for(const n of match){
+    const p=PROFILES[n]||{}, i=st.invs[n];
+    const bal=i?i.equity:0, net=i?i.equity-i.contributed:0, pc=(totalEq&&i)?i.equity/totalEq*100:0;
+    h+='<tr class=click data-n="'+esc(n)+'" onclick="openClient(this.dataset.n)"><td><b>'+esc(n)+"</b></td><td>"+
+       esc(p.email||"—")+"</td><td>"+esc(p.phone||"—")+"</td><td class=num>"+pct(pc)+"</td><td class=num>"+money(bal)+
+       '</td><td class="num '+(net>=0?"pos":"neg")+'">'+money(net)+"</td></tr>";
+  }
+  $("clientTable").innerHTML=h;
+}
+function renderActivity(){
+  let h="<tr><th>Time</th><th>Type</th><th>Detail</th></tr>";
+  if(!ACTIVITY.length) h+='<tr><td colspan=3 class=small>No activity yet — everything you do through the ＋ button shows up here.</td></tr>';
+  for(const a of [...ACTIVITY].reverse().slice(0,10))
+    h+='<tr><td style="white-space:nowrap">'+a.ts+"</td><td><span class=badge>"+esc(a.kind)+"</span></td><td>"+esc(a.text)+"</td></tr>";
+  $("activityTable").innerHTML=h;
+  $("activityMore").textContent = ACTIVITY.length>10 ? "Latest 10 of "+ACTIVITY.length+" actions — money entries live in the Trade Log." : "";
+}
+
+function infoCard(name, inv){
+  const p=PROFILES[name]||{};
+  const firstDep = (inv&&inv.deposits.length) ? inv.deposits[0].date : null;
+  const onboard = p.onboard || (firstDep ? firstDep+" (first deposit)" : null);
+  let rows="";
+  const row=(k,v)=>{if(v) rows+='<tr><td class=small style="width:150px">'+k+"</td><td>"+esc(v)+"</td></tr>";};
+  row("E-Mail",p.email); row("Phone #",p.phone); row("Address",p.address);
+  row("Client Onboarding Date",onboard);
+  if(firstDep && p.onboard) row("First Deposit",firstDep);
+  row("Accredited Investor",p.accredited);
+  row("Notes",p.notes);
+  if(!rows) return "";
+  return "<h2>Client Information</h2><div class=card><table>"+rows+"</table></div>";
+}
+function renderStatement(st, name){
+  const el=$("stmtBody");
+  if(!name){el.innerHTML='<div class="card small">No client selected.</div>';return;}
+  if(!st.invs[name]){
+    el.innerHTML='<h2 style="margin-top:0">'+esc(name)+"</h2>"+infoCard(name)+
+      '<div class="card small">No deposits recorded yet — use ＋ → Deposit to record their first contribution.</div>';
+    return;
+  }
+  const inv=st.invs[name];
+  const totalEq=Object.values(st.invs).reduce((s,i)=>s+i.equity,0);
+  const share= totalEq? inv.equity/totalEq*100 : 0;
+  const lk=lockInfo(inv, st.asof);
+  const est=(st.est.per[name]||{}).total||0;
+  const net=inv.equity-inv.contributed;
+  const netAfter=net-est;
+  let h='<div class=secrow><h2 style="margin-top:0">Account Statement — '+esc(name)+
+        ' <span class=badge>as of '+st.asof+'</span></h2>'+
+        '<button class=iconbtn data-n="'+esc(name)+'" onclick="downloadStatement(this.dataset.n)" title="Download this statement">⤓</button></div>';
+  h+='<div class=tiles>'+tile("Current balance",money(inv.equity))+tile("Share of fund",pct(share))+
+     tile("Contributed",money(inv.contributed))+
+     tile("Net profit",'<span class="'+(net>=0?"pos":"neg")+'">'+money(net)+"</span>")+
+     tile("Pending fees (this month)",est>0?money(est):"&mdash;")+
+     tile("Net profit after fees",'<span class="'+(netAfter>=0?"pos":"neg")+'">'+money(netAfter)+"</span>")+
+     tile("Fees paid to date",money(inv.fees))+tile("Withdrawable now",money(Math.max(inv.equity-lk.locked,0)))+"</div>";
+  h+=infoCard(name, inv);
+  const svg=chartSVG(inv);
+  if(svg) h+="<h2>Balance</h2><div class=card>"+svg+"</div>";
+  h+="<h2>Deposits</h2><div class=card><table><tr><th>Deposit date</th><th class=num>Amount</th><th>Unlocks ("+CFG.lockup+"-day lock-up)</th><th>Status</th></tr>";
+  for(const r of lk.rows)
+    h+="<tr><td>"+r.date+"</td><td class=num>"+money(r.amount)+"</td><td>"+r.unlock+"</td><td>"+
+       (r.isLocked?'<span class=badge>Locked</span>':'<span class=badge style="color:var(--pos)">Unlocked</span>')+"</td></tr>";
+  h+="</table></div>";
+  h+="<h2>Account Breakdown</h2><div class=card style='overflow-x:auto'><table><tr><th>Date</th><th>Activity</th><th class=num>Fund day P&amp;L</th><th class=num>Your share of fund</th><th class=num>Amount</th><th class=num>Balance</th></tr>";
+  for(const r of inv.history){
+    h+="<tr><td>"+r.date+"</td><td>"+r.kind+'<div class=small>'+esc(r.detail)+"</div></td><td class=num>"+
+       (r.fundPnl!=null?('<span class="'+(r.fundPnl>=0?"pos":"neg")+'">'+money(r.fundPnl)+"</span>"):"&mdash;")+
+       "</td><td class=num>"+(r.sharePct!=null?r.sharePct.toFixed(2)+"%":"&mdash;")+
+       '</td><td class=num><span class="'+(r.amount>=0?"pos":"neg")+'">'+money(r.amount)+"</span></td><td class=num>"+money(r.balance)+"</td></tr>";
+  }
+  h+="</table></div>";
+  el.innerHTML=h;
+}
+function chartSVG(inv){
+  const pts=inv.history.filter(h=>h.date).map(h=>[h.date.slice(0,10),h.balance]);
+  if(pts.length<2) return "";
+  const ys=pts.map(p=>p[1]); let lo=Math.min(...ys), hi=Math.max(...ys);
+  const pad=(hi-lo)*0.12||Math.max(hi*0.05,1); lo-=pad; hi+=pad;
+  const W=880,H=190,L=58,R=10,T=10,B=22,iw=W-L-R,ih=H-T-B;
+  const X=i=>L+iw*i/(pts.length-1), Y=v=>T+ih*(1-(v-lo)/(hi-lo));
+  let path=pts.map((p,i)=>(i?"L":"M")+X(i).toFixed(1)+","+Y(p[1]).toFixed(1)).join(" ");
+  const area=path+" L"+X(pts.length-1).toFixed(1)+","+(T+ih)+" L"+X(0).toFixed(1)+","+(T+ih)+" Z";
+  let grid="";
+  for(let g=1;g<=3;g++){const v=lo+(hi-lo)*g/4, y=Y(v);
+    grid+='<line x1="'+L+'" y1="'+y.toFixed(1)+'" x2="'+(W-R)+'" y2="'+y.toFixed(1)+'" style="stroke:var(--rule)"/>'+
+      '<text x="'+(L-6)+'" y="'+(y+3).toFixed(1)+'" font-size="10" style="fill:var(--muted)" text-anchor="end">'+CFG.cur+(v/1000).toFixed(1)+"k</text>";}
+  return '<svg viewBox="0 0 '+W+" "+H+'" role="img" aria-label="Account balance over time" style="width:100%;height:auto">'+grid+
+    '<path d="'+area+'" style="fill:var(--chart-fill)"/><path d="'+path+'" fill="none" style="stroke:var(--chart-line)" stroke-width="2"/>'+
+    '<text x="'+L+'" y="'+(H-6)+'" font-size="10" style="fill:var(--muted)">'+pts[0][0]+"</text>"+
+    '<text x="'+(W-R)+'" y="'+(H-6)+'" font-size="10" style="fill:var(--muted)" text-anchor="end">'+pts[pts.length-1][0]+"</text></svg>";
+}
+function renderTradesInto(){
+  const tr=[...TRADES].sort((a,b)=> (b.date+(b.time||""))<(a.date+(a.time||""))?-1:1);
+  let h="<tr><th>Date</th><th>Time</th><th>Symbol</th><th>Side</th><th class=num>Qty</th><th class=num>Entry</th><th class=num>Exit</th><th class=num>P&L</th><th></th></tr>";
+  if(!tr.length) h+='<tr><td colspan=9 class=small>No trades yet — use Trade Log Upload.</td></tr>';
+  let tot=0;
+  for(const t of tr){
+    tot+=t.pnl;
+    h+="<tr><td>"+t.date+"</td><td>"+esc(t.time||"—")+"</td><td><b>"+esc(t.symbol)+"</b></td><td>"+esc(t.side)+
+       "</td><td class=num>"+t.qty+"</td><td class=num>"+esc(String(t.entry))+"</td><td class=num>"+esc(String(t.exit))+
+       '</td><td class="num '+(t.pnl>=0?"pos":"neg")+'">'+money(t.pnl)+
+       '</td><td><button class=danger onclick="delTrade('+t.id+')">delete</button></td></tr>';
+  }
+  $("logTable").innerHTML=h;
+  $("logNote").textContent = tr.length ? tr.length+" trades — total P&L "+money(tot) : "";
+}
+function delTrade(id){
+  const t=TRADES.find(x=>x.id===id);
+  TRADES=TRADES.filter(x=>x.id!==id);
+  if(t) logAct("Edit","Deleted trade: "+t.symbol+" "+t.side+" x"+t.qty+" on "+t.date+" ("+money(t.pnl)+")");
+  render();
+}
+/* Shared trade-CSV parser: returns {trades:[{date,time,symbol,side,qty,entry,exit,pnl}], error}.
+   Ids are assigned only when the trades are actually committed. */
+function parseTradesCSV(text){
+  try{
+    const lines=text.split(/\r?\n/).filter(l=>l.trim());
+    if(lines.length<2) return {error:"That CSV has no data rows."};
+    const head=lines[0].toLowerCase().split(",").map(s=>s.trim().replace(/["']/g,""));
+    const idx=k=>head.findIndex(h=>k.includes(h));
+    const iDate=idx(["date"]), iTime=idx(["time"]), iSym=idx(["symbol","contract","product"]),
+          iSide=idx(["side","direction","b/s"]), iQty=idx(["qty","quantity","size"]),
+          iEntry=idx(["entry","entryprice","buyprice","boughtprice"]),
+          iExit=idx(["exit","exitprice","sellprice","soldprice"]),
+          iPnl=idx(["pnl","p&l","p/l","profit","netpnl","realizedpnl"]);
+    if(iDate<0||iPnl<0) return {error:"Couldn't read that CSV — expected columns like: date, time, symbol, side, qty, entry, exit, pnl."};
+    const trades=[];
+    for(const line of lines.slice(1)){
+      const c=line.split(",").map(s=>s.trim().replace(/^"|"$/g,""));
+      const pnl=parseFloat(String(c[iPnl]).replace(/[$,()]/g, m=>m==="("?"-":""));
+      if(!c[iDate]||!isFinite(pnl)) continue;
+      trades.push({date:c[iDate], time:iTime>=0?c[iTime]:"",
+        symbol:iSym>=0?c[iSym]:"—", side:iSide>=0?c[iSide]:"—",
+        qty:iQty>=0?(parseInt(c[iQty],10)||0):0,
+        entry:iEntry>=0?c[iEntry]:"—", exit:iExit>=0?c[iExit]:"—", pnl});
+    }
+    if(!trades.length) return {error:"No valid trade rows found in that CSV."};
+    return {trades};
+  }catch(e){ return {error:"Couldn't parse that CSV."}; }
+}
+function importTrades(input){
+  const f=input.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    const res=parseTradesCSV(r.result);
+    if(res.error){ flash(res.error,1); return; }
+    for(const t of res.trades) TRADES.push(Object.assign({id:NEXT_TRADE++}, t));
+    logAct("Trades","Imported "+res.trades.length+" trades from CSV ("+f.name+")");
+    flash("Imported "+res.trades.length+" trades."); setLogFilter("TRADES");
+  };
+  r.readAsText(f); input.value="";
+}
+
+/* ---- Daily Trading: stage an upload, preview per-day net, post as fund P&L ---- */
+let STAGED=[], STAGED_NAME="";
+function stageDailyTrades(input){
+  const f=input.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    const res=parseTradesCSV(r.result);
+    if(res.error){ flash(res.error,1); return; }
+    STAGED=res.trades; STAGED_NAME=f.name;
+    showTab("daily"); renderDailyPreview();
+    flash("Staged "+STAGED.length+" trades — review, then Post.");
+  };
+  r.readAsText(f); input.value="";
+}
+function clearStaged(){ STAGED=[]; STAGED_NAME=""; renderDailyPreview(); }
+function stagedByDate(){
+  const by={}; for(const t of STAGED){ (by[t.date]=by[t.date]||[]).push(t); } return by;
+}
+function renderDailyPreview(){
+  const el=$("dailyPreview"); if(!el) return;
+  if(!STAGED.length){ el.innerHTML=""; return; }
+  const by=stagedByDate(), dates=Object.keys(by).sort();
+  const net=STAGED.reduce((s,t)=>s+t.pnl,0);
+  let h='<hr class=soft><div class=tiles>'+
+    tile("Trades staged", STAGED.length)+
+    tile("Net P&L", '<span class="'+(net>=0?"pos":"neg")+'">'+money(net)+"</span>")+
+    tile("Trading days", dates.length)+"</div>";
+  h+='<table><tr><th>Date</th><th class=num>Trades</th><th class=num>Day net P&amp;L</th><th>Fund P&amp;L status</th></tr>';
+  for(const d of dates){
+    const ts=by[d], dn=ts.reduce((s,t)=>s+t.pnl,0);
+    const exists=ENTRIES.some(e=>e.type==="PNL"&&e.date===d);
+    const noCap=poolBefore(d)<=1e-9;
+    const status=exists?'<span class=badge>already recorded — will skip</span>'
+      :noCap?'<span class=badge style="color:var(--warn)">no capital that day — will skip</span>'
+      :'<span class=badge style="color:var(--pos)">will record</span>';
+    h+="<tr><td>"+d+"</td><td class=num>"+ts.length+'</td><td class="num '+(dn>=0?"pos":"neg")+'">'+money(dn)+"</td><td>"+status+"</td></tr>";
+  }
+  h+="</table><div style='height:12px'></div>";
+  h+='<button class="act" onclick="postDaily()">Post — file '+STAGED.length+" trades + record daily fund P&amp;L</button> "+
+     '<span class=small style="margin-left:8px">Source: '+esc(STAGED_NAME)+"</span>";
+  el.innerHTML=h;
+}
+function postDaily(){
+  if(!STAGED.length){ flash("Nothing staged.",1); return; }
+  const by=stagedByDate();
+  let addedT=0, addedP=0, skipped=0;
+  for(const t of STAGED){ TRADES.push(Object.assign({id:NEXT_TRADE++}, t)); addedT++; }
+  for(const d of Object.keys(by).sort()){
+    const dn=by[d].reduce((s,t)=>s+t.pnl,0);
+    if(ENTRIES.some(e=>e.type==="PNL"&&e.date===d)){ skipped++; continue; }
+    if(poolBefore(d)<=1e-9){ skipped++; continue; }
+    ENTRIES.push({id:NEXT_ID++, date:d, type:"PNL", amount:dn});
+    addedP++;
+  }
+  logAct("Daily","Uploaded "+addedT+" trades ("+STAGED_NAME+"); recorded "+addedP+" fund P&L day(s)"+(skipped?", "+skipped+" skipped":""));
+  STAGED=[]; STAGED_NAME="";
+  flash("Filed "+addedT+" trades"+(addedP?" and recorded "+addedP+" fund P&L day(s)":"")+
+        (skipped?" ("+skipped+" day(s) skipped — already recorded or no capital)":"")+".");
+  render();
+}
+function renderDailyHist(){
+  const t=$("dailyHistTable"); if(!t) return;
+  const by={}; for(const tr of TRADES){ (by[tr.date]=by[tr.date]||[]).push(tr); }
+  const dates=Object.keys(by).sort().reverse();
+  let h="<tr><th>Date</th><th class=num>Trades</th><th class=num>Net P&amp;L (trades)</th><th class=num>Recorded fund P&amp;L</th><th>Reconciliation</th></tr>";
+  if(!dates.length) h+='<tr><td colspan=5 class=small>No trades uploaded yet — use the upload above.</td></tr>';
+  for(const d of dates){
+    const ts=by[d], dn=ts.reduce((s,x)=>s+x.pnl,0);
+    const rec=ENTRIES.find(e=>e.type==="PNL"&&e.date===d);
+    let recCell="&mdash;", status='<span class=badge>not recorded</span>';
+    if(rec){
+      recCell=money(rec.amount);
+      const diff=rec.amount-dn;
+      status=Math.abs(diff)<0.005 ? '<span class=badge style="color:var(--pos)">matches</span>'
+        : '<span class=badge style="color:var(--warn)">off by '+money(diff)+"</span>";
+    }
+    h+="<tr><td>"+d+"</td><td class=num>"+ts.length+'</td><td class="num '+(dn>=0?"pos":"neg")+'">'+money(dn)+
+       '</td><td class="num">'+recCell+"</td><td>"+status+"</td></tr>";
+  }
+  t.innerHTML=h;
+  const note=$("dailyHistNote");
+  if(note) note.textContent = dates.length ? dates.length+" trading day(s) on record. “Reconciliation” compares uploaded trade totals to the fund P&L recorded for that day." : "";
+}
+
+function renderTradeLog(){
+  if(LOG_FILTER==="TRADES"){renderTradesInto();return;}
+  const order={PNL:0,DEPOSIT:1,WITHDRAWAL:2};
+  const label={PNL:"P&L",DEPOSIT:"Deposit",WITHDRAWAL:"Withdrawal"};
+  const ev=[...ENTRIES].sort((a,b)=> a.date===b.date ? order[b.type]-order[a.type] : (a.date>b.date?-1:1))
+    .filter(e=> LOG_FILTER==="ALL" || e.type===LOG_FILTER);
+  let h="<tr><th>Date</th><th>Type</th><th>Client</th><th class=num>Amount</th><th></th></tr>";
+  if(!ev.length) h+='<tr><td colspan=5 class=small>'+(ENTRIES.length?"Nothing matches this filter.":"No entries yet — use the ＋ button.")+"</td></tr>";
+  for(const e of ev){
+    const shown = e.type==="WITHDRAWAL" ? -e.amount : e.amount;
+    h+="<tr><td>"+e.date+"</td><td>"+label[e.type]+"</td><td>"+esc(e.name||"Fund")+
+       '</td><td class="num '+(shown>=0?"pos":"neg")+'">'+money(shown)+
+       '</td><td><button class=danger onclick="delEntry('+e.id+')">delete</button></td></tr>';
+  }
+  $("logTable").innerHTML=h;
+  $("logNote").textContent="";
+}
+
+/* ========================= daily statements ========================= */
+function statementDoc(st, name){
+  const inv=st.invs[name], p=PROFILES[name]||{};
+  const asof=st.asof, gen=nowStamp();
+  const totalEq=Object.values(st.invs).reduce((s,i)=>s+i.equity,0);
+  const share= (inv&&totalEq)? inv.equity/totalEq*100 : 0;
+  const est=inv?((st.est.per[name]||{}).total||0):0;
+  const net=inv?inv.equity-inv.contributed:0;
+  const lk=inv?lockInfo(inv,asof):{locked:0,rows:[]};
+  const sum=(k,v)=>'<tr><td class=k>'+k+'</td><td class=v>'+v+"</td></tr>";
+  let today="", hist="", deps="";
+  if(inv){
+    const todays=inv.history.filter(x=>x.date===asof);
+    if(todays.length){
+      for(const r of todays)
+        today+="<tr><td>"+r.kind+"</td><td>"+esc(r.detail)+"</td><td class=num>"+
+          (r.fundPnl!=null?money(r.fundPnl):"—")+"</td><td class=num>"+
+          (r.sharePct!=null?r.sharePct.toFixed(2)+"%":"—")+'</td><td class="num">'+money(r.amount)+"</td></tr>";
+    } else today='<tr><td colspan=5 class=muted>No account activity on this statement date.</td></tr>';
+    for(const r of inv.history)
+      hist+="<tr><td>"+r.date+"</td><td>"+r.kind+'<div class=muted>'+esc(r.detail)+"</div></td><td class=num>"+
+        (r.fundPnl!=null?money(r.fundPnl):"—")+"</td><td class=num>"+
+        (r.sharePct!=null?r.sharePct.toFixed(2)+"%":"—")+"</td><td class=num>"+money(r.amount)+
+        "</td><td class=num>"+money(r.balance)+"</td></tr>";
+    for(const r of lk.rows)
+      deps+="<tr><td>"+r.date+"</td><td class=num>"+money(r.amount)+"</td><td>"+r.unlock+"</td><td>"+
+        (r.isLocked?"Locked":"Unlocked")+"</td></tr>";
+  }
+  return '<!doctype html><html><head><meta charset="utf-8"><title>Statement — '+esc(name)+" — "+asof+'</title><style>'+
+    'body{font-family:Helvetica,Arial,sans-serif;color:#1a1a1a;margin:0;background:#fff}'+
+    '.wrap{max-width:760px;margin:0 auto;padding:34px 28px}'+
+    '.brand{font-family:Georgia,serif;font-weight:bold;font-size:24px;text-align:center}'+
+    '.sub{text-align:center;font-size:10px;letter-spacing:1.6px;color:#6b7280;text-transform:uppercase;margin:2px 0 4px}'+
+    '.conf{text-align:center;font-size:9px;color:#6b7280;margin-bottom:12px}'+
+    'hr{border:none;border-top:2px solid #1f3d5c;margin:12px 0 18px}'+
+    'h2{font-size:12px;color:#1f3d5c;margin:20px 0 6px;text-transform:uppercase;letter-spacing:.8px}'+
+    'table{width:100%;border-collapse:collapse;font-size:11px}'+
+    'td,th{padding:6px 8px;border-bottom:1px solid #e3e7ec;text-align:left;vertical-align:top}'+
+    'th{background:#f4f6f8;color:#6b7280;font-size:9px;text-transform:uppercase;letter-spacing:.6px;border-bottom:2px solid #1f3d5c}'+
+    '.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}'+
+    '.k{color:#6b7280;width:210px}.v{font-weight:bold}.muted{color:#6b7280;font-size:9.5px}'+
+    '.foot{font-size:8.5px;color:#6b7280;margin-top:22px;line-height:1.5;border-top:1px solid #e3e7ec;padding-top:10px}'+
+    '</style></head><body><div class=wrap>'+
+    '<div class=brand>Hūs Rihtlǣefan</div><div class=sub>Daily Account Statement</div>'+
+    '<div class=conf>CONFIDENTIAL — prepared for the named client only</div><hr>'+
+    '<h2>Statement</h2><table>'+
+    sum("Client", esc(name))+
+    sum("Statement date (data through)", asof)+
+    sum("Generated", gen)+
+    (p.email?sum("E-Mail",esc(p.email)):"")+(p.phone?sum("Phone #",esc(p.phone)):"")+
+    (p.address?sum("Address",esc(p.address)):"")+
+    ((p.onboard||(inv&&inv.deposits.length))?sum("Client Onboarding Date",
+        esc(p.onboard||inv.deposits[0].date+" (first deposit)")):"")+
+    (p.accredited?sum("Accredited Investor",esc(p.accredited)):"")+"</table>"+
+    (inv?(
+    '<h2>Account Summary</h2><table>'+
+    sum("Current balance", money(inv.equity))+
+    sum("Share of fund", share.toFixed(2)+"%")+
+    sum("Contributed capital", money(inv.contributed))+
+    sum("Net profit (after charged fees)", money(net))+
+    sum("Pending fees (this month, est.)", est>0?money(est):"—")+
+    sum("Net profit after pending fees", money(net-est))+
+    sum("Fees paid to date", money(inv.fees))+
+    sum("High-water mark", money(inv.hwm))+
+    sum("Withdrawable now (post lock-up)", money(Math.max(inv.equity-lk.locked,0)))+"</table>"+
+    '<h2>Activity on Statement Date</h2><table><tr><th>Type</th><th>Detail</th><th class=num>Fund day P&L</th><th class=num>Your share</th><th class=num>Amount</th></tr>'+today+"</table>"+
+    '<h2>Deposits</h2><table><tr><th>Date</th><th class=num>Amount</th><th>Unlocks ('+CFG.lockup+'-day lock-up)</th><th>Status</th></tr>'+(deps||'<tr><td colspan=4 class=muted>None</td></tr>')+"</table>"+
+    '<h2>Account Breakdown — Complete Record</h2>'+
+    '<table><tr><th>Date</th><th>Activity</th><th class=num>Fund day P&L</th><th class=num>Your share of fund</th><th class=num>Amount</th><th class=num>Balance</th></tr>'+hist+"</table>"
+    ):'<p class=muted>No deposits recorded yet for this client.</p>')+
+    '<div class=foot>Fee terms: 3% management + 30% performance, charged monthly on new profit above your high-water mark; '+
+    'each deposit is locked for '+CFG.lockup+' days and participates in P&L from the next trading day after it is received. '+
+    'Figures are produced by the fund’s internal tracker, are net of fees charged through the last completed month, and are not '+
+    'audited financial statements. Trading futures involves substantial risk of loss, including loss of principal. '+
+    'Past performance does not guarantee future results. Questions: reply to this email or contact the Manager.</div>'+
+    "</div></body></html>";
+}
+function stmtFileName(name, asof){return name.replace(/[^A-Za-z0-9]+/g,"_")+"_Statement_"+asof+".html";}
+function downloadStatement(name){
+  const st=computeState();
+  if(!st.invs[name]&&!PROFILES[name]){flash("No such client.",1);return;}
+  download(stmtFileName(name,st.asof), statementDoc(st,name), "text/html");
+  logAct("Statement","Statement downloaded for "+name+" (as of "+st.asof+")");
+  render();
+}
+function downloadAllStatements(){
+  const st=computeState();
+  const names=[...new Set([...Object.keys(st.invs),...Object.keys(PROFILES)])].sort();
+  if(!names.length){flash("No clients yet.",1);return;}
+  names.forEach((n,i)=>setTimeout(()=>download(stmtFileName(n,st.asof), statementDoc(st,n), "text/html"), i*450));
+  logAct("Statement","Statements downloaded for all "+names.length+" clients (as of "+st.asof+")");
+  render();
+}
+function mailDraft(name){
+  const st=computeState(); const inv=st.invs[name]; const p=PROFILES[name]||{};
+  if(!p.email){flash("No e-mail on file for "+name+" — add it via ＋ → Client.",1);return;}
+  const est=inv?((st.est.per[name]||{}).total||0):0;
+  const net=inv?inv.equity-inv.contributed:0;
+  const body=
+"Dear "+(p.first||name)+",%0D%0A%0D%0A"+
+"Your Hūs Rihtlǣefan daily statement for "+st.asof+" is attached.%0D%0A%0D%0A"+
+"Summary:%0D%0A"+
+(inv?("  Current balance: "+money(inv.equity)+"%0D%0A"+
+"  Net profit (after charged fees): "+money(net)+"%0D%0A"+
+"  Pending fees this month (est.): "+(est>0?money(est):"$0.00")+"%0D%0A"+
+"  Net profit after pending fees: "+money(net-est)+"%0D%0A"):"  No deposits recorded yet.%0D%0A")+
+"%0D%0AThe attached statement contains your complete account record. Please reply with any questions.%0D%0A%0D%0A"+
+"Hūs Rihtlǣefan LLC";
+  logAct("Statement","Mail draft opened for "+name);
+  location.href="mailto:"+encodeURIComponent(p.email)+
+    "?subject="+encodeURIComponent("Hūs Rihtlǣefan — Daily Statement "+st.asof)+
+    "&body="+body;
+  render();
+}
+function openStatements(){
+  const st=computeState();
+  const names=[...new Set([...Object.keys(st.invs),...Object.keys(PROFILES)])].sort();
+  let h="<tr><th>Client</th><th>E-Mail</th><th></th><th></th></tr>";
+  if(!names.length) h+='<tr><td colspan=4 class=small>No clients yet.</td></tr>';
+  for(const n of names){
+    const p=PROFILES[n]||{};
+    h+='<tr><td><b>'+esc(n)+"</b></td><td>"+esc(p.email||"— no e-mail on file —")+"</td>"+
+       '<td><button class=ghost data-n="'+esc(n)+'" onclick="downloadStatement(this.dataset.n)">Download</button></td>'+
+       '<td>'+(p.email?'<button class=ghost data-n="'+esc(n)+'" onclick="mailDraft(this.dataset.n)">Mail draft</button>':"")+"</td></tr>";
+  }
+  $("stmtsTable").innerHTML=h;
+  openModal("stmtsModal");
+}
+
+/* ========================= actions ========================= */
+function parseAmt(s){const v=parseFloat(String(s).replace(/[$,\s]/g,""));return isFinite(v)?v:null;}
+function poolBefore(dateISO){
+  // invested capital strictly before this date (same-day deposits don't count —
+  // they only start participating the next trading day)
+  const order={PNL:0,DEPOSIT:1,WITHDRAWAL:2};
+  const ev=[...ENTRIES].filter(e=>e.date<dateISO)
+    .sort((a,b)=> a.date===b.date ? order[a.type]-order[b.type] : (a.date<b.date?-1:1));
+  let pool=0;
+  for(const e of ev){
+    if(e.type==="DEPOSIT") pool+=e.amount;
+    else if(e.type==="WITHDRAWAL") pool-=Math.min(e.amount,pool);
+    else if(pool>1e-9) pool=Math.max(pool+e.amount,0);
+  }
+  return pool;
+}
+function addPnl(){
+  const d=$("pnlDate").value, a=parseAmt($("pnlAmt").value);
+  if(!d||a===null){flash("Enter a date and a P&L number.",1);return;}
+  if(poolBefore(d)<=1e-9){
+    flash("No invested capital as of "+d+" — deposits made that day start participating the NEXT trading day, so this P&L has no one to belong to. Date it the day after the first deposit.",1);
+    return;
+  }
+  ENTRIES.push({id:NEXT_ID++, date:d, type:"PNL", amount:a});
+  logAct("P&L", "Fund day P&L of "+money(a)+" recorded (dated "+d+")");
+  $("pnlAmt").value=""; closeModals(); flash("Recorded fund P&L "+money(a)+" on "+d+"."); render();
+}
+function addFlow(){
+  const t=$("flowType").value==="Deposit"?"DEPOSIT":"WITHDRAWAL";
+  const n=$("flowName").value.trim(), a=parseAmt($("flowAmt").value), d=$("flowDate").value;
+  if(!n||!d||a===null||a<=0){flash("Enter investor name, positive amount, and date.",1);return;}
+  ENTRIES.push({id:NEXT_ID++, date:d, type:t, name:n, amount:a});
+  logAct(t==="DEPOSIT"?"Deposit":"Withdrawal",
+         (t==="DEPOSIT"?"Deposit of ":"Withdrawal of ")+money(a)+" for "+n+" (dated "+d+")");
+  $("flowAmt").value=""; closeModals(); flash("Recorded "+t.toLowerCase()+" of "+money(a)+" for "+n+" on "+d+"."); render();
+}
+function addClient(){
+  const first=$("cFirst").value.trim(), last=$("cLast").value.trim();
+  if(!first||!last){flash("Enter the client's first and last name.",1);return;}
+  const n=(first+" "+last).replace(/\s+/g," ");
+  const amtRaw=$("clientAmt").value.trim();
+  const a=amtRaw?parseAmt(amtRaw):null, d=$("clientDate").value;
+  if(amtRaw && (a===null||a<=0)){flash("The deposit must be a positive number (or leave it blank).",1);return;}
+  if(a && !d){flash("Pick a date for the deposit.",1);return;}
+  const existed = !!PROFILES[n] || ENTRIES.some(e=>e.name===n);
+  const old=PROFILES[n]||{};
+  const val=id=>$(id).value.trim();
+  PROFILES[n]={first, last,
+               email:   val("cEmail")   || old.email   || "",
+               phone:   val("cPhone")   || old.phone   || "",
+               address: val("cAddr")    || old.address || "",
+               onboard: val("cOnboard") || old.onboard || "",
+               accredited: val("cAccred") || old.accredited || "",
+               notes:   val("cNotes")   || old.notes   || ""};
+  if(a) ENTRIES.push({id:NEXT_ID++, date:d, type:"DEPOSIT", name:n, amount:a});
+  logAct("Client", (existed?"Updated client info for ":"New client added: ")+n+
+         (a?(" — initial deposit "+money(a)+" (dated "+d+")"):""));
+  for(const id of ["cFirst","cLast","cEmail","cPhone","cAddr","cOnboard","cNotes","clientAmt"]) $(id).value="";
+  $("cAccred").value=" ";
+  closeModals();
+  flash((existed?"Updated client ":"Client ")+n+(existed?"":" added")+
+        (a?(" — deposit of "+money(a)+" recorded on "+d+".") : "."));
+  render();
+}
+function delEntry(id){
+  const e=ENTRIES.find(x=>x.id===id);
+  ENTRIES=ENTRIES.filter(x=>x.id!==id);
+  if(e) logAct("Edit", "Deleted "+(e.type==="PNL"?"P&L":e.type.toLowerCase())+" entry of "+money(e.amount)+
+               (e.name?" for "+e.name:"")+" (was dated "+e.date+")");
+  flash("Entry deleted."); render();
+}
+function saveCfg(){
+  const m=parseAmt($("cfgMgmt").value), p=parseAmt($("cfgPerf").value), l=parseInt($("cfgLock").value,10);
+  if(m===null||p===null||!isFinite(l)){flash("Check the settings values.",1);return;}
+  CFG.mgmt=m/100; CFG.perf=p/100; CFG.lockup=l;
+  CFG.members=[$("cfgM1").value.trim()||CFG.members[0], $("cfgM2").value.trim()||CFG.members[1]];
+  logAct("Settings", "Settings updated — mgmt "+(CFG.mgmt*100)+"%, perf "+(CFG.perf*100)+"%, lock-up "+CFG.lockup+" days");
+  closeModals(); flash("Settings applied."); render();
+}
+function wipe(){
+  if(!confirm("Delete ALL entries and client info? (Download a backup first if unsure.)")) return;
+  ENTRIES=[];PROFILES={};ACTIVITY=[];TRADES=[];SELECTED_CLIENT=null;
+  if(CACHE_OK){try{localStorage.removeItem(CACHE_KEY);}catch(e){}}
+  closeModals(); flash("Cleared."); render();
+}
+
+/* ========================= save / load / export ========================= */
+function download(name, text, type){
+  const b=new Blob([text],{type:type||"application/octet-stream"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+function saveFile(){
+  download("hus_rihtlaefan_fund_data.json",
+    JSON.stringify({cfg:CFG, entries:ENTRIES, profiles:PROFILES, activity:ACTIVITY, trades:TRADES},null,1), "application/json");
+}
+function loadFile(input){
+  const f=input.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{try{
+      const d=JSON.parse(r.result);
+      if(!Array.isArray(d.entries)) throw 0;
+      ENTRIES=d.entries; if(d.cfg) CFG=Object.assign(CFG,d.cfg);
+      PROFILES=d.profiles||{}; ACTIVITY=d.activity||[]; TRADES=d.trades||[];
+      NEXT_ID=ENTRIES.reduce((m,e)=>Math.max(m,e.id||0),0)+1;
+      NEXT_TRADE=TRADES.reduce((m,t)=>Math.max(m,t.id||0),0)+1;
+      setTheme(CFG.theme||"dark");
+      logAct("Data", "Backup loaded — "+ENTRIES.length+" entries, "+Object.keys(PROFILES).length+" clients");
+      closeModals(); flash("Loaded "+ENTRIES.length+" entries."); render();
+    }catch(e){flash("That file doesn't look like a portal save file.",1);}};
+  r.readAsText(f); input.value="";
+}
+function exportCSVs(){
+  const tx=[["date","type","investor","amount"]], pnl=[["date","pnl"]];
+  const order={PNL:0,DEPOSIT:1,WITHDRAWAL:2};
+  for(const e of [...ENTRIES].sort((a,b)=>a.date===b.date?order[a.type]-order[b.type]:(a.date<b.date?-1:1))){
+    if(e.type==="PNL") pnl.push([e.date, e.amount.toFixed(2)]);
+    else tx.push([e.date, e.type, e.name, e.amount.toFixed(2)]);
+  }
+  const csv=rows=>rows.map(r=>r.map(c=>/[",\n]/.test(c)?'"'+String(c).replace(/"/g,'""')+'"':c).join(",")).join("\n")+"\n";
+  const cl=[["name","first","last","email","phone","address","onboard","accredited","notes"]];
+  for(const [n,p] of Object.entries(PROFILES))
+    cl.push([n,p.first||"",p.last||"",p.email||"",p.phone||"",p.address||"",p.onboard||"",p.accredited||"",p.notes||""]);
+  download("transactions.csv", csv(tx), "text/csv");
+  setTimeout(()=>download("daily_pnl.csv", csv(pnl), "text/csv"), 400);
+  setTimeout(()=>download("clients.csv", csv(cl), "text/csv"), 800);
+}
+function loadDemo(){
+  if(ENTRIES.length && !confirm("Replace current entries with demo data?")) return;
+  let id=1;
+  ENTRIES=[
+    {id:id++,date:"2026-05-01",type:"DEPOSIT",name:"Jane Alpha",amount:50000},
+    {id:id++,date:"2026-05-05",type:"PNL",amount:3000},
+    {id:id++,date:"2026-05-15",type:"DEPOSIT",name:"Bob Beta",amount:25000},
+    {id:id++,date:"2026-05-20",type:"PNL",amount:-1500},
+    {id:id++,date:"2026-05-28",type:"PNL",amount:4200},
+    {id:id++,date:"2026-06-10",type:"PNL",amount:2000},
+    {id:id++,date:"2026-06-25",type:"PNL",amount:1000},
+    {id:id++,date:"2026-07-01",type:"DEPOSIT",name:"Cara Gamma",amount:40000},
+    {id:id++,date:"2026-07-15",type:"PNL",amount:5000},
+  ];
+  PROFILES={
+    "Jane Alpha":{first:"Jane",last:"Alpha",email:"jane.alpha@email.com",phone:"(269) 555-0111",address:"14 Lakeview Dr, Saint Joseph, MI 49085",onboard:"2026-04-28",accredited:"Yes"},
+    "Bob Beta":{first:"Bob",last:"Beta",email:"bob.beta@email.com",phone:"(269) 555-0122",address:"77 Harbor St, Benton Harbor, MI 49022",accredited:"Yes"},
+    "Cara Gamma":{first:"Cara",last:"Gamma",email:"cara.g@email.com",phone:"(312) 555-0177",address:"901 Shore Rd, Chicago, IL 60611",accredited:"Pending verification"}};
+  let tid=1;
+  TRADES=[  // each day's tickets sum exactly to that day's recorded fund P&L
+    {id:tid++,date:"2026-05-05",time:"09:41–10:15",symbol:"MES",side:"Long", qty:5, entry:"6785.00", exit:"6845.00", pnl:1500},
+    {id:tid++,date:"2026-05-05",time:"13:02–13:38",symbol:"MNQ",side:"Long", qty:10,entry:"24650.00",exit:"24725.00",pnl:1500},
+    {id:tid++,date:"2026-05-20",time:"09:35–09:58",symbol:"MES",side:"Long", qty:5, entry:"6812.00", exit:"6782.00", pnl:-750},
+    {id:tid++,date:"2026-05-20",time:"14:20–14:49",symbol:"MES",side:"Short",qty:3, entry:"6790.00", exit:"6840.00", pnl:-750},
+    {id:tid++,date:"2026-05-28",time:"10:05–11:12",symbol:"MNQ",side:"Long", qty:8, entry:"24880.00",exit:"25030.00",pnl:2400},
+    {id:tid++,date:"2026-05-28",time:"14:41–15:10",symbol:"MES",side:"Long", qty:6, entry:"6841.00", exit:"6901.00", pnl:1800},
+    {id:tid++,date:"2026-06-10",time:"09:47–10:31",symbol:"MES",side:"Short",qty:4, entry:"6875.00", exit:"6795.00", pnl:1600},
+    {id:tid++,date:"2026-06-10",time:"13:55–14:12",symbol:"MNQ",side:"Long", qty:2, entry:"25120.00",exit:"25220.00",pnl:400},
+    {id:tid++,date:"2026-06-25",time:"11:18–12:02",symbol:"MES",side:"Long", qty:4, entry:"6890.50", exit:"6940.50", pnl:1000},
+    {id:tid++,date:"2026-07-15",time:"09:38–10:44",symbol:"MNQ",side:"Long", qty:10,entry:"25400.00",exit:"25550.00",pnl:3000},
+    {id:tid++,date:"2026-07-15",time:"14:07–14:36",symbol:"MES",side:"Long", qty:8, entry:"6952.00", exit:"7002.00", pnl:2000},
+  ];
+  NEXT_TRADE=tid;
+  NEXT_ID=id;
+  logAct("Data", "Demo data loaded — 3 investors, 6 P&L days (May–July)");
+  flash("Demo data loaded — 3 investors, May–July."); render();
+}
+/* ========================= server sync ========================= */
+/* The fund state lives in one browser via localStorage AND, when the operator is
+   signed into the terminal (same origin), syncs to /api/fund (operator-gated KV).
+   The Supabase session persisted by the terminal is reused for the bearer token,
+   so the fund manager never signs in twice. Server is authoritative on load when
+   its copy is at least as new as the local one; otherwise the local copy is pushed. */
+const fundSync = (function(){
+  let token=null, pushT=null, lastPushed="", available=false;
+  function readToken(){
+    try{
+      for(let i=0;i<localStorage.length;i++){
+        const k=localStorage.key(i);
+        if(/^sb-.*-auth-token$/.test(k)){
+          const v=JSON.parse(localStorage.getItem(k)||"null");
+          const t=v && (v.access_token || (v.currentSession&&v.currentSession.access_token));
+          if(t) return t;
+        }
+      }
+    }catch(e){}
+    return null;
+  }
+  function setStatus(s){
+    const el=$("syncStatus"); if(!el) return;
+    const map={
+      local:["local only","var(--muted)"], syncing:["syncing…","var(--warn)"],
+      synced:["synced ✓","var(--pos)"], offline:["offline — local only","var(--warn)"],
+      noauth:["sign in on terminal to sync","var(--muted)"]
+    };
+    const m=map[s]||map.local; el.textContent=m[0]; el.style.color=m[1];
+  }
+  function currentState(){ return {cfg:CFG, entries:ENTRIES, profiles:PROFILES, activity:ACTIVITY, trades:TRADES}; }
+  function applyState(s){
+    if(!s) return;
+    ENTRIES=Array.isArray(s.entries)?s.entries:[]; PROFILES=s.profiles||{};
+    ACTIVITY=s.activity||[]; TRADES=s.trades||[];
+    if(s.cfg) CFG=Object.assign(CFG,s.cfg);
+    NEXT_ID=ENTRIES.reduce((m,e)=>Math.max(m,e.id||0),0)+1;
+    NEXT_TRADE=TRADES.reduce((m,t)=>Math.max(m,t.id||0),0)+1;
+    setTheme(CFG.theme||"dark");
+  }
+  async function pull(){
+    token=readToken();
+    if(!token){ available=false; setStatus("noauth"); return; }
+    available=true; setStatus("syncing");
+    try{
+      const r=await fetch("/api/fund",{headers:{Authorization:"Bearer "+token}});
+      if(r.status===401||r.status===403){ available=false; setStatus("noauth"); return; }
+      if(!r.ok){ setStatus("offline"); return; }
+      const d=await r.json();
+      const localSaved=(function(){try{return JSON.parse(localStorage.getItem(CACHE_KEY)||"{}").savedAt||"";}catch(e){return "";}})();
+      if(d && d.state && (d.savedAt||"") >= localSaved){
+        applyState(d.state); setStatus("synced"); render();
+      } else {
+        // server empty or older than local -> seed/overwrite server from local
+        setStatus("synced"); push(true);
+      }
+    }catch(e){ setStatus("offline"); }
+  }
+  function push(now){
+    if(!available){ token=readToken(); available=!!token; if(!available){ setStatus("noauth"); return; } }
+    const body=JSON.stringify({state:currentState()});
+    if(body===lastPushed && !now) return;
+    clearTimeout(pushT);
+    pushT=setTimeout(async ()=>{
+      const t=readToken(); if(!t){ setStatus("noauth"); return; }
+      setStatus("syncing");
+      try{
+        const r=await fetch("/api/fund",{method:"PUT",
+          headers:{"Content-Type":"application/json",Authorization:"Bearer "+t},
+          body});
+        if(r.status===401||r.status===403){ available=false; setStatus("noauth"); return; }
+        if(r.ok){ lastPushed=body; setStatus("synced"); }
+        else setStatus("offline");
+      }catch(e){ setStatus("offline"); }
+    }, now?0:1400);
+  }
+  return {pull, push, applyState};
+})();
+
+/* ---- init ---- */
+restoreCache();
+setTheme(CFG.theme||"dark");
+$("cacheStatus").innerHTML = CACHE_OK
+  ? "Auto-cache: <b>ON</b> — data is saved in this browser automatically after every change."
+  : "Auto-cache: <b>unavailable here</b> — rely on backup files.";
+render();
+fundSync.pull();
+</script>
+</body>
+</html>
