@@ -180,25 +180,6 @@ try:
             # Tension intersections — where the CL and CM lobes cross
             _txz=_zc(_cl-_cm); _txt=_times(_txz); _o['tx_t']=(' \u00b7 '.join(_txt[:6])) if _txt else None
             _o['tx']=[{'cw':float(_z),'time':_cwc(_z)} for _z in _txz] if _txz else None
-            # chronometric field registry \u2014 self-describing curves for the chart-tab
-            # chronometric heatmap layer (Chrono spec Obj 2). No fixed count is assumed:
-            # the client renders whatever appears here, so future sheets/derivative
-            # levels are added by appending entries. Isolated try: a failure here must
-            # never null the brief.
-            try:
-                _st=max(1,len(_cw)//192)
-                def _ser(_y): return [float(_v) if np.isfinite(_v) else None for _v in _y[::_st]]
-                _cwd=[float(_v) for _v in _cw[::_st]]
-                _g1=np.gradient(_cl,_cw); _g2=np.gradient(_g1,_cw); _g3=np.gradient(_g2,_cw); _g4=np.gradient(_g3,_cw)
-                _o['chrono']=[
-                    {'id':'cl','name':'Tension CL','sheet':'Time-State','cw':_cwd,'v':_ser(_cl)},
-                    {'id':'cm','name':'Tension CM','sheet':'Time-State','cw':_cwd,'v':_ser(_cm)},
-                    {'id':'dx','name':'CL\u2212CM differential','sheet':'Dual Phase','cw':_cwd,'v':_ser(_cl-_cm)},
-                    {'id':'g1','name':'DS Gradient','sheet':'Difference Sum','cw':_cwd,'v':_ser(_g1)},
-                    {'id':'g2','name':'DS Velocity','sheet':'Difference Sum','cw':_cwd,'v':_ser(_g2)},
-                    {'id':'g3','name':'DS Curvature','sheet':'Difference Sum','cw':_cwd,'v':_ser(_g3)},
-                    {'id':'g4','name':'DS Jerk','sheet':'Difference Sum','cw':_cwd,'v':_ser(_g4)}]
-            except Exception: _o['chrono']=None
 except Exception as _ew: _o['_twerr']=str(_ew)
 
 # Python json.dumps emits bare NaN/Infinity for non-finite floats, which JS JSON.parse

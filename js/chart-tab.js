@@ -36,6 +36,10 @@
   function VertLine(chart,time,color,w,dash,hotColor){ this._chart=chart; this._time=time; this._color=color; this._w=w||1; this._dash=dash; this._hotColor=hotColor; this._hot=false; this._paneViews=[new VertLinePaneView(this)]; }
   VertLine.prototype.updateAllViews=function(){ this._paneViews.forEach(function(v){ v.update(); }); };
   VertLine.prototype.paneViews=function(){ return this._paneViews; };
+  // v5 primitive lifecycle: capture requestUpdate so state changes (hover brighten) can ask
+  // for a repaint directly instead of invalidating the whole series via applyOptions({})
+  VertLine.prototype.attached=function(p){ this._ru=(p&&p.requestUpdate)||null; };
+  VertLine.prototype.detached=function(){ this._ru=null; };
 
   // ---- vertical-band primitive: a Gaussian-weighted highlight along the time axis ----
   // Renders a soft session-time highlight for a chronometric event: opacity follows a
@@ -256,15 +260,21 @@
         var ext=[], scale=barTimes.slice(), t=lastBar+iv, guard=0;
         while(t<=maxEv+iv && guard<3000){ ext.push({time:t}); scale.push(t); t+=iv; guard++; }
         if(ext.length){
-          var vr=chart.timeScale().getVisibleLogicalRange();
-          series.setData(bars.map(function(b){ return {time:b.time,open:b.open,high:b.high,low:b.low,close:b.close}; }).concat(ext));
-          if(vr) try{ chart.timeScale().setVisibleLogicalRange(vr); }catch(_v){}
+          // setData only when this bars array hasn't already been extended this far —
+          // repeated refreshes (levels/date/cell events) otherwise reset the series each time
+          if(_chronoExt.bars!==bars||_chronoExt.to<maxEv){
+            var vr=chart.timeScale().getVisibleLogicalRange();
+            series.setData(bars.map(function(b){ return {time:b.time,open:b.open,high:b.high,low:b.low,close:b.close}; }).concat(ext));
+            if(vr) try{ chart.timeScale().setVisibleLogicalRange(vr); }catch(_v){}
+            _chronoExt={bars:bars,to:maxEv};
+          }
           future.forEach(function(e){ drawAt(nearest(scale,e._t), e); });
           dbg.drawn=chronoBands.length;
         }
       }catch(_){}
     }
   }
+  var _chronoExt={bars:null,to:0};   // whitespace-extension memo: which bars array was extended, and to when
   // console diagnostic — pinpoints where the chrono chain breaks (data / bars / coordinate resolution)
   window.__chronoDebug=function(){
     var inst=(document.getElementById('instA')||{}).value||'', date=(document.getElementById('dayDate')||{}).value||'';
@@ -300,7 +310,10 @@
     wrap.appendChild(chronoTip); return chronoTip;
   }
   var chronoHot=null;
-  function setChronoHot(b){ if(chronoHot===b) return; if(chronoHot) chronoHot._hot=false; if(b) b._hot=true; chronoHot=b; try{ series.applyOptions({}); }catch(_){} }  // force a repaint so the hovered line brightens
+  function setChronoHot(b){ if(chronoHot===b) return; var prev=chronoHot; if(prev) prev._hot=false; if(b) b._hot=true; chronoHot=b;
+    var ru=(b&&b._ru)||(prev&&prev._ru);                       // one primitive's requestUpdate repaints the pane — both lines restyle
+    if(ru){ try{ ru(); return; }catch(_){} }
+    try{ series.applyOptions({}); }catch(_){} }                // fallback for builds without the attached() lifecycle
   function onChronoCrosshair(param){
     var tip=ensureChronoTip(); if(!tip) return;
     if(!chronoOn||!param||!param.point||!chronoBands.length){ tip.style.display='none'; setChronoHot(null); return; }
@@ -343,6 +356,7 @@
     });
   }
 
+  var histSeq=0;
   function loadHistory(){
     if(!statusEl) return;
     var inst=(document.getElementById('instA')||{}).value||'', sym=(window.__YF_SYMS||{})[inst];
@@ -353,8 +367,10 @@
     statusEl.textContent='loading '+sym+'…';
     var _h={}; var _t=window.__authToken&&window.__authToken(); if(_t) _h['Authorization']='Bearer '+_t;
     if(window.__viewToken) _h['X-Quan-Token']=window.__viewToken;   // client view (view.html) has no login, carries a publish token
+    var seq=++histSeq;                                              // stale-response guard: rapid instrument/interval flips race their fetches
     fetch(PROXY_BASE+'/history?symbol='+encodeURIComponent(sym)+'&range='+curRange+'&interval='+curInterval,{headers:_h})
       .then(function(r){ return r.json(); }).then(function(d){
+        if(seq!==histSeq) return;                                   // a newer request superseded this one — drop it
         if(!d||!d.bars||!d.bars.length){ statusEl.textContent=(d&&d.error)?('error: '+d.error):'no bars returned'; return; }
         series.setData(d.bars.map(function(b){ return {time:b.time,open:b.open,high:b.high,low:b.low,close:b.close}; }));
         window.__chartBars=d.bars; // chart-heat.js reads these for the volume-bubble layer
@@ -367,7 +383,7 @@
         statusEl.textContent=sym+' · '+d.bars.length+' bars · '+new Date().toLocaleTimeString();
         refreshLevels();
         drawDayRange(d.bars,(document.getElementById('dayDate')||{}).value||'');
-      }).catch(function(){ statusEl.textContent='proxy unreachable — check your connection'; });
+      }).catch(function(){ if(seq===histSeq) statusEl.textContent='proxy unreachable — check your connection'; });
   }
 
   // js/chart-heat.js (Bookmap-style heat blend) needs the live chart + series to attach its pane primitive

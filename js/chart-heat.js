@@ -154,7 +154,15 @@
   function curDate(){ return (document.getElementById('dayDate')||{}).value||''; }
   function selDate(){ return curDate()||Object.keys(DAYGRIDS).sort().pop()||todaySessionDate(); }
   function getApi(){ try{ return window.__chartApi?window.__chartApi():null; }catch(_){ return null; } }
-  function nudge(){ var api=getApi(); if(api&&api.series){ try{ api.series.applyOptions({}); }catch(_){} } }
+  // rAF-coalesced repaint request: event storms (bars + date + cell all firing together)
+  // collapse into a single series invalidation per frame instead of one each
+  var _nudgeRaf=0;
+  function nudge(){
+    if(_nudgeRaf) return;
+    _nudgeRaf=requestAnimationFrame(function(){ _nudgeRaf=0;
+      var api=getApi(); if(api&&api.series){ try{ api.series.applyOptions({}); }catch(_){} } });
+  }
+  var _aggMemo={key:'',sorted:null,agg:null};   // per-frame aggregation memo (see HeatPaneView.update)
 
   // ---- segment model: sorted boundaries [{t,grid,date}] ----
   function buildSegments(){
@@ -414,11 +422,20 @@
       return out;
     }
 
-    var sortedCache=[], aggCache=[];
-    for(var s=0;s<bounds.length;s++){
-      var rows=(bounds[s].grid.rows||[]).filter(function(r){ return r&&isFinite(r.k); }).sort(function(a,b){ return a.k-b.k; });
-      sortedCache.push(rows);
-      aggCache.push(aggregate(rows));
+    // update() runs on every chart repaint (pan/zoom/crosshair). Sorting + aggregating
+    // every day's grid each frame is pure churn — the inputs only change on data ingest
+    // (lastHash), granularity, or metric. Pixel mapping below stays per-frame.
+    var memoKey=curInstKey+'|'+lastHash+'|'+granIdx+'|'+metric+'|'+bounds.length;
+    var sortedCache, aggCache;
+    if(_aggMemo.key===memoKey&&_aggMemo.sorted){ sortedCache=_aggMemo.sorted; aggCache=_aggMemo.agg; }
+    else{
+      sortedCache=[]; aggCache=[];
+      for(var s=0;s<bounds.length;s++){
+        var rows=(bounds[s].grid.rows||[]).filter(function(r){ return r&&isFinite(r.k); }).sort(function(a,b){ return a.k-b.k; });
+        sortedCache.push(rows);
+        aggCache.push(aggregate(rows));
+      }
+      _aggMemo={key:memoKey,sorted:sortedCache,agg:aggCache};
     }
     // global normalization across visible aggregated buckets of every segment
     var vmax=0;
