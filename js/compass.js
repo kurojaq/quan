@@ -752,6 +752,7 @@ async function initDefault(){ try{ const D=JSON.parse(atob(DEFAULT_B64)); STORE=
    // the global control bar governs instrument + date — open on the terminal's current selection
    { const _gi=($('instA')||{}).value; if(_gi){ inst=_gi; if($('cp_inst'))$('cp_inst').value=inst; }
      const _gd=($('dayDate')||{}).value; if(_gd) $('cp_day').value=_gd; }
+   cpProjectFromWarehouse(inst);             // project the global warehouse (single source) into the Compass store
    try{ await _cpLoadPrice(); }catch(_e){}   // price path from the Chart tab's yfinance feed (shared bars or /api/history)
    refresh(); loadAnchor(); updateLogN();
    const _sel=$('cp_day').value;
@@ -771,10 +772,32 @@ window.__compassResize=render;
 // pointer synced to the main bar so the view follows the terminal instead of the now-hidden
 // local cp_ controls. Live price rides the global anchor (Live -> #gAnchor -> quan:cell ->
 // __compassSetAnchor), so nothing Compass-local drives it anymore.
+// Project the global warehouse (window.__qStore — the single source of truth) into the Compass's
+// working store: every session date the warehouse holds a Daily chain for becomes the Compass's
+// weekly entry (chain + anchor + locked + greeks). The Compass thus becomes a complete VIEW of the
+// warehouse for its core session data rather than an independently-maintained copy — no drift, no
+// "empty because it wasn't pushed". Merges: EOM/quarterly horizon uploads (which the warehouse's
+// Daily/EOM bucket model cannot represent) are preserved. Additive + defensive: a no-op leaves the
+// existing store untouched, so there is no regression if the warehouse is empty or shaped unexpectedly.
+function cpProjectFromWarehouse(pi){
+  pi=pi||inst; const W=window.__qStore&&window.__qStore[pi]; if(!W||!W.sess) return false;
+  const S=(STORE[pi]=STORE[pi]||{}); let any=false;
+  for(const d in W.sess){
+    const cell=W.sess[d]; if(!cell||!cell.exp) continue;
+    const daily=cell.exp.Daily; if(!daily||!daily.chain) continue;
+    const old=S[d], anc=(cell.anchor!=null&&cell.anchor!=='')?+cell.anchor:((old&&old.anchor)??null);
+    S[d]={csv:daily.chain, anchor:anc, locked:!!cell.locked, fn:daily.fn||'', series:'weekly'}; any=true;
+    if(daily.greeks){ try{ (GREEKS[pi]=GREEKS[pi]||{})[d]=parseGreeks(daily.greeks);
+      (GREEKSRAW[pi]=GREEKSRAW[pi]||{})[d]={text:daily.greeks,fn:daily.gfn||'',series:'weekly'}; }catch(_e){} }
+  }
+  return any;
+}
+
 let _cpSyncT=0;
 function _cpSyncFromGlobal(){
   if(!window.__compassBooted) return;
   const gi=($('instA')||{}).value, gd=($('dayDate')||{}).value; let changed=false;
+  if(gi) cpProjectFromWarehouse(gi);                 // pull the instrument's full warehouse view first
   if(gi && gi!==inst){ inst=gi; if($('cp_inst')) $('cp_inst').value=inst; changed=true; }
   if(gd && $('cp_day') && $('cp_day').value!==gd) changed=true;
   if(!changed) return;
@@ -786,6 +809,10 @@ function _cpSyncFromGlobal(){
 }
 window.addEventListener('quan:instr', _cpSyncFromGlobal);
 window.addEventListener('quan:date',  _cpSyncFromGlobal);
+// warehouse data changed for the current instrument (chain/greeks/anchor loaded) — reproject + recompute
+window.addEventListener('quan:cell', function(){ if(!window.__compassBooted) return;
+  if(cpProjectFromWarehouse(inst)){ refresh(); loadAnchor();
+    clearTimeout(_cpSyncT); _cpSyncT=setTimeout(function(){ autorun(); }, 60); } });
 
 // Price path from the SAME yfinance feed the Chart tab uses. When the Chart tab is open it has
 // already fetched /api/history into window.__chartBars (refreshed on every global change, then
