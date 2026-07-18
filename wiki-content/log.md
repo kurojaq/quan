@@ -256,3 +256,61 @@
   Forecasting Model," "Scalar Decay-Weighted Greek Model," and "TDR
   (Trigger, Distribution, Reversion) framework" named in the Polynomial
   Skew section but not independently confirmed elsewhere.
+
+* **Creation — the base Risq formulas, located**: continued reading the
+  front-matter block that was skipped on the first pass (the reference
+  manual's actual opening — a 12-section term glossary, lines 1–2244) and
+  found the complete "RISQ" document embedded inside it (lines 1480–1767):
+  [Risq framework](/analytics/risq-framework.md) (the five base
+  dimension formulas + thresholds + the Risq Ratio) and
+  [Risq operational protocol](/analytics/risq-operational-protocol.md)
+  (Risq Surface, Entropy Budget, coherence-misalignment patterns, the
+  three inertia risks, the pre-/intra-session protocol) — resolving the
+  open item above. Both prior Risq-revision concepts updated to link to
+  these instead of flagging the base formulas as missing.
+* **Creation — the Deep Strike execution playbook, resolving PDSL, Layer
+  A/B/C, and μ-Wave** (used pervasively elsewhere without a fixed
+  definition until now), found immediately after RISQ in the same
+  front-matter block ("Qu'an Execution Playbook," lines 1782–2240):
+  [Deep Strike Analysis](/analytics/deep-strike-analysis.md),
+  [Fibonacci Strike Architecture](/analytics/fibonacci-strike-architecture.md),
+  [Three-Layer Execution Model](/analytics/three-layer-execution-model.md),
+  [Stop Architecture & Loss Management](/analytics/stop-architecture-loss-management.md),
+  [Pre-Session Checklist](/analytics/pre-session-checklist.md).
+* **Update**: [Dealer Watermark (PDSL)](/analytics/dealer-watermark-pdsl.md)
+  reconciled against a third, formally-different PDSL definition (the
+  Execution Playbook's four-joint-criteria Deep Strike test) found
+  alongside the Heat Map panel's own formula and the LR-20–55 Watermark
+  rule — three related but non-identical constructs, now documented as
+  such. [Strike Observable Manifold](/analytics/strike-observable-manifold.md)
+  gained the Regime Classification Matrix (ATT_X/REP_X/ATT/REP/COMP/BND)
+  and TRW (Temporal Resolution Window).
+* **Creation — PRAQ (mission discipline, stability & rhythm)**:
+  [PRAQ — Mission Discipline](/analytics/praq-mission-discipline.md)
+  (Strategist/Ground-Lead role separation, Intelligence Preparation of
+  the Session, the five-paragraph OPORD Mission Brief, After-Action
+  Review, the Field Intelligence Log) and
+  [PRAQ — Stability & Rhythm](/analytics/praq-stability-and-rhythm.md)
+  (Three-Body Stability Protocol, the four-domain Daily Selection Audit,
+  the daily/weekly/monthly battle rhythm, the eight-document
+  Practitioner's Dossier), from "PRAQ — Practitioner" (lines 4644–5168).
+* **Creation — INTENTUM, the closing document**:
+  [INTENTUM — The Phenomenology of Will](/analytics/intentum-phenomenology-of-intent.md)
+  (lines 5169–5499, document end) — fifteen philosophers (Brentano
+  through Whitehead) mapped onto the CW arc, culminating in a four-grade
+  scale for how genuinely a Mission Brief was actually intended. Notes
+  explicitly that "Psyq," referenced constantly throughout PRAQ and
+  INTENTUM as the psychological-architecture pillar, was never located
+  as a standalone document in this source file.
+* **The doctrine manual extraction is now complete** — all 5499 lines
+  read. Two intentionally-unresolved gaps remain, both flagged in place
+  rather than guessed at: `sfloor`'s exact meaning ([Chart tab](/terminal/tabs/chart.md)),
+  and the "Psyq" document itself. Both would need a new source, not
+  further reading of this file, to resolve.
+* **Deployment**: the wiki was shipped as a gated in-app "Desk Wiki" tab
+  in the Qu'an terminal (Desk tier only, $699/mo) — see
+  `js/wiki-viewer.js` and the `wiki-content/` static mirror of this
+  bundle in the main QBT repo. Verified working in a local preview
+  (gating, navigation, table rendering) and pushed to `main`
+  (commit `241ef8e`). `wiki-content/` should be kept in sync with this
+  `wiki/` source on future enrichment passes.

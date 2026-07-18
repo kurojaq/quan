@@ -1,6 +1,6 @@
 {
   "generated": "2026-07-18",
-  "count": 71,
+  "count": 72,
   "entries": [
     {
       "path": "analytics/chirality.md",
@@ -61,6 +61,12 @@
       "title": "Information Field & Dealer-Basis Risk Engine (Apex Dealer Logic Book, Section III)",
       "type": "Risk Model",
       "description": "Distributional observables across Intent/Transaction/Realization, the Composite Dealer Score, Trigger Pull gate, and the dealer-basis VaR engine — a separate risk system from the five-dimension Risq framework."
+    },
+    {
+      "path": "analytics/intentum-phenomenology-of-intent.md",
+      "title": "INTENTUM — The Phenomenology of Will",
+      "type": "Market Concept",
+      "description": "A philosophical framework (Brentano through Whitehead) for what makes a Mission Brief genuinely \"intended\" rather than a functional document — culminating in a four-grade self-diagnostic scale for the quality of an entry."
     },
     {
       "path": "analytics/observational-flow-frames.md",

@@ -5,18 +5,20 @@ trading doctrine, as distinct from the software architecture that
 delivers it. The shipped [Field Study tab](/terminal/tabs/field-study.md)
 renders three of these together. The full doctrine manual behind them
 (`raw/Qu'an Reference Manual - extracted text.txt`, 5499 lines) has now
-been read through line 3987 (front-matter glossary, "RISQ," the "Qu'an
+been **read in full**: the front-matter glossary, "RISQ," the "Qu'an
 Execution Playbook," Time State Compass, the "Navigation" interior-
 structure essay, "SOP & Chirality," "Field Notes," "Apex Dealer Logic
-Book") and lines 4644–5168 ("PRAQ" — mission discipline, stability, and
-battle rhythm). The NQM26 worked case study (3988–4643) was skimmed for
-generalizable content only (Regime Matrix, TRW); its per-strike numeric
-walkthrough was intentionally not transcribed as doctrine. **Still
-unread**: glossary lines 650–1480 (Sections VI–XII, largely redundant
-restatement — low priority) and lines 5169–5499, where a *further*
-document ("INTENTUM," a phenomenology-of-intent extension of something
-called "Psyq" — referenced constantly throughout PRAQ but never itself
-located in this file) begins. That's the next continuation point.
+Book," "PRAQ" (mission discipline, stability, battle rhythm), and
+"INTENTUM" (the closing phenomenology-of-intent document). The NQM26
+worked case study (3988–4643) was skimmed for generalizable content only
+(Regime Matrix, TRW); its per-strike numeric walkthrough was
+intentionally not transcribed as doctrine, and glossary Sections VI–XII
+(lines 650–1480) were judged redundant with material captured elsewhere
+and not fully transcribed. **"Psyq"** — referenced constantly throughout
+PRAQ and INTENTUM as the psychological-architecture pillar (internal
+Hunters, the reset protocol, Frankl Space) — was never located as a
+standalone document in this file; treat it as inherited context, not
+confirmed doctrine, until a source for it turns up.
 
 # Shipped, code-grounded
 
@@ -52,6 +54,7 @@ located in this file) begins. That's the next continuation point.
 
 * [PRAQ — Mission Discipline](praq-mission-discipline.md) - the Strategist/Ground-Lead split, the four-layer Intelligence Preparation of the Session, the five-paragraph OPORD Mission Brief, After-Action Review, and the Field Intelligence Log.
 * [PRAQ — Stability & Rhythm](praq-stability-and-rhythm.md) - the Three-Body (Self/Market/Framework) stability check, the four-domain Daily Selection Audit, the daily/weekly/monthly battle rhythm, and the eight-document Practitioner's Dossier.
+* [INTENTUM — The Phenomenology of Will](intentum-phenomenology-of-intent.md) - fifteen philosophers mapped onto the CW arc, culminating in a four-grade scale (Functional → Endorsed → Attentive → Living) for how genuinely a Mission Brief was actually intended.
 
 # Dealer field manual (Apex Dealer Logic Book)
 
