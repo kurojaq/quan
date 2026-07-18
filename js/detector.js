@@ -92,8 +92,11 @@ const BAKED_PRICE={};  /* demo price dataset removed — back dates now show onl
 
   const COL_X='Chronometer Watch', COL_M='PG/PC Dual Phase Tension', COL_S='PC/PG Dual Phase Tension';
   const WH_KEY='quan_intermarket_warehouse_v2', SEL_KEY='quan_intermarket_sel_v2';
-  // ---- full CME Group instrument set (CME+CBOT+NYMEX+COMEX), grouped by asset class; each symbol verified live against Yahoo Finance ----
-  const INSTRUMENT_GROUPS=[
+  // ---- full CME Group instrument set (CME+CBOT+NYMEX+COMEX), grouped by asset class ----
+  // Sourced from js/instrument-registry.js (the single instrument table shared with
+  // the ingest worker, heatmap, and auto-pull); the literal below is only a
+  // fallback for embeds that load detector.js without the registry.
+  const INSTRUMENT_GROUPS=(window.QuanInstruments&&window.QuanInstruments.groups())||[
     ['Equity Index',[['ES','ES'],['MES','MES'],['NQ','NQ'],['MNQ','MNQ'],['YM','YM'],['MYM','MYM'],['RTY','RTY'],['M2K','M2K']]],
     ['Rates',[['ZT','ZT'],['ZF','ZF'],['ZN','ZN'],['ZB','ZB'],['UB','UB'],['SR3','SR3']]],
     ['FX',[['6E','6E'],['6B','6B'],['6J','6J'],['6A','6A'],['6C','6C'],['6S','6S'],['6N','6N']]],

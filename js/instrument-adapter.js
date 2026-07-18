@@ -15,12 +15,27 @@
   "use strict";
 
   var FRAC = /^(-?)(\d+)-(\d{1,3})(\+?)(s?)$/;          // 13-01, 0-01s, 110-16+
-  var FAMILY = [
-    [/^(nq|es|rty|ym|np|em)/i, "INDEX"],
-    [/^(zn|zb|zf|zt|ub|tn|ge|sr|zq)/i, "RATES"],
-    [/^(6e|6j|6b|6a|6c|6s|6n|6m|6l|m6|e7|j7)/i, "FX"],
-    [/^(si|gc|hg|pl|pa|qo|qi)/i, "METAL"]
-  ];
+  // Family detection roots come from the shared registry when it's loaded, so a
+  // root added there (or a Barchart alias like e6/d6) is recognized here too.
+  // The literal regexes remain both as fallback and for roots the registry
+  // doesn't model (tn, ge, zq, m6, e7, j7, qo, qi).
+  var FAMILY = (function () {
+    var base = [
+      [/^(nq|es|rty|ym|np|em)/i, "INDEX"],
+      [/^(zn|zb|zf|zt|ub|tn|ge|sr|zq)/i, "RATES"],
+      [/^(6e|6j|6b|6a|6c|6s|6n|6m|6l|m6|e7|j7)/i, "FX"],
+      [/^(si|gc|hg|pl|pa|qo|qi)/i, "METAL"]
+    ];
+    var REG = (typeof window !== "undefined" && window.QuanInstruments) || null;
+    if (!REG) return base;
+    return ["INDEX", "RATES", "FX", "METAL"].map(function (fam, i) {
+      var roots = REG.familyRoots(fam), extra = base[i][0].source.match(/\(([^)]*)\)/)[1].split("|");
+      extra.forEach(function (r) { if (roots.indexOf(r) < 0) roots.push(r); });
+      // longest-first so "sil" wins over "si", "sr3" over "sr"
+      roots.sort(function (a, b) { return b.length - a.length; });
+      return [new RegExp("^(" + roots.join("|").replace(/[^a-z0-9|]/g, "") + ")", "i"), fam];
+    });
+  })();
 
   function isFractional(s) { return FRAC.test(String(s).trim()); }
   function parseCSVLine(line) {

@@ -166,36 +166,78 @@
   // On date/instrument selection, if this cell has no chain loaded yet, check whether the
   // Drive auto-pull worker already ingested a file for it and load it automatically — the
   // whole point being the user never has to manually upload what's already in Drive.
+  // Every stage reports through __qPipe (when present): a session that cannot load
+  // says which stage broke and what to do about it, instead of silently showing empty.
+  var INGEST_TTL_MS=5*60*1000;   // cron ingests every 15m — a session must eventually see new files without a reload
   var _ingestCache={}, _ingestInflight={};
   function ingestHeaders(){ var t=window.__authToken&&window.__authToken(); var h={}; if(t)h.Authorization='Bearer '+t; return h; }
+  function pipeLog(stage,state,reason,ctx,meta){ try{ if(window.__qPipe) window.__qPipe.log(stage,state,reason,ctx,meta); }catch(_){} }
   async function ingestListFor(inst){
-    if(_ingestCache[inst]) return _ingestCache[inst];
+    var c=_ingestCache[inst];
+    if(c && (Date.now()-c.at)<INGEST_TTL_MS) return c;
     if(_ingestInflight[inst]) return _ingestInflight[inst];
     _ingestInflight[inst]=fetch('/api/ingest-list?inst='+encodeURIComponent(inst),{headers:ingestHeaders()})
-      .then(function(r){ return r.ok?r.json():{files:[]}; })
-      .catch(function(){ return {files:[]}; })
-      .then(function(d){ _ingestCache[inst]=d.files||[]; delete _ingestInflight[inst]; return _ingestCache[inst]; });
+      .then(function(r){
+        if(!r.ok) return r.text().then(function(t){ return {files:[],problems:[],error:'HTTP '+r.status+(t?(' — '+t.slice(0,140)):'')}; });
+        return r.json().then(function(d){ return {files:d.files||[],problems:d.problems||[],error:null}; });
+      })
+      .catch(function(err){ return {files:[],problems:[],error:String(err&&err.message||err)}; })
+      .then(function(d){ d.at=Date.now(); _ingestCache[inst]=d; delete _ingestInflight[inst]; return d; });
     return _ingestInflight[inst];
   }
   function synthName(row){ var ex=row.expiration||'', p=ex.split('-'); var mm=p[1]||'01', dd=p[2]||'01', yy=(p[0]||'2026').slice(2);
     return row.instrument+'-exp-'+mm+'_'+dd+'_'+yy+'-'+row.session_date.replace(/-/g,'')+'.csv'; }
-  async function autoLoadFromIngest(){ try{
-    if(!window.__authToken || !window.__authToken()) return;   // operator-only endpoints; skip quietly if signed out
+  // Exact session-date match first; then legacy weekend-dated rows (the ingest
+  // worker previously indexed Friday chains under Saturday — those rows still
+  // exist in D1, and a Monday request must find them deterministically).
+  function findRow(files,date,type){
+    var hit=files.find(function(f){return f.session_date===date&&f.data_type===type;});
+    if(hit||type!=='optionPrices') return hit||null;
+    var d=new Date(date+'T00:00:00Z');
+    if(d.getUTCDay()===1){                       // Monday: accept a Sat/Sun-dated legacy chain row
+      for(var back=1; back<=2; back++){
+        d.setUTCDate(d.getUTCDate()-1);
+        var wd=d.toISOString().slice(0,10);
+        hit=files.find(function(f){return f.session_date===wd&&f.data_type===type;});
+        if(hit) return hit;
+      }
+    }
+    return null;
+  }
+  var _autoLoadBusy=null;   // 'inst|date' — quan:date and quan:instr both schedule this; only one pass per cell may run
+  async function autoLoadFromIngest(){
     var inst=curInst, date=gDate(); if(!inst||!date) return;
-    var cell=curCell(false); var b=cell?activeOf(cell):null; var e=(cell&&cell.exp)?cell.exp[b]:null;
-    if(e&&e.chain) return;   // already has data (manual upload or prior auto-load) — never overwrite
-    var files=await ingestListFor(inst);
-    var chainRow=files.find(function(f){return f.session_date===date&&f.data_type==='optionPrices';});
-    var greeksRow=files.find(function(f){return f.session_date===date&&f.data_type==='greeks';});
-    if(!chainRow) return;
-    if(curInst!==inst||gDate()!==date) return;   // selection changed while we were fetching
-    var cr=await fetch('/api/ingest-file?key='+encodeURIComponent(chainRow.storage_key),{headers:ingestHeaders()});
-    if(!cr.ok) return; var chainText=await cr.text();
-    if(curInst!==inst||gDate()!==date) return;
-    window.__qLoadChain(chainText, synthName(Object.assign({instrument:inst},chainRow)));
-    if(greeksRow){ var gr=await fetch('/api/ingest-file?key='+encodeURIComponent(greeksRow.storage_key),{headers:ingestHeaders()});
-      if(gr.ok){ var greeksText=await gr.text(); if(curInst===inst&&gDate()===date) window.__qLoadGreeks(greeksText, synthName(Object.assign({instrument:inst},greeksRow)), null); } }
-  }catch(_e){} }
+    var busyKey=inst+'|'+date; if(_autoLoadBusy===busyKey) return; _autoLoadBusy=busyKey;
+    try{ await _autoLoadFromIngest(inst,date); } finally { if(_autoLoadBusy===busyKey) _autoLoadBusy=null; }
+  }
+  async function _autoLoadFromIngest(inst,date){
+    var ctx={instrument:inst,session:date};
+    try{
+      if(!window.__authToken || !window.__authToken()) return;   // operator-only endpoints; skip quietly if signed out
+      var cell=curCell(false); var b=cell?activeOf(cell):null; var e=(cell&&cell.exp)?cell.exp[b]:null;
+      if(e&&e.chain) return;   // already has data (manual upload or prior auto-load) — never overwrite
+      var d=await ingestListFor(inst);
+      if(d.error){ pipeLog('Ingest Index','fail','could not list ingested files: '+d.error+' — check /api/ingest-list auth + D1 binding',ctx); return; }
+      var chainRow=findRow(d.files,date,'optionPrices');
+      var greeksRow=findRow(d.files,date,'greeks');
+      if(!chainRow){
+        var prob=(d.problems||[]).find(function(p){return p.session_date===date;});
+        if(prob) pipeLog('Ingest Index','warn','file for this session failed ingestion ('+prob.status+'): '+(prob.error||prob.original_filename)+' — fix the Drive file or re-run /sync',ctx);
+        return;   // no data for this day is a normal state, not a failure
+      }
+      if(curInst!==inst||gDate()!==date) return;   // selection changed while we were fetching
+      var cr=await fetch('/api/ingest-file?key='+encodeURIComponent(chainRow.storage_key),{headers:ingestHeaders()});
+      if(!cr.ok){ pipeLog('Ingest Retrieval','fail','chain '+chainRow.storage_key+' → HTTP '+cr.status+' — R2 object missing or binding broken; re-run ingest /sync',ctx); return; }
+      var chainText=await cr.text();
+      if(curInst!==inst||gDate()!==date) return;
+      window.__qLoadChain(chainText, synthName(Object.assign({instrument:inst},chainRow)));
+      pipeLog('Ingest Auto-Load','ok',null,ctx,{key:chainRow.storage_key});
+      if(greeksRow){ var gr=await fetch('/api/ingest-file?key='+encodeURIComponent(greeksRow.storage_key),{headers:ingestHeaders()});
+        if(!gr.ok){ pipeLog('Ingest Retrieval','warn','greeks '+greeksRow.storage_key+' → HTTP '+gr.status+' — chain loaded without greeks',ctx); return; }
+        var greeksText=await gr.text();
+        if(curInst===inst&&gDate()===date) window.__qLoadGreeks(greeksText, synthName(Object.assign({instrument:inst},greeksRow)), null); }
+    }catch(err){ pipeLog('Ingest Auto-Load','fail',String(err&&err.message||err),ctx,{stack:err&&err.stack}); }
+  }
   window.__autoLoadFromIngest=autoLoadFromIngest;
   window.addEventListener('quan:date',function(){ setTimeout(autoLoadFromIngest,50); });
   window.addEventListener('quan:instr',function(){ setTimeout(autoLoadFromIngest,50); });
@@ -214,10 +256,19 @@
     try{ if(!(await KV.get('qhub:detpurge:v2'))){
       const _ix=await KV.get(IDXKEY);
       if(Array.isArray(_ix)){ for(const _i of _ix){ const _V=await KV.get(METAKEY(_i)); if(_V&&_V.det){ _V.det=null; await KV.set(METAKEY(_i),_V); } } }
-      try{ localStorage.removeItem(WH_KEY); }catch(_w){}   /* nuke stale legacy warehouse that fed baked detector data */
-      try{ await KV.set(WH_KEY,null); }catch(_w2){}
       await KV.set('qhub:detpurge:v2',1);
     } }catch(_pe){}
+    /* nuke the stale legacy warehouse that fed baked detector data. Separate
+       one-time flag: the original attempt referenced detector.js's WH_KEY by
+       name — a ReferenceError silently eaten by its catch, so on machines that
+       already carry the detpurge flag the purge never actually happened.
+       (Key is write-dead: detector.js only reads it via __detLegacy.) */
+    try{ if(!(await KV.get('qhub:whpurge:v1'))){
+      const LEGACY_WH_KEY='quan_intermarket_warehouse_v2';
+      try{ localStorage.removeItem(LEGACY_WH_KEY); }catch(_w){}
+      try{ await KV.set(LEGACY_WH_KEY,null); }catch(_w2){}
+      await KV.set('qhub:whpurge:v1',1);
+    } }catch(_we){}
     const idx=await KV.get(IDXKEY);
     if(Array.isArray(idx)){ for(const i of idx){ const V=await KV.get(METAKEY(i)); if(!V) continue;
       const r=rec(i); r.det=V.det||null; r.sess={};

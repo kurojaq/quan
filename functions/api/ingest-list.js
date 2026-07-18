@@ -18,7 +18,19 @@ export async function onRequestGet({ request, env }) {
        FROM ingest_files WHERE instrument = ? AND status = 'ok' ORDER BY session_date DESC`
     ).bind(inst).all();
 
-    return json({ inst, files: results || [] });
+    // Rows the ingest worker could not store (invalid CSV, download error) —
+    // surfaced so the terminal can say WHY a session has no data instead of
+    // silently showing an empty day. Tolerant of a pre-`error`-column DB.
+    let problems = [];
+    try {
+      const p = await env.QUAN_INGEST_DB.prepare(
+        `SELECT session_date, data_type, status, error, original_filename
+         FROM ingest_files WHERE instrument = ? AND status != 'ok' ORDER BY session_date DESC LIMIT 50`
+      ).bind(inst).all();
+      problems = p.results || [];
+    } catch (_) {}
+
+    return json({ inst, files: results || [], problems });
   } catch (err) {
     return serverError(err.message);
   }

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Deep Strike Analysis — Dealer Watermark (PDSL)</title>
+<script src="js/instrument-registry.js"></script>
 <script src="js/barchart-parse.js"></script>
 <style>
 :root{--bg:#050506;--panel:#121214;--panel2:#17171a;--line:rgba(255,255,255,0.07);--line2:rgba(255,255,255,0.13);
@@ -486,7 +487,13 @@ render(); applyZoom(); setPulse();
 </style>
 <script>
 (function(){
-const INSTR={
+// Instrument table from the shared registry (js/instrument-registry.js) — the
+// same table the terminal dropdown, ingest worker, and auto-pull use, so the
+// heatmap can never disagree with the warehouse about an instrument. Literal
+// fallback covers a standalone open without the registry script.
+const INSTR=(function(){
+ if(window.QuanInstruments){const o={};window.QuanInstruments.symbols().forEach(s=>{o[s]={mult:window.QuanInstruments.mult(s)};});return o;}
+ return {
  ES:{mult:50},MES:{mult:5},NQ:{mult:20},MNQ:{mult:2},YM:{mult:5},MYM:{mult:0.5},RTY:{mult:50},M2K:{mult:5},
  ZT:{mult:2000},ZF:{mult:1000},ZN:{mult:1000},ZB:{mult:1000},UB:{mult:1000},SR3:{mult:2500},
  '6E':{mult:125000},'6B':{mult:62500},'6J':{mult:12500000},'6A':{mult:100000},'6C':{mult:100000},'6S':{mult:125000},'6N':{mult:100000},
@@ -495,7 +502,8 @@ const INSTR={
  ZC:{mult:50},ZW:{mult:50},ZS:{mult:50},ZM:{mult:100},ZL:{mult:600},KE:{mult:50},ZO:{mult:50},ZR:{mult:2000},
  LE:{mult:400},GF:{mult:500},HE:{mult:400},DC:{mult:2000},
  BTC:{mult:5},MBT:{mult:0.1},ETH:{mult:50}
-};
+ };
+})();
 M.mult=(INSTR[M.inst]&&INSTR[M.inst].mult)||20;
 const _ncdf=x=>{const a1=.254829592,a2=-.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=.3275911;
   const s=x<0?-1:1;x=Math.abs(x)/Math.SQRT2;const t=1/(1+p*x);
@@ -643,7 +651,11 @@ const RFR_DEF=3.7;rfrEl.value=RFR_DEF;anchorIn.value=M.anchor;
 let anchorLocked=false;const BAKED_EXP=BAKED_META.exp;const BAKED_DATE='2026-06-19';
 function setLockUI(){anchorLock.classList.toggle('on',anchorLocked);anchorLock.textContent=anchorLocked?'\uD83D\uDD12':'\uD83D\uDD13';anchorLock.title=anchorLocked?'Anchor locked for this date \u2014 click to unlock':'Lock anchor for this date';}
 function applyAnchorState(inst,date){const cell=(__qStore[inst]&&__qStore[inst][date])||null;const a=(cell&&cell.anchor!=null&&isFinite(cell.anchor))?cell.anchor:null;anchorLocked=!!(cell&&cell.anchorLocked&&a!=null);if(a!=null){M.anchor=a;anchorIn.value=a;}else{M.anchor=null;anchorIn.value='';}setLockUI();syncSpot();}
-function instFromName(name){var m=(name||'').toLowerCase().replace(/^.*\//,'').match(/^([a-z]{2,4}?)[fghjkmnquvxz]2\d/);return m?m[1].toUpperCase():null;}
+function instFromName(name){
+ // registry-aware: resolves digit-bearing roots (e6→6E) and any year, so FX
+ // terminal feeds aren't falsely flagged as loaded under the wrong instrument
+ if(window.QuanInstruments){var c=window.QuanInstruments.parseContract(name||'');return c?c.inst:null;}
+ var m=(name||'').toLowerCase().replace(/^.*\//,'').match(/^([a-z]{2,4}?)[fghjkmnquvxz]2\d/);return m?m[1].toUpperCase():null;}
 function syncFileLabels(inst,date){var s=__qStore[inst]&&__qStore[inst][date];
   function lab(el,nm){ if(!el)return; if(!nm){el.textContent='none';el.title='';el.style.color='';return;}
     var fi=instFromName(nm), mis=fi&&fi!==inst;
@@ -679,11 +691,11 @@ function mergeEngine(inst,date){const s=__qStore[inst]&&__qStore[inst][date];if(
   const res=window.__engRun(s.chainRaw,M.anchor);if(!res||!res.rows)return;
   s.eng=res.rows;s.engKey=s.chainRaw;applyEngRows(res.rows);}
 // ---- current day's high/low, sourced from the parent window's auth (this file always runs inside an iframe — app.html or view.html) ----
-let _dayRangeKey=null;
+let _dayRangeKey=null,_dayRangeInflight=null;
 async function fetchDayRange(inst,date){
-  const key=inst+'|'+date; if(_dayRangeKey===key)return; _dayRangeKey=key; M.dayHigh=null; M.dayLow=null;
+  const key=inst+'|'+date; if(_dayRangeKey===key||_dayRangeInflight===key)return; _dayRangeInflight=key; M.dayHigh=null; M.dayLow=null;
   var syms=(window.parent&&window.parent.__YF_SYMS)||{}; var sym=syms[inst];
-  if(!sym||!date)return;
+  if(!sym||!date){_dayRangeKey=key;return;}
   try{
     var _h={}; var _t=window.parent&&window.parent.__authToken&&window.parent.__authToken(); if(_t)_h['Authorization']='Bearer '+_t;
     var _vt=window.parent&&window.parent.__viewToken; if(_vt)_h['X-Quan-Token']=_vt;
@@ -693,7 +705,9 @@ async function fetchDayRange(inst,date){
     const etDate=t=>{ const p={}; fmt.formatToParts(new Date(t*1000)).forEach(x=>p[x.type]=x.value); return p.year+'-'+p.month+'-'+p.day; };
     const day=(d&&d.bars||[]).filter(b=>etDate(b.time)===date);
     if(day.length){ M.dayHigh=Math.max.apply(null,day.map(b=>b.high)); M.dayLow=Math.min.apply(null,day.map(b=>b.low)); }
+    _dayRangeKey=key;   // latch only on success — a failed fetch stays retryable on the next load
   }catch(_e){}
+  if(_dayRangeInflight===key)_dayRangeInflight=null;
   if(instSel.value===inst&&activeDate()===date){ render(); if(typeof drawProfiles==='function'&&profPanel&&profPanel.style.display!=='none') drawProfiles(); }
 }
 function loadDate(){const inst=instSel.value,date=activeDate();

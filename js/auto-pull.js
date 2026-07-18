@@ -63,20 +63,32 @@
     var el = document.getElementById('cp_inst');
     return (el && el.value ? el.value : 'ES').toUpperCase();
   }
-  // Front contract symbol, e.g. ESM25. Prefer the symbol the active chain was
-  // loaded under (most reliable); otherwise compute the front quarterly month.
+  // Front contract symbol, e.g. ESM25 / E6M25. Prefer the contract the active
+  // chain was loaded under (most reliable); otherwise compute the front
+  // quarterly month. Contract parsing + root mapping come from the registry, so
+  // digit-bearing Barchart roots (e6, b6, …) resolve — the old all-letter regex
+  // never matched a currency filename, which broke FX auto-pull entirely.
   function frontSymbol(inst, iso) {
+    var REG = window.QuanInstruments;
     try {
       var a = window.__qActiveChain && window.__qActiveChain();
-      var fn = a && a.fn ? String(a.fn).toLowerCase() : '';
-      var m = fn.match(/^([a-z]{2}[a-z]?\d{2})/);
-      if (m) return m[1].toUpperCase();
+      var fn = a && a.fn ? String(a.fn) : '';
+      if (REG && fn) {
+        var c = REG.parseContract(fn);
+        if (c) return (c.root + c.month + c.year).toUpperCase();
+      } else if (fn) {
+        var m = fn.toLowerCase().match(/^([a-z]{2}[a-z]?\d{2})/);
+        if (m) return m[1].toUpperCase();
+      }
     } catch (_) {}
     var d = new Date(iso + 'T00:00:00Z');
     var y = d.getUTCFullYear(), mo = d.getUTCMonth();
     for (var i = 0; i < 12; i++) {
       var mm = (mo + i) % 12, yy = y + Math.floor((mo + i) / 12);
-      if (QCODE[mm]) return inst + QCODE[mm] + String(yy).slice(2);
+      if (QCODE[mm]) {
+        var code = QCODE[mm], yy2 = String(yy).slice(2);
+        return REG ? REG.contractFor(inst, code, yy2) : (inst + code + yy2);
+      }
     }
     return inst;
   }
@@ -328,8 +340,9 @@
       var url = (panel.querySelector('#apUrl').value || '').trim();
       var kind = panel.querySelector('#apKind').value;
       var msg = panel.querySelector('#apSaveMsg');
-      if (!/^[A-Z]{2}[A-Z]?\d/.test(sym) || !/^\d{2}_\d{2}_\d{2}$/.test(exp) || !/^https?:\/\//.test(url)) {
-        if (msg) msg.textContent = 'need symbol (ESM25), exp MM_DD_YY, http(s) url';
+      // root (2-3 alnum, digits allowed — E6M25 is a valid FX contract) + month code + yy
+      if (!/^[A-Z0-9]{2,3}[FGHJKMNQUVXZ]\d{1,2}$/.test(sym) || !/^\d{2}_\d{2}_\d{2}$/.test(exp) || !/^https?:\/\//.test(url)) {
+        if (msg) msg.textContent = 'need a contract symbol (ESM25, E6M25), exp MM_DD_YY, http(s) url';
         return;
       }
       selection.push({ symbol: sym, expiry: exp, kind: kind, url: url, on: true });
