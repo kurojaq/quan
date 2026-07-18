@@ -258,6 +258,23 @@
   .chart-tools-wrap .chart-tools{position:absolute;top:calc(100% + 6px);right:0;left:auto;display:none;flex-direction:column;gap:4px;background:var(--glass-strong);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:0.5px solid var(--glass-line);border-radius:var(--radius-md);padding:6px;max-width:none;overflow:visible;box-shadow:var(--shadow);}
   .chart-tools-wrap.open .chart-tools{display:flex;animation:ddIn .18s var(--ease);}
   @keyframes ddIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
+  /* chart drawing toolbar (js/chart-draw.js) — design-system styling */
+  .cdraw-bar{position:absolute;top:8px;left:8px;z-index:8;display:flex;align-items:center;gap:2px;flex-wrap:wrap;
+    padding:3px;border-radius:var(--radius-md);background:var(--glass-strong);
+    backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+    border:0.5px solid var(--glass-line);box-shadow:var(--shadow);opacity:0.55;transition:opacity .18s var(--ease);}
+  .chartwrap:hover .cdraw-bar,.cdraw-bar:focus-within,.cdraw-bar.active{opacity:1;}
+  .cdraw-btn{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:23px;padding:0 8px;
+    font:600 11px var(--font-sans);letter-spacing:.02em;color:var(--cream-dim);background:transparent;
+    border:1px solid transparent;border-radius:6px;cursor:pointer;
+    transition:background .14s var(--ease),color .14s var(--ease),border-color .14s var(--ease);}
+  .cdraw-btn:hover{background:var(--fill);color:var(--cream);}
+  .cdraw-btn.on{background:var(--fill-3);color:var(--cream);border-color:rgba(232,192,122,0.55);
+    box-shadow:inset 0 0 0 1px rgba(232,192,122,0.16);}
+  .cdraw-btn:active{transform:scale(0.94);}
+  .cdraw-sep{width:1px;align-self:stretch;margin:3px 3px;background:var(--glass-line);}
+  .cdraw-btn.cdraw-clear{color:#d98c8c;}
+  .cdraw-btn.cdraw-clear:hover{background:rgba(200,90,90,0.15);color:#f0b4b4;}
   /* CSS-based "maximize" (not the real Fullscreen API — iOS Safari won't requestFullscreen()
      arbitrary elements, only <video>/<iframe>), toggled by wireFullscreen() in chart-controls.js */
   .maxed{position:fixed !important;inset:0 !important;width:auto !important;height:auto !important;

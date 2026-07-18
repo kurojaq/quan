@@ -96,20 +96,21 @@
   function commit(){ save(); repaint(); setTool(null); }   // one drawing per tool selection, then back to pan mode
 
   // ---- toolbar ----
-  function btn(label,title,on){ var b=document.createElement('button'); b.textContent=label; b.title=title;
-    b.style.cssText='background:#161616;color:#cbc6b8;border:1px solid rgba(255,255,255,0.12);border-radius:5px;padding:2px 7px;font:11px system-ui;cursor:pointer;';
+  function btn(label,title,on,cls){ var b=document.createElement('button'); b.type='button'; b.textContent=label; b.title=title;
+    b.className='cdraw-btn'+(cls?(' '+cls):'');
     b.addEventListener('click',function(e){ e.preventDefault(); on(b); }); return b; }
   function buildToolbar(){ if(toolbar||!api||!api.container) return;
     var wrap=document.getElementById('chartWrap')||api.container;
-    toolbar=document.createElement('div');
-    toolbar.style.cssText='position:absolute;top:6px;left:6px;z-index:8;display:flex;gap:4px;flex-wrap:wrap;background:rgba(14,14,16,0.72);padding:4px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);';
+    toolbar=document.createElement('div'); toolbar.className='cdraw-bar';
     toolbar._tools={};
     [['Trend','trend','Trend line (drag)'],['Ray','ray','Ray (drag)'],['H','hline','Horizontal level (click)'],['V','vline','Vertical marker (click)'],['Rect','rect','Rectangle (drag)']]
       .forEach(function(t){ var b=btn(t[0],t[2],function(){ setTool(tool===t[1]?null:t[1]); }); toolbar._tools[t[1]]=b; toolbar.appendChild(b); });
-    var clr=btn('Clear','Remove all drawings on this session',function(){ DRAWINGS=[]; save(); repaint(); }); clr.style.color='#e0a0a0'; toolbar.appendChild(clr);
+    toolbar.appendChild(Object.assign(document.createElement('span'),{className:'cdraw-sep'}));
+    toolbar.appendChild(btn('Clear','Remove all drawings on this session',function(){ DRAWINGS=[]; save(); repaint(); },'cdraw-clear'));
     wrap.style.position=wrap.style.position||'relative'; wrap.appendChild(toolbar); }
-  function syncToolbar(){ if(!toolbar) return; Object.keys(toolbar._tools).forEach(function(k){ var b=toolbar._tools[k];
-    b.style.background=(tool===k)?'#3a3320':'#161616'; b.style.borderColor=(tool===k)?'rgba(232,192,122,0.7)':'rgba(255,255,255,0.12)'; }); }
+  function syncToolbar(){ if(!toolbar) return;
+    toolbar.classList.toggle('active',!!tool);   // keep the bar fully opaque while a tool is armed
+    Object.keys(toolbar._tools).forEach(function(k){ toolbar._tools[k].classList.toggle('on',tool===k); }); }
 
   // reload drawings when the session/instrument changes
   function reload(){ if(!ensurePrim()) return; load(); repaint(); }
