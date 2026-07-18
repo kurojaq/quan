@@ -1,0 +1,432 @@
+{
+  "generated": "2026-07-18",
+  "count": 71,
+  "entries": [
+    {
+      "path": "analytics/chirality.md",
+      "title": "Chirality — The Arc's Handedness",
+      "type": "Market Concept",
+      "description": "Whether the CW arc's preparation (negative) and execution (positive) surfaces are mirror-symmetric or dominant one way — right-handed, left-handed, or achiral sessions, and the three-session reversal sequence."
+    },
+    {
+      "path": "analytics/dealer-field-architecture.md",
+      "title": "Dealer Field Architecture (Apex Dealer Logic Book, Sections I–II)",
+      "type": "Reference",
+      "description": "The Intent/Transaction/Realization three-tier structure, the Puts-Minus-Calls sign convention, unified signal thresholds, the Liquidity Ratio trapped-dealer table, and the temporal/relativistic field vocabulary (SoI/SoT/SoR, Lorentz factor, Tachyonic flag)."
+    },
+    {
+      "path": "analytics/dealer-watermark-pdsl.md",
+      "title": "Dealer Watermark (PDSL)",
+      "type": "Metric",
+      "description": "Focal dealer strikes — peak Inventory Distribution × Dealer Premium Time, weighted by adjacency to spot — shown as latent resistance/support levels on the Heat Map."
+    },
+    {
+      "path": "analytics/deep-strike-analysis.md",
+      "title": "Deep Strike Analysis — Close Reading & Pre-Session Blueprint",
+      "type": "Execution Playbook",
+      "description": "The four-signal Time State Compass close-reading protocol and the five-layer Deep Strike Analysis that formally defines PDSL/DSC and produces the 0–10 Deep Strike Scorecard."
+    },
+    {
+      "path": "analytics/difference-sum.md",
+      "title": "Difference Sum (DS)",
+      "type": "Metric",
+      "description": "One of the three shipped Field Study sheets — the base derivative signal computed alongside Dual Phase and SWF."
+    },
+    {
+      "path": "analytics/dual-phase.md",
+      "title": "Dual Phase",
+      "type": "Metric",
+      "description": "PG/PC and PC/PG dual-phase tension — one of the three shipped Field Study sheets, also used by ZN Timestate."
+    },
+    {
+      "path": "analytics/fibonacci-strike-architecture.md",
+      "title": "Fibonacci Strike Architecture",
+      "type": "Reference",
+      "description": "Fibonacci levels drawn PDSL-to-PDSL rather than swing-high-to-low — the level table, quarter-level microstructure, and the cascading extension rule."
+    },
+    {
+      "path": "analytics/field-notes-observations.md",
+      "title": "Field Notes on the Qu'an — Practitioner Observations",
+      "type": "Market Concept",
+      "description": "Ten cross-cutting observations offered as \"lenses, not procedures\" — Mass-Jerk coupling, the forward-reading negative arc, entropy as an honest signal, and the pending order as a structural claim."
+    },
+    {
+      "path": "analytics/index.md",
+      "title": "Analytics",
+      "type": null,
+      "description": null
+    },
+    {
+      "path": "analytics/information-field-risk-engine.md",
+      "title": "Information Field & Dealer-Basis Risk Engine (Apex Dealer Logic Book, Section III)",
+      "type": "Risk Model",
+      "description": "Distributional observables across Intent/Transaction/Realization, the Composite Dealer Score, Trigger Pull gate, and the dealer-basis VaR engine — a separate risk system from the five-dimension Risq framework."
+    },
+    {
+      "path": "analytics/observational-flow-frames.md",
+      "title": "Observational Flow Frames & Quick Reference (Apex Dealer Logic Book, Sections IV–VII)",
+      "type": "Execution Playbook",
+      "description": "The structured pre-session/intraday/execution checklists, the 25 essential analytical questions, the regime classification matrix, and the Twelve Axioms of Dealer Logic."
+    },
+    {
+      "path": "analytics/polynomial-skew-framework.md",
+      "title": "Polynomial Skew Framework",
+      "type": "Reference",
+      "description": "Fitting a 2nd-6th order polynomial to Pressure Curvature across the Chronometer Watch axis — each order maps to a distinct market-structural phenomenon."
+    },
+    {
+      "path": "analytics/praq-mission-discipline.md",
+      "title": "PRAQ — Mission Discipline (IPS, OPORD, AAR, Field Intelligence Log)",
+      "type": "Execution Playbook",
+      "description": "The military-derived operational discipline layer — Strategist/Ground-Lead role separation, the four-layer Intelligence Preparation of the Session, the five-paragraph Mission Brief (OPORD), After-Action Review, and the Field Intelligence Log."
+    },
+    {
+      "path": "analytics/praq-stability-and-rhythm.md",
+      "title": "PRAQ — Three-Body Stability, Selection Standard & Battle Rhythm",
+      "type": "Risk Model",
+      "description": "The Self/Market/Framework stability check, the four-domain Daily Selection Audit gating whether to trade at all, the daily/weekly/monthly battle rhythm, and the eight-document Practitioner's Dossier."
+    },
+    {
+      "path": "analytics/pre-session-checklist.md",
+      "title": "Pre-Session Checklist — Full Integration Protocol",
+      "type": "Execution Playbook",
+      "description": "The eight-phase sequence tying the close reading, Deep Strike Analysis, Fibonacci architecture, conductance gate, and order construction into one ordered pre-session routine (45–75 minutes)."
+    },
+    {
+      "path": "analytics/risq-framework.md",
+      "title": "Risq — The Five-Dimension Risk Framework (base formulas)",
+      "type": "Risk Model",
+      "description": "The authoritative Risq ontology, the five risk dimensions with formulas and thresholds, and the Risq Ratio — the unified structural edge-to-risk measure that drives position sizing."
+    },
+    {
+      "path": "analytics/risq-operational-protocol.md",
+      "title": "Risq Operational Protocol",
+      "type": "Execution Playbook",
+      "description": "The Risq Surface (risk as CW×Fibonacci geometry), the Entropy Budget (session information capital), the temporal risk profile across the CW arc, coherence misalignment detection, the three inertia risks, and the pre-/intra-session Risq Protocol."
+    },
+    {
+      "path": "analytics/sop-chirality-execution-protocol.md",
+      "title": "SOP-Chirality Combined Execution Protocol",
+      "type": "Risk Model",
+      "description": "The four SOP×Chirality configurations and how each modifies position sizing, stop architecture, and the five-dimension Risq weighting."
+    },
+    {
+      "path": "analytics/sop-superposition-of-pressure.md",
+      "title": "SOP — Superposition of Pressure",
+      "type": "Reference",
+      "description": "The wave-mechanics-derived reading of how Pressure Gradient and Pressure Curvature interact — SOPG/SOPC, dominance ratios, Product Tension, Latent Motion, and the live-session checkpoint protocol."
+    },
+    {
+      "path": "analytics/statewave-fingerprint.md",
+      "title": "Statewave Fingerprint (SWF)",
+      "type": "Metric",
+      "description": "The DIPLTRPD/SOPPM ratio series — one of the three shipped Field Study sheets, read as an evolving temporal signature."
+    },
+    {
+      "path": "analytics/stop-architecture-loss-management.md",
+      "title": "Stop Architecture & Loss Management",
+      "type": "Risk Model",
+      "description": "Quarter-level stop placement by layer type, the three-stage loss escalation protocol, and the single-re-entry-per-PDSL rule."
+    },
+    {
+      "path": "analytics/strike-observable-manifold.md",
+      "title": "Strike Observable Manifold (Columns W–AM)",
+      "type": "Reference",
+      "description": "The 13-column spatial observable set — Kurt, Skew, ICF, vol-surface derivatives, Mass, Force, Speed, Lag, Acceleration, Jerk — read relationally across the strike ladder."
+    },
+    {
+      "path": "analytics/three-layer-execution-model.md",
+      "title": "Three-Layer Execution Model — Layers A/B/C, μ-Wave, and Order Sequencing",
+      "type": "Execution Playbook",
+      "description": "The market-maker-emulation position build (Layer A/B/C), the micro Elliott Wave confirmation vocabulary that triggers Layer B, and the CW-indexed pending-order sequencing protocol."
+    },
+    {
+      "path": "analytics/time-state-compass.md",
+      "title": "Time State Compass — Conductance Derivative Architecture",
+      "type": "Reference",
+      "description": "The toroidal-fold column architecture (Conductance, Pairs Multiplied/Divided, Sum of Pairs, DIPLTR, ratio suite, Dual Phase) that Field Study's shipped DS/Dual Phase/SWF visualization is drawn from."
+    },
+    {
+      "path": "analytics/tsc-interior-structure.md",
+      "title": "Time State Compass — Interior Structure",
+      "type": "Market Concept",
+      "description": "The toroidal topology, chirality, entropy-loading, pilot-wave, and Jensen's-Gap readings of the Compass, and how each revises the five-dimension Risq risk framework."
+    },
+    {
+      "path": "architecture/client-warehouse.md",
+      "title": "Client Warehouse",
+      "type": "Reference",
+      "description": "The STORE[inst].sess[date] cache that feeds every tab and the heatmap iframe."
+    },
+    {
+      "path": "architecture/data-plane.md",
+      "title": "Data Plane (Cloudflare)",
+      "type": "Reference",
+      "description": "Pages Functions plus standalone Workers, backed by R2, D1, KV, and Supabase."
+    },
+    {
+      "path": "architecture/index.md",
+      "title": "Architecture",
+      "type": null,
+      "description": null
+    },
+    {
+      "path": "architecture/instrument-registry.md",
+      "title": "Instrument Registry",
+      "type": "Reference",
+      "description": "Single source of truth for instrument symbol knowledge — roots, contract parsing, multipliers, families."
+    },
+    {
+      "path": "architecture/presentation-layer.md",
+      "title": "Presentation Layer",
+      "type": "Reference",
+      "description": "Static Pages app — one classic script per feature, wired only by window globals and CustomEvents."
+    },
+    {
+      "path": "architecture/pyodide-engines.md",
+      "title": "Pyodide Engines",
+      "type": "Reference",
+      "description": "Four intentionally-diverged in-browser Python engine copies, one per consumer; do not merge."
+    },
+    {
+      "path": "architecture/tick-engine.md",
+      "title": "Tick Engine (planned)",
+      "type": "Reference",
+      "description": "The planned canonical market-data subsystem — one Tradovate MD subscription per contract, fanned out internally to Chronometer, Analytics, Execution, and Risk."
+    },
+    {
+      "path": "architecture/tradovate-market-data-api.md",
+      "title": "Tradovate Market Data API — Capability Inventory",
+      "type": "Reference",
+      "description": "What the Tradovate WebSocket market-data API actually exposes, compiled from official docs before designing the Tick Engine against it."
+    },
+    {
+      "path": "doctrine/index.md",
+      "title": "Doctrine",
+      "type": null,
+      "description": null
+    },
+    {
+      "path": "doctrine/invariants.md",
+      "title": "Terminal Invariants",
+      "type": "Risk Model",
+      "description": "The frozen constraints that must hold across any change to the terminal."
+    },
+    {
+      "path": "doctrine/tick-engine-constraints.md",
+      "title": "Tick Engine Cost & Licensing Constraints",
+      "type": "Risk Model",
+      "description": "The cost, licensing, and rate-limit rules that must govern the planned Tick Engine's design and build order."
+    },
+    {
+      "path": "incidents/audit-ledger-d1-d12.md",
+      "title": "Production-Hardening Audit Ledger (D1–D12)",
+      "type": "Incident",
+      "description": "The twelve defects found in the hardening audit, with root causes and dispositions."
+    },
+    {
+      "path": "incidents/index.md",
+      "title": "Incidents",
+      "type": null,
+      "description": null
+    },
+    {
+      "path": "incidents/pyodide-nan-json.md",
+      "title": "Pyodide NaN/JSON Nulling",
+      "type": "Incident",
+      "description": "Bare NaN/Infinity from Python json.dumps makes JS JSON.parse reject the whole brief."
+    },
+    {
+      "path": "index.md",
+      "title": "Qu'an Knowledge Base",
+      "type": null,
+      "description": null
+    },
+    {
+      "path": "log.md",
+      "title": "Update Log",
+      "type": null,
+      "description": null
+    },
+    {
+      "path": "pipelines/index.md",
+      "title": "Pipelines",
+      "type": null,
+      "description": null
+    },
+    {
+      "path": "pipelines/ingest-lifecycle.md",
+      "title": "Ingest Lifecycle",
+      "type": "Execution Playbook",
+      "description": "The canonical path from Barchart CSVs in Google Drive to a published client brief."
+    },
+    {
+      "path": "pipelines/visual-corpus-ingestion.md",
+      "title": "Visual Corpus & Reference-Text Ingestion",
+      "type": "Execution Playbook",
+      "description": "How the wiki abstracts trading and risk methodology from daily Bookmap/Heat Map/Field Study screenshots plus reference text, rather than from code alone."
+    },
+    {
+      "path": "roadmap/bookmap-research-environment.md",
+      "title": "Bookmap Research Environment (planned)",
+      "type": "Reference",
+      "description": "The full vision for the Bookmap module as an institutional research environment — session isolation, liquidity layering, event detection, inspection tools. Mostly not yet built."
+    },
+    {
+      "path": "roadmap/chronometric-heatmap-full-vision.md",
+      "title": "Chronometric Heatmap Engine — Full Vision (partially shipped)",
+      "type": "Reference",
+      "description": "The complete temporal-field visualization spec for the Bookmap — a multi-sheet dropdown, event/intersection detection, cross-sheet correlation, and publication integration. Only the event-highlight bands are shipped."
+    },
+    {
+      "path": "roadmap/index.md",
+      "title": "Roadmap",
+      "type": null,
+      "description": null
+    },
+    {
+      "path": "roadmap/price-tab-annotation-framework.md",
+      "title": "Price Tab Annotation & Drawing Framework (planned)",
+      "type": "Reference",
+      "description": "Persistent annotations, drawing tools, cursor modes, and a layer manager for the Chart tab — not yet built."
+    },
+    {
+      "path": "roadmap/rolling-analysis-full-vision.md",
+      "title": "Rolling Analysis Engine — Full Vision (partially shipped)",
+      "type": "Reference",
+      "description": "The complete forward dealer-interest term-structure spec — core aggregation/weighting/heuristics are shipped; Bookmap integration, expiration-curve visualization, rolling reporting, and historical replay are not."
+    },
+    {
+      "path": "roadmap/universal-screenshot-capture.md",
+      "title": "Universal Screenshot Capture (planned)",
+      "type": "Reference",
+      "description": "A reusable \"capture current visualization\" service every analytical tab can register with, for publication-quality exports — not yet built."
+    },
+    {
+      "path": "saas/go-live-runbook.md",
+      "title": "Go-Live Runbook (Trial Seats)",
+      "type": "Execution Playbook",
+      "description": "The ordered external-configuration checklist to take the terminal from code-ready to a paid trial a stranger can sign up for."
+    },
+    {
+      "path": "saas/index.md",
+      "title": "SaaS",
+      "type": null,
+      "description": null
+    },
+    {
+      "path": "saas/tiers-and-gating.md",
+      "title": "SaaS Tiers & Gating",
+      "type": "Reference",
+      "description": "Cloudflare Pages + Stripe + Supabase; four subscription tiers behind a hard paywall."
+    },
+    {
+      "path": "satellites/bookmap.md",
+      "title": "Bookmap Layers",
+      "type": "Reference",
+      "description": "Chart-tab multi-view scalar/spectral heatmap plus chronometric temporal-field overlays."
+    },
+    {
+      "path": "satellites/cboe.md",
+      "title": "CBOE Proxy",
+      "type": "Reference",
+      "description": "Adapts CBOE quotedata into the golden-reference frame via put-call (no-premium) logic."
+    },
+    {
+      "path": "satellites/index.md",
+      "title": "Satellites",
+      "type": null,
+      "description": null
+    },
+    {
+      "path": "satellites/payload.md",
+      "title": "Payload Generator",
+      "type": "Reference",
+      "description": "Shadow-DOM payload generation with its own diverged Pyodide engine copy."
+    },
+    {
+      "path": "satellites/timestate.md",
+      "title": "ZN Timestate",
+      "type": "Reference",
+      "description": "Standalone terminal for Promissory Notes — golden-reference derivative stack vs a Chronometer Watch."
+    },
+    {
+      "path": "terminal/index.md",
+      "title": "Terminal",
+      "type": null,
+      "description": null
+    },
+    {
+      "path": "terminal/overview.md",
+      "title": "Qu'an Terminal — Overview",
+      "type": "Market Concept",
+      "description": "A static, in-browser dealer-positioning options/futures terminal with a header hub and a tab strip."
+    },
+    {
+      "path": "terminal/tabs/account-sim.md",
+      "title": "Account Sim Tab",
+      "type": "Market Concept",
+      "description": "Position/risk simulation against the loaded dealer structure."
+    },
+    {
+      "path": "terminal/tabs/chart.md",
+      "title": "Chart Tab",
+      "type": "Market Concept",
+      "description": "Live price chart with Bookmap-style scalar/spectral and chronometric layers."
+    },
+    {
+      "path": "terminal/tabs/compass.md",
+      "title": "Compass Tab",
+      "type": "Market Concept",
+      "description": "Compass view of the selected session's dealer structure."
+    },
+    {
+      "path": "terminal/tabs/detector.md",
+      "title": "Detector Tab",
+      "type": "Market Concept",
+      "description": "The default tab — intermarket breach detection over the loaded option chains."
+    },
+    {
+      "path": "terminal/tabs/execution.md",
+      "title": "Execution Tab",
+      "type": "Execution Playbook",
+      "description": "Per-user Tradovate execution cockpit; subscribers are demo-clamped, only the operator can route live."
+    },
+    {
+      "path": "terminal/tabs/field-study.md",
+      "title": "Field Study Tab",
+      "type": "Market Concept",
+      "description": "Polar / SOP field view of dealer structure for the selected session."
+    },
+    {
+      "path": "terminal/tabs/heat-map.md",
+      "title": "Heat Map Tab",
+      "type": "Market Concept",
+      "description": "Strike-field heat map; a standalone iframe document with its own Pyodide engine."
+    },
+    {
+      "path": "terminal/tabs/index.md",
+      "title": "Terminal Tabs",
+      "type": null,
+      "description": null
+    },
+    {
+      "path": "terminal/tabs/report.md",
+      "title": "Report — Chronometric Field Brief",
+      "type": "Execution Playbook",
+      "description": "The computed brief; auto-archived, publishable to client links or the blog."
+    },
+    {
+      "path": "terminal/tabs/rolling.md",
+      "title": "Rolling Tab",
+      "type": "Market Concept",
+      "description": "The Rolling Analysis Engine — forward dealer-interest term structure across expirations."
+    },
+    {
+      "path": "terminal/tabs/strike-field.md",
+      "title": "Strike Field Tab",
+      "type": "Market Concept",
+      "description": "Strike-field scalar view; hosts the Strike Compass."
+    }
+  ]
+}

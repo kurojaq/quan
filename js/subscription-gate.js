@@ -25,7 +25,7 @@
     scout:    ['detector', 'chart'],
     operator: OPERATOR_VIEWS,
     prime:    PRIME_VIEWS,
-    desk:     PRIME_VIEWS.concat(['team', 'export'])
+    desk:     PRIME_VIEWS.concat(['team', 'export', 'wiki'])
   };
 
   // Upgrade direction — higher rank = more access. Used by the entitlement gate
