@@ -4,6 +4,8 @@
 # pages) does NOT live here — Pages ignores host-matched 200 rewrites (host
 # sources only work for 3xx redirects, verified 2026-07-11). It's handled
 # server-side by functions/_middleware.js instead, routed via _routes.json.
-
-# Clean URL for the operator Fund Portal (fund.html). Path-source 200 rewrites work.
-/fund   /fund.html   200
+#
+# The Fund Portal (fund.html) is reachable at the clean URL /fund via Cloudflare
+# Pages' native clean-URL serving — no rewrite rule needed here (an explicit
+# /fund -> /fund.html rewrite fights Pages' automatic /fund.html -> /fund 308 and
+# causes a redirect loop).
