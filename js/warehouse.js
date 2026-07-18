@@ -78,7 +78,7 @@
     if(text){ if(window.__polarLoadChain)window.__polarLoadChain(text,name); if(window.__strikeLoadChain)window.__strikeLoadChain(text,name); if(window.__compassLoadChain)window.__compassLoadChain(text,name); }
     else { if(window.__polarClear)window.__polarClear(); if(window.__strikeClear)window.__strikeClear(); if(window.__compassClear)window.__compassClear(); } }
   function loadGreeksToTabs(text,name,gkt){
-    if(text){ if(window.__strikeLoadGreeks)window.__strikeLoadGreeks(text,name,gkt); }
+    if(text){ if(window.__strikeLoadGreeks)window.__strikeLoadGreeks(text,name,gkt); if(window.__compassLoadGreeks)window.__compassLoadGreeks(text,name,gkt); }
     else { if(window.__strikeClearGreeks)window.__strikeClearGreeks(); } }
 
   // ---- lock UI: gAnchor is the only live anchor; mirror disabled/visual to the hidden tab locks ----

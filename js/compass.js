@@ -752,6 +752,7 @@ async function initDefault(){ try{ const D=JSON.parse(atob(DEFAULT_B64)); STORE=
    // the global control bar governs instrument + date — open on the terminal's current selection
    { const _gi=($('instA')||{}).value; if(_gi){ inst=_gi; if($('cp_inst'))$('cp_inst').value=inst; }
      const _gd=($('dayDate')||{}).value; if(_gd) $('cp_day').value=_gd; }
+   try{ await _cpLoadPrice(); }catch(_e){}   // price path from the Chart tab's yfinance feed (shared bars or /api/history)
    refresh(); loadAnchor(); updateLogN();
    const _sel=$('cp_day').value;
    if(DATA && DATA._curDate===_sel){ applyView(); boot(); }   // embedded compute already matches the selected session -> fast paint
@@ -781,9 +782,38 @@ function _cpSyncFromGlobal(){
   if(gd && $('cp_day')) $('cp_day').value=gd;        // re-assert the global date after refresh repopulates options
   loadAnchor(); refreshUpUI();
   clearTimeout(_cpSyncT);
-  _cpSyncT=setTimeout(function(){ autorun(); try{ fetchDayRange(inst,$('cp_day').value); }catch(_e){} }, 60);
+  _cpSyncT=setTimeout(async function(){ await _cpLoadPrice(); autorun(); try{ fetchDayRange(inst,$('cp_day').value); }catch(_e){} }, 60);
 }
 window.addEventListener('quan:instr', _cpSyncFromGlobal);
 window.addEventListener('quan:date',  _cpSyncFromGlobal);
+
+// Price path from the SAME yfinance feed the Chart tab uses. When the Chart tab is open it has
+// already fetched /api/history into window.__chartBars (refreshed on every global change, then
+// quan:bars fires) — reuse those exact bars, one shared fetch. When the Chart tab was never
+// opened, its bars don't exist, so fall back to the Compass's own fetchLivePrice, which hits the
+// identical /api/history + __YF_SYMS endpoint. Either way the feed is the chart's, governed by
+// the global bar — replacing the now-hidden manual price pull.
+async function _cpLoadPrice(){
+  if(!window.__compassBooted) return false;
+  const pi=inst||'NQ'; let sess=null; const cb=window.__chartBars;
+  try{ sess=(cb&&cb.length)?rowsToPriceSessions(cb.map(b=>[b.time,b.close])):await fetchLivePrice(pi); }catch(_e){ sess=null; }
+  if(!sess||!sess.sessions) return false;
+  const P=(PRICE[pi]=PRICE[pi]||{sessions:{},closeBy:{}}); P.sessions=P.sessions||{}; P.closeBy=P.closeBy||{};
+  for(const L in sess.sessions){ P.sessions[L]=sess.sessions[L]; P.closeBy[L]=sess.closeBy[L]; }
+  persistInst(pi); return true;
+}
+window.addEventListener('quan:bars', async function(){ if(await _cpLoadPrice()){ refresh(); autorun(); } });
+
+// Greeks bridged from the global warehouse (loadGreeksToTabs -> __compassLoadGreeks) so the
+// Compass greeks overlay follows the main bar like chains do. Filed under the 'weekly' series
+// (the Daily bucket); Compass-local uploads still handle EOM/quarterly horizon greeks.
+window.__compassLoadGreeks=function(text,name,gkt){
+  if(!text) return;
+  const p=parseChain(name||''); const gi=p.inst||inst||'NQ', dt=p.date; if(!dt) return;
+  try{ (GREEKS[gi]=GREEKS[gi]||{})[dt]=parseGreeks(text);
+       (GREEKSRAW[gi]=GREEKSRAW[gi]||{})[dt]={text:text,fn:name||'',series:'weekly'}; }catch(_e){ return; }
+  _ivMemo={}; persistInst(gi);
+  if(gi===inst && dt===($('cp_day')&&$('cp_day').value)){ refresh(); render(); if(view==='heat')feedHeat(); }
+};
 
 })();
