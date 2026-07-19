@@ -42,6 +42,10 @@ on every `quan:cell` tick for the selected instrument.
   the Doctrine → Execution path.
 - Account state persists at `localStorage qsim:broker:v1`; Reset restarts
   at the Account $ value.
+- **Chart overlay**: open positions and working orders are drawn on the
+  [Chart tab](/terminal/tabs/chart.md) price axis for the charted
+  instrument (`js/chart-sim-overlay.js`), so the demo book is visible on
+  the tape it fills against.
 
 # Related
 

@@ -18,8 +18,15 @@ and session-time Gaussian event-highlight bands.
 - Price is anchored via the live anchor
   when `/api/quote` is available.
 - The former Compass "Price" control now just deep-links here.
+- **Sim positions overlay** (`js/chart-sim-overlay.js`): the
+  [Account Sim demo broker](/terminal/tabs/account-sim.md)'s live state is
+  drawn on the price axis for the charted instrument — open position at
+  avg entry (solid green/red, carrying side · qty · uPnL), resting entry
+  orders (dashed/dotted gold), and bracket exits (green target / red
+  stop). Refreshes on `quan:sim`; owns its own price lines, never
+  touching the structural or day-range levels.
 - Modules: `js/chart-tab.js`, `js/chart-draw.js`, `js/chart-controls.js`,
-  `js/chart-zoom.js`, `js/chart-heat.js`.
+  `js/chart-zoom.js`, `js/chart-heat.js`, `js/chart-sim-overlay.js`.
 
 # Open questions
 

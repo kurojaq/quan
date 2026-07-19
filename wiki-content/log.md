@@ -2,6 +2,13 @@
 
 ## 2026-07-19
 
+* **Sim positions on the Chart**: `js/chart-sim-overlay.js` draws the
+  demo broker's open position (avg entry, side·qty·uPnL), resting entry
+  orders, and bracket exits on the price Chart for the charted
+  instrument, refreshed on a new `quan:sim` account-state event. Concepts
+  updated: [Chart tab](/terminal/tabs/chart.md),
+  [Account Sim tab](/terminal/tabs/account-sim.md).
+
 * **Anchor agency + Sim demo broker**: the Doctrine scan is now ranked by
   anchor-adjacency weight (far-OTM PDSLs yield rank, roles classed
   support/resistance vs spot), Fib anchors bracket the anchor price, and

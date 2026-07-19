@@ -204,6 +204,9 @@
   }
 
   function renderAll(){
+    // broadcast account state so other surfaces (the price Chart overlay) can
+    // redraw regardless of whether the Sim tab is the visible one.
+    try{ window.dispatchEvent(new CustomEvent('quan:sim')); }catch(_){}
     const host=$('simBroker'); if(!host) return; ensureUI();
     const sum=$('sbSummary'); if(!sum) return;
     const u=unrealized(), eq=equity();
