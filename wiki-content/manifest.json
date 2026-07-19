@@ -270,7 +270,7 @@
       "path": "terminal/tabs/account-sim.md",
       "title": "Account Sim Tab",
       "type": "Market Concept",
-      "description": "Position/risk simulation against the loaded dealer structure."
+      "description": "Illustrative order-report simulation off the brief, plus the live demo broker — a paper account that proxies the Execution engine's order lifecycle against the anchor/live price."
     },
     {
       "path": "terminal/tabs/chart.md",

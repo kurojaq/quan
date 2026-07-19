@@ -90,9 +90,19 @@
   // ---- Deep Strike scan (deep-strike-analysis.md Part II, layers 1–5) -----
   // prevICF: optional {strike -> icf} map from the prior session's scan (for
   // the ICF Time Density trend); null ⇒ trend unavailable (+1 never granted).
-  function scanStrikes(rows, cr, g, prevICF){
+  // anchor: the live/session anchor price. Far-OTM PDSLs keep their doctrinal
+  // score untouched, but ranking gains spot agency: adjW decays with distance
+  // from the anchor (normalized to the ±10-strike ATM window, the same
+  // adjacency notion the Dealer Watermark and the Integrated Spot-Adjacency
+  // Execution Protocol use), and each hit is classed by its role relative to
+  // spot — support below / resistance above / against-spot mismatch.
+  function scanStrikes(rows, cr, g, prevICF, anchor){
     const byK=rows.filter(r=>fin(r.k)&&fin(r.mass)).sort((a,b)=>a.k-b.k);
     const fMax=Math.max.apply(null, byK.map(r=>Math.abs(r.force||0)).concat([1e-12]));
+    const steps=[]; for(let i=1;i<byK.length;i++) steps.push(byK[i].k-byK[i-1].k);
+    steps.sort((a,b)=>a-b);
+    const span=10*(steps.length?steps[steps.length>>1]:1);            // ±10-strike ATM adjacency window
+    const hasAnchor=fin(anchor)&&anchor>0;
     const out=[];
     for(let i=0;i<byK.length;i++){
       const r=byK[i];
@@ -125,13 +135,23 @@
       if(icfTrend===true) score+=1;
       const demoted=cr&&cr.prior!=='none'&&dirWord!==0&&cr.dir===-dirWord;  // conflicting prior ⇒ watch-only
       const tier=demoted?3:(score>=8?1:(score>=6?2:(score>=4?3:0)));
+      const dAnchor=hasAnchor?r.k-anchor:null;
+      const adjW=hasAnchor?1/(1+Math.abs(dAnchor)/Math.max(span,1e-9)):1;
+      const side=hasAnchor?(r.k<anchor?'below':'above'):null;
+      const spotRole=!hasAnchor?null
+        :(grad==='phase'?'phase'
+        :(side==='below'&&grad==='ascending')?'support'
+        :(side==='above'&&grad==='descending')?'resistance':'against-spot');
       out.push({k:r.k, cls:cls, crit:crit, nHit:nHit, grad:grad, dr3:dr3, dpt:fin(r.dpremT)?r.dpremT:null,
                 icf:fin(r.icf)?r.icf:null, icfTrend:icfTrend, live:live, score:score, tier:tier,
                 demoted:demoted, priorAligned:priorAligned,
+                dAnchor:dAnchor, adjW:adjW, wScore:score*adjW, side:side, spotRole:spotRole,
                 mass:r.mass, kurtV:r.kurt, lr:r.liqratio, a:r.netoipcr, force:r.force, jerk:r.jerk,
                 invdist:r.invdist, invtxn:r.invtxn, riskreal:r.riskreal});
     }
-    out.sort((a,b)=>b.score-a.score||Math.abs(b.mass)-Math.abs(a.mass));
+    // spot agency: anchor-weighted rank when an anchor exists, doctrinal score otherwise
+    out.sort(hasAnchor?((a,b)=>b.wScore-a.wScore||b.score-a.score)
+                      :((a,b)=>b.score-a.score||Math.abs(b.mass)-Math.abs(a.mass)));
     return out;
   }
 
@@ -172,16 +192,28 @@
   }
 
   // ---- Fibonacci strike architecture --------------------------------------
-  // Anchors: the two highest-scoring PDSLs (fall back to best DSC when only one
-  // PDSL exists). Orientation from the dominant anchor's gradient.
-  function fibAnchors(scan){
+  // Anchors: with a live anchor price, prefer the two best hits BRACKETING
+  // spot (best below → AL, best above → AH — attractors below / repulsors
+  // above, per the Integrated Spot-Adjacency Execution Protocol), so the grid
+  // is where price actually lives instead of stranded far OTM. Falls back to
+  // the two highest-scoring PDSLs when no bracket exists.
+  function fibAnchors(scan, anchor){
+    const cand=scan.filter(s=>s.cls==='PDSL').concat(scan.filter(s=>s.cls==='DSC'));
+    if(fin(anchor)&&anchor>0){
+      const below=cand.find(s=>s.k<anchor), above=cand.find(s=>s.k>anchor);
+      if(below&&above){
+        const lead=(below.wScore||below.score)>=(above.wScore||above.score)?below:above;
+        return {al:below.k, ah:above.k, range:above.k-below.k,
+                dir:lead.grad==='descending'?'descending':'ascending', lead:lead.k, bracket:true};
+      }
+    }
     const p=scan.filter(s=>s.cls==='PDSL');
     let a1=p[0]||scan[0], a2=p[1]||scan.find(s=>s!==a1);
     if(!a1||!a2||a1.k===a2.k) return null;
     const al=Math.min(a1.k,a2.k), ah=Math.max(a1.k,a2.k);
     const lead=a1.score>=a2.score?a1:a2;
     const dir=lead.grad==='descending'?'descending':'ascending';
-    return {al:al, ah:ah, range:ah-al, dir:dir, lead:lead.k};
+    return {al:al, ah:ah, range:ah-al, dir:dir, lead:lead.k, bracket:false};
   }
   const FIB_LEVELS=[0,0.236,0.382,0.5,0.618,0.786,1,1.272,1.618];
   function fibGrid(anch){

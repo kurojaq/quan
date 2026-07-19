@@ -2,6 +2,17 @@
 
 ## 2026-07-19
 
+* **Anchor agency + Sim demo broker**: the Doctrine scan is now ranked by
+  anchor-adjacency weight (far-OTM PDSLs yield rank, roles classed
+  support/resistance vs spot), Fib anchors bracket the anchor price, and
+  the Risq Surface marker is price itself — all live when the feed is on.
+  The [Account Sim tab](/terminal/tabs/account-sim.md) gains
+  `js/sim-broker.js`, a paper broker proxying the Execution order
+  lifecycle (MKT/LMT/STP/STP-LMT, OCO brackets, positions, MAE/MFE,
+  equity curve) with fills against the anchor/live price, and the
+  [Doctrine tab](/terminal/tabs/doctrine.md)'s compiled plan stages into
+  it one-click.
+
 * **Mission console shipped**: the Doctrine tab gains Mission/Archive
   views implementing [PRAQ mission discipline](/analytics/praq-mission-discipline.md)
   — auto-answered PSIS, five-paragraph OPORD with freeze-on-close role

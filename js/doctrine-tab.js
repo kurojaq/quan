@@ -18,6 +18,12 @@
   function ctxNow(){ try{ const a=window.__qActiveChain&&window.__qActiveChain(); if(a) return {inst:a.inst,date:a.date||''}; }catch(_){}
     return {inst:(window.__qCurInst&&window.__qCurInst())||'—',date:''}; }
   function condFactor(){ const s=$('dcCond'); return s?parseFloat(s.value):1.0; }
+  // The anchor is the tab's price agent: the header hub's shared anchor, which
+  // the Live feed drives in real time when it's on (js/live-anchor.js).
+  function anchorPx(){ try{ const a=window.__qActiveChain&&window.__qActiveChain(); const v=parseFloat(a&&a.anchor);
+      if(isFinite(v)&&v>0) return v; }catch(_){}
+    const g=document.getElementById('gAnchor'); const v=g?parseFloat(g.value):NaN;
+    return (isFinite(v)&&v>0)?v:null; }
   function cwPos(){ const s=$('dcCW'); return s?parseFloat(s.value):-1; }
   function baseAlloc(){ const s=$('dcBase'); const v=s?parseInt(s.value,10):10; return isFinite(v)?v:10; }
   function status(msg,warn){ const el=$('dcStatus'); if(el){ el.textContent=msg; el.style.color=warn?'#e0a96a':'var(--dim)'; } }
@@ -76,7 +82,7 @@
       if(!rows||!rows.length){ scan=[]; glob=null; coh=null;
         status('Heat engine rows unavailable — load a chain (header hub) and retry.',true); render(); return; }
       glob=D().bookGlobals(rows); coh=D().coherence(glob);
-      scan=D().scanStrikes(rows,cr,glob,prevICF(c.inst,c.date));
+      scan=D().scanStrikes(rows,cr,glob,prevICF(c.inst,c.date),anchorPx());
       saveICF(c.inst,c.date);
       if(selK==null||!scan.some(s=>s.k===selK)) selK=scan.length?scan[0].k:null;
       const src=(hmMeta&&hmMeta.inst?hmMeta.inst+' ':'')+(hmMeta&&hmMeta.exp?hmMeta.exp:'');
@@ -111,8 +117,10 @@
     $('dcClass').innerHTML=cr?('PRIOR: <span style="color:'+pc+'">'+prior+'</span>'
       +(cr.dir!==0?' · <span style="color:'+dirColor(cr.dir)+'">'+dirWord(cr.dir)+'</span>':'')
       +(eb?' &nbsp;·&nbsp; EB '+fmt(ebRun,1)+'/'+fmt(eb.eb0,1)+(locked?' <span style="color:#d9463b">SESSION CLOSED TO NEW INITIATIONS</span>':''):'')):'AWAITING FIELD DATA';
-    $('dcSub').textContent=c.inst+(c.date?' · '+c.date:'')+' · condFactor '+condFactor().toFixed(2)+' · CW '+cwPos().toFixed(1);
-    const anch=(scan.length&&glob)?D().fibAnchors(scan):null;
+    const apx=anchorPx();
+    $('dcSub').textContent=c.inst+(c.date?' · '+c.date:'')+(apx!=null?' · anchor '+fmt(apx,2):' · no anchor')
+      +' · condFactor '+condFactor().toFixed(2)+' · CW '+cwPos().toFixed(1);
+    const anch=(scan.length&&glob)?D().fibAnchors(scan,apx):null;
 
     let h='';
     // Close reading
@@ -133,25 +141,29 @@
 
     // Deep Strike table
     if(scan.length){
+      const roleColor=r=>r==='support'?'#3f9d6b':(r==='resistance'?'#d9463b':(r==='phase'?'#6fd3ff':'#e0a96a'));
       let t='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;'+MONO+'">'
-        +'<thead><tr>'+['strike','M','K','LR','A','class','gradient','DR3','DPT','ICF∆','score','tier']
+        +'<thead><tr>'+['strike','Δanchor','role','M','K','LR','A','class','grad','DR3','ICF∆','score','adj·w','tier']
           .map(x=>'<th style="text-align:right;padding:3px 8px;color:var(--dim);font-weight:600;border-bottom:.5px solid var(--line)">'+x+'</th>').join('')+'</tr></thead><tbody>';
       for(const s of scan.slice(0,14)){
         const on=s.k===selK;
         t+='<tr data-k="'+s.k+'" style="cursor:pointer;'+(on?'background:rgba(232,181,58,.08);':'')+'">'
           +'<td style="text-align:right;padding:3px 8px;color:'+(on?'var(--gold)':'var(--cream)')+'">'+fmt(s.k,1)+'</td>'
+          +'<td style="text-align:right;padding:3px 8px;color:'+(s.dAnchor==null?'var(--dim)':(s.dAnchor>=0?'#3f9d6b':'#d9463b'))+'">'+(s.dAnchor==null?'—':((s.dAnchor>=0?'+':'')+fmt(s.dAnchor,1)))+'</td>'
+          +'<td style="text-align:right;padding:3px 8px;color:'+roleColor(s.spotRole)+'">'+(s.spotRole||'—')+'</td>'
           +'<td style="text-align:right;padding:3px 8px">'+dot(s.crit.mass)+'</td><td style="text-align:right;padding:3px 8px">'+dot(s.crit.kurt)+'</td>'
           +'<td style="text-align:right;padding:3px 8px">'+dot(s.crit.lr)+'</td><td style="text-align:right;padding:3px 8px">'+dot(s.crit.a)+'</td>'
           +'<td style="text-align:right;padding:3px 8px;color:'+(s.cls==='PDSL'?'var(--gold)':'var(--cream)')+'">'+s.cls+'</td>'
           +'<td style="text-align:right;padding:3px 8px">'+s.grad+(s.demoted?' <span style="color:#e0a96a">⨯prior</span>':'')+'</td>'
           +'<td style="text-align:right;padding:3px 8px">'+fmt(s.dr3,2)+(s.dr3!=null?(s.dr3<0.3?' <span style="color:#3f9d6b">live</span>':(s.dr3>0.7?' <span style="color:#d9463b">spent</span>':'')):'')+'</td>'
-          +'<td style="text-align:right;padding:3px 8px">'+fmt(s.dpt,1)+'</td>'
           +'<td style="text-align:right;padding:3px 8px">'+(s.icfTrend==null?'—':(s.icfTrend?'▲':'▼'))+'</td>'
           +'<td style="text-align:right;padding:3px 8px;color:var(--cream)">'+s.score+'/10</td>'
+          +'<td style="text-align:right;padding:3px 8px;color:var(--cream)">'+fmt(s.wScore,1)+'</td>'
           +'<td style="text-align:right;padding:3px 8px;font-weight:700;color:'+(s.tier===1?'#3f9d6b':(s.tier===2?'#e8b53a':'#999'))+'">'+(s.tier?('T'+s.tier):'—')+'</td></tr>';
       }
       t+='</tbody></table></div>';
-      h+=panel('Deep Strike scan — 4-criteria observable field (Mass>±2 · Kurt>4.5 · LR>8 · |A|>20)',t);
+      if(apx!=null) t+='<div style="'+MONO+'color:var(--dim);margin-top:5px">Ranked by anchor-adjacency-weighted score (adj·w = score × 1/(1+|Δ|/10-strike window)) — doctrinal 0–10 score untouched; far-OTM PDSLs stay listed but yield rank to actionable ones. Live feed on = this re-ranks in real time.</div>';
+      h+=panel('Deep Strike scan — 4-criteria observable field (Mass>±2 · Kurt>4.5 · LR>8 · |A|>20)'+(apx!=null?' · anchored @ '+fmt(apx,2):''),t);
     } else h+=panel('Deep Strike scan','<div style="'+MONO+'color:var(--dim)">No strikes meet 3-of-4 criteria (or engine rows unavailable).</div>');
 
     // Risq panel + order plan for the selected strike
@@ -171,18 +183,21 @@
 
       const plan=D().orderPlan(s,anch,{condFactor:condFactor(),risqTier:r.tier,alloc:r.alloc});
       let pb='';
-      if(anch) pb+='<div style="'+MONO+'color:var(--dim);margin-bottom:6px">Fib anchors AL '+fmt(anch.al,1)+' → AH '+fmt(anch.ah,1)+' ('+anch.dir+', range '+fmt(anch.range,1)+')</div>';
+      if(anch) pb+='<div style="'+MONO+'color:var(--dim);margin-bottom:6px">Fib anchors AL '+fmt(anch.al,1)+' → AH '+fmt(anch.ah,1)+' ('+anch.dir+', range '+fmt(anch.range,1)+')'
+        +(anch.bracket?' · <span style="color:#3f9d6b">bracketing the anchor</span>':(apx!=null?' · <span style="color:#e0a96a">⚠ one-sided — no qualifying strike on the other side of price</span>':''))+'</div>';
       if(plan.layers.length){
+        const dAnc=v=>{ const n=parseFloat(v); return (apx!=null&&isFinite(n))?((n-apx>=0?'+':'')+fmt(n-apx,1)):'—'; };
         pb+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;'+MONO+'"><thead><tr>'
-          +['layer','type','side','size','entry','stop','target'].map(x=>'<th style="text-align:left;padding:3px 8px;color:var(--dim);font-weight:600;border-bottom:.5px solid var(--line)">'+x+'</th>').join('')+'</tr></thead><tbody>';
-        for(const L of plan.layers) pb+='<tr>'+[L.layer,L.type,L.side,L.size,L.entry,L.stop,L.target]
+          +['layer','type','side','size','entry','Δanchor','stop','target'].map(x=>'<th style="text-align:left;padding:3px 8px;color:var(--dim);font-weight:600;border-bottom:.5px solid var(--line)">'+x+'</th>').join('')+'</tr></thead><tbody>';
+        for(const L of plan.layers) pb+='<tr>'+[L.layer,L.type,L.side,L.size,L.entry,dAnc(L.entry),L.stop,L.target]
           .map(x=>'<td style="padding:3px 8px;color:var(--cream)">'+esc(x)+'</td>').join('')+'</tr>';
         pb+='</tbody></table></div>';
         for(const L of plan.layers) pb+='<div style="'+MONO+'color:var(--dim);margin-top:4px">• <b>'+esc(L.layer.split(' — ')[0])+'</b>: '+esc(L.note)+' <i>'+esc(L.cancel)+'</i></div>';
         if(plan.gateNote) pb+='<div style="'+MONO+'color:#e0a96a;margin-top:6px">'+esc(plan.gateNote)+'</div>';
         pb+='<div style="'+MONO+'color:var(--dim);margin-top:6px">'+esc(plan.note)+'</div>';
         pb+='<div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap"><button class="rptbtn" id="dcCopyPlan" type="button">Copy plan</button>'
-          +'<span style="'+MONO+'color:var(--dim);align-self:center">Advisory only — route manually via the Execution tab.</span></div>';
+          +(window.__simBroker?'<button class="rptbtn" id="dcStageSim" type="button">Stage to Account Sim (demo)</button>':'')
+          +'<span style="'+MONO+'color:var(--dim);align-self:center">Advisory only — live routing stays manual in the Execution tab. Staging fills against the anchor price in the Sim demo broker.</span></div>';
       } else pb+='<div style="'+MONO+'color:#e0a96a">'+esc(plan.note)+'</div>';
       h+=panel('Order architecture — three-layer build @ '+fmt(s.k,1),pb);
 
@@ -209,6 +224,7 @@
 
     body.querySelectorAll('tr[data-k]').forEach(tr=>tr.addEventListener('click',()=>{ selK=parseFloat(tr.dataset.k); render(); }));
     const cp=$('dcCopyPlan'); if(cp) cp.addEventListener('click',copyPlan);
+    const sg=$('dcStageSim'); if(sg) sg.addEventListener('click',stageToSim);
     const bA=$('dcEbA'); if(bA) bA.addEventListener('click',()=>ebLog('A'));
     const bAB=$('dcEbAB'); if(bAB) bAB.addEventListener('click',()=>ebLog('AB'));
     const bABC=$('dcEbABC'); if(bABC) bABC.addEventListener('click',()=>ebLog('ABC'));
@@ -217,7 +233,7 @@
     // published state for the Mission console (js/doctrine-mission.js)
     window.__doctrineState=function(){ const ss=sel(); const rr=(ss&&glob)?risqFor(ss):null;
       return {inst:c.inst, date:c.date, cr:cr, scan:scan, glob:glob, coh:coh, sel:ss, risq:rr,
-        eb:eb, ebRun:ebRun, cond:condFactor(), cw:cwPos(), base:baseAlloc(), anch:anch,
+        anchor:anchorPx(), eb:eb, ebRun:ebRun, cond:condFactor(), cw:cwPos(), base:baseAlloc(), anch:anch,
         plan:(ss&&rr)?D().orderPlan(ss,anch,{condFactor:condFactor(),risqTier:rr.tier,alloc:rr.alloc}):null}; };
     if(window.__missionOnState) window.__missionOnState();
   }
@@ -240,16 +256,41 @@
     for(const cw of [-1,-0.5,0,0.5,1]) svg+='<text x="'+(x(cw)-8)+'" y="'+(H-8)+'" fill="var(--dim,#8f8c82)" font-size="8" font-family="Menlo,monospace">'+(cw>0?'+':'')+cw.toFixed(1)+'</text>';
     const q=(cx,f,t)=>'<text x="'+x(cx)+'" y="'+y(f)+'" fill="var(--dim,#8f8c82)" font-size="9" font-family="Menlo,monospace" text-anchor="middle">'+t+'</text>';
     svg+=q(-0.5,0.5,'I · PREPARATION')+q(0.5,0.5,'II · EXECUTION')+q(0.5,1.45,'III · BOUNDARY')+q(-0.5,1.45,'IV · LOADING')+q(0.5,0.06,'III')+q(-0.5,0.06,'IV');
-    const fp=Math.max(-0.1,Math.min(1.7,(s.k-anch.al)/anch.range));
-    svg+='<circle cx="'+x(cwPos())+'" cy="'+y(fp)+'" r="5" fill="none" stroke="var(--gold,#e8b53a)" stroke-width="1.6"/>'
-      +'<circle cx="'+x(cwPos())+'" cy="'+y(fp)+'" r="1.6" fill="var(--gold,#e8b53a)"/></svg>';
-    return svg+'<div style="'+MONO+'color:var(--dim);margin-top:4px">marker: selected strike '+fmt(s.k,1)+' at Fib '+fmt((s.k-anch.al)/anch.range,3)+' × CW '+cwPos().toFixed(1)
+    const clampF=f=>Math.max(-0.1,Math.min(1.7,f));
+    // selected strike = a level line on the grid; the PRICE (anchor, live when
+    // the feed is on) is the exposure marker — the surface tracks price, not
+    // the strike, so far-OTM selections read as distance instead of presence.
+    const fpS=clampF((s.k-anch.al)/anch.range);
+    svg+='<line x1="'+X0+'" y1="'+y(fpS)+'" x2="'+X1+'" y2="'+y(fpS)+'" stroke="var(--gold,#e8b53a)" stroke-width="0.9" stroke-dasharray="5 3"/>'
+      +'<text x="'+(X1-4)+'" y="'+(y(fpS)-3)+'" fill="var(--gold,#e8b53a)" font-size="8" font-family="Menlo,monospace" text-anchor="end">PDSL '+fmt(s.k,1)+'</text>';
+    const apx=anchorPx(); let cap='';
+    if(apx!=null){
+      const fpA=clampF((apx-anch.al)/anch.range);
+      svg+='<circle cx="'+x(cwPos())+'" cy="'+y(fpA)+'" r="5" fill="none" stroke="var(--cream,#e6e2d8)" stroke-width="1.6"/>'
+        +'<circle cx="'+x(cwPos())+'" cy="'+y(fpA)+'" r="1.6" fill="var(--cream,#e6e2d8)"/>'
+        +'<text x="'+(x(cwPos())+8)+'" y="'+(y(fpA)+3)+'" fill="var(--cream,#e6e2d8)" font-size="8" font-family="Menlo,monospace">price '+fmt(apx,1)+'</text>';
+      cap='price '+fmt(apx,1)+' at Fib '+fmt((apx-anch.al)/anch.range,3)+' × CW '+cwPos().toFixed(1)+' · selected PDSL '+fmt(s.k,1)+' ('+((s.k-apx)>=0?'+':'')+fmt(s.k-apx,1)+' from price)';
+    } else cap='no anchor price — set the anchor (or turn the Live feed on) to place price on the surface';
+    svg+='</svg>';
+    return svg+'<div style="'+MONO+'color:var(--dim);margin-top:4px">'+cap
       +' — pending orders belong in Quadrant I; Quadrant IV holds only Watermark-level (LR&gt;30) overnight exposure at 50% size; no new initiations past CW +0.5.</div>';
+  }
+
+  function stageToSim(){
+    if(!window.__simBroker) return;
+    const s=sel(); if(!s||!glob) return;
+    const r=risqFor(s), anch=D().fibAnchors(scan,anchorPx());
+    const plan=D().orderPlan(s,anch,{condFactor:condFactor(),risqTier:r.tier,alloc:r.alloc});
+    if(!plan.layers.length){ status(plan.note||'Nothing to stage.',true); return; }
+    const c=ctxNow();
+    const res=window.__simBroker.stagePlan(c.inst,plan.layers,'PDSL '+fmt(s.k,1));
+    status(res&&res.ok?('Staged '+res.count+' order'+(res.count===1?'':'s')+' to the Sim demo broker (Account Sim tab).')
+                      :('Stage failed: '+((res&&res.error)||'sim broker unavailable')),!(res&&res.ok));
   }
 
   function copyPlan(){
     const s=sel(); if(!s||!glob) return;
-    const r=risqFor(s), anch=D().fibAnchors(scan), plan=D().orderPlan(s,anch,{condFactor:condFactor(),risqTier:r.tier,alloc:r.alloc});
+    const r=risqFor(s), anch=D().fibAnchors(scan,anchorPx()), plan=D().orderPlan(s,anch,{condFactor:condFactor(),risqTier:r.tier,alloc:r.alloc});
     const c=ctxNow();
     let txt='QU\'AN DOCTRINE ORDER PLAN — '+c.inst+' '+c.date+' @ '+s.k+'\n'
       +'Prior: '+(cr?cr.prior:'—')+' · Score '+s.score+'/10 (T'+s.tier+') · ℛₓ '+r.rx.toFixed(1)+' (Tier '+(r.tier===5?'VETO':r.tier)+') · cond '+condFactor().toFixed(2)+'\n\n';

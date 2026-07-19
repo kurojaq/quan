@@ -39,6 +39,15 @@ worked by hand from the manuals.
 3. Operator inputs: **condFactor** (manual four-value select until the
    Tick Engine supplies Packet Timing), **CW position** slider for
    intra-session ℛ_T re-reads, and base allocation.
+3a. **Anchor agency**: the scan is ranked by an anchor-adjacency-weighted
+   score (`adj·w = score × 1/(1+|Δanchor|/10-strike window)` — the same
+   adjacency notion as the Dealer Watermark) so far-OTM PDSLs stay listed
+   but yield rank to actionable ones; each hit is classed
+   support/resistance/against-spot relative to price; Fib anchors prefer
+   the best strikes **bracketing** the anchor (attractors below,
+   repulsors above); and the Risq Surface marker is the **price itself**,
+   not the selected strike. With the Live feed on, all of this re-ranks
+   in real time — the anchor is the tab's price agent.
 4. **Risq Surface**: the CW × Fibonacci quadrant map from the
    [Risq operational protocol](/analytics/risq-operational-protocol.md) —
    which the source describes as "mental, not software-generated" — is
