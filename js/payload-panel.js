@@ -41,7 +41,7 @@
       drift = (got !== String(D.REF_EXPECTED).trim());
       ready=true; booting=false; setStatus(hashTag());
       try{ window.__engBrief=function(txt,gtxt,anchor,T){ try{ if(window.QuanInstrumentAdapter){try{var _sel=(typeof curInst==='function')?curInst():(window.curInst?window.curInst():null); txt=window.QuanInstrumentAdapter.bindParser(txt,{selected:_sel}).text; if(gtxt)gtxt=window.QuanInstrumentAdapter.bindParser(gtxt,{selected:_sel}).text;}catch(_na){}} py.globals.set('_brf_text',txt); py.globals.set('_brf_gtext',gtxt||''); py.globals.set('_brf_inst',(typeof curInst==='function'?curInst():'')||''); py.globals.set('_brf_anchor',(anchor==null||anchor==='')?null:Number(anchor)); py.globals.set('_brf_T',(T==null)?1.0:Number(T)); var js=py.runPython(`import json,tempfile,os,math
-import numpy as np, quan_analyze as QA, quan_engine as E, quan_greeks as GK, quan_information as INFO, quan_blackscholes as BS, quan_realization as R, quan_relativistic as RV
+import numpy as np, quan_analyze as QA, quan_engine as E, quan_greeks as GK, quan_information as INFO, quan_blackscholes as BS, quan_realization as R, quan_relativistic as RV, quan_scorecard as SC, quan_fib as FIB, quan_risq as RISQ
 _p=os.path.join(tempfile.gettempdir(),'_brf.csv'); open(_p,'w').write(_brf_text)
 _F=float(_brf_anchor) if _brf_anchor not in (None,'') else None
 _Td=float(_brf_T) if _brf_T not in (None,'') else 1.0
@@ -181,6 +181,21 @@ try:
             _txz=_zc(_cl-_cm); _txt=_times(_txz); _o['tx_t']=(' \u00b7 '.join(_txt[:6])) if _txt else None
             _o['tx']=[{'cw':float(_z),'time':_cwc(_z)} for _z in _txz] if _txz else None
 except Exception as _ew: _o['_twerr']=str(_ew)
+
+# Deep Strike Scorecard (PDSL/DSC) + Fibonacci Strike Architecture + Risq — layered on the
+# already-validated per-strike block. NEUTRAL TSC-prior slot: no live intraday clock at
+# report time, same convention quan_fib's own _cards() helper already uses internally.
+try:
+    _card=SC.scorecard(_fr, realization_dir="NEUTRAL", anchor=_F)
+    _o['pdsl']=_card[:8] if _card else []
+except Exception as _epd: _o['_pdslerr']=str(_epd)
+try:
+    _o['fib']=FIB.build_fib(_fr, _F) if _F is not None else dict(ok=False, note="no anchor set")
+except Exception as _efib: _o['_fiberr']=str(_efib)
+try:
+    _cascade=dict(DIDK=_c.get('DIDK'), DITK=_c.get('DITK'), DR3K=_c.get('DR3K'), DIDS=_c.get('DIDS'), DITS=_c.get('DITS'))
+    _o['risq']=RISQ.compute_risq(_fr, _F, _o.get('cds') or 0.0, _cascade, realization_dir="NEUTRAL")
+except Exception as _erq: _o['_risqerr']=str(_erq)
 
 # Python json.dumps emits bare NaN/Infinity for non-finite floats, which JS JSON.parse
 # REJECTS -> engBrief returns null for the whole instrument. Currency-scale inputs

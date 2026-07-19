@@ -14,6 +14,7 @@
    ['Greeks Exposure', [['Net DDE','netdde'],['Dollar DDE ($)','dollardde'],['Net GEX ($)','netgex'],['Net Vega ($)','netvega'],['Net Theta ($)','nettheta'],['Net Vanna','netvanna']]],
    ['IV Surface', [['ATM IV (\u0394\u22480.5)','atmiv'],['25\u0394 Risk Reversal','rr25'],['25\u0394 Butterfly','bf25'],['Smile Slope d\u03c3/dK','smile'],['Vol-of-vol','volvol'],['Weighted Avg IV','wavgiv']]],
    ['Risk Engine', [['VaR 95% \u0394','var95'],['VaR 99% \u0394','var99'],['CF VaR 99% \u0394','cfvar99'],['CF vs Normal 99%','cfspread'],['Stress F+5% P&L','stresup'],['Stress F-5% P&L','stresdn']]],
+   ['Risq \u2014 Structural Risk (top PDSL/DSC)', [['Field Risk \u211b_F','risqF'],['Temporal Risk \u211b_T','risqT'],['Information Risk \u211b_I','risqI'],['Coherence Risk \u211b_C','risqC'],['Inertia Risk \u211b_\u03a9','risqW'],['Risq Ratio \u211b\u2093','risqRatio'],['Risq Tier','risqTier']]],
    ['Information Field', [['Shannon Entropy H','shannon'],['Max Entropy','hmax'],['Normalized H','hnorm'],['Corr(DID,DIT)','corrIT'],['Corr(DID,DR3)','corrIR'],['Dominant Coupling','domcoup']]],
    ['Context', [['Forward Price F','fwd'],['Days to Expiry T','dte'],['Risk-Free r','rfr'],['Active Strikes (IV)','activestk'],['Parity Quality','parity'],['Half-Kelly f*/2','halfkelly']]]
   ];
@@ -91,6 +92,28 @@
     d.halfkelly=(_PK&&_PK.description)?_PK.description:(b.halfkelly||null);
     d.parity=(b.parity==null?null:b.parity+(b.paritypct==null?'':' ('+_n(b.paritypct*100,1)+'% within $0.01)')); d.oishelf=b.oishelf||null;
     d.clstate=b.clstate||null; d.cmstate=b.cmstate||null; d.breachc=b.breachc||null;
+    // ---- Risq (five-dimension structural risk, computed for the top-scored PDSL/DSC) ----
+    var _rq=b.risq||null;
+    if(_rq&&_rq.ok){
+      var _rd=_rq.dims||{};
+      d.risqF=_n(_rd.R_F,3); d.risqT=_n(_rd.R_T,3); d.risqI=_n(_rd.R_I,3); d.risqC=_n(_rd.R_C,3); d.risqW=_n(_rd.R_W,3);
+      d.risqRatio=_n(_rq.ratio,2);
+      d.risqTier=(_rq.risq_tier||'—')+((_rq.flags&&_rq.flags.length)?(' — '+_rq.flags.join('; ')):'')+' · @ '+_px(_rq.strike)+' ('+_esc(_rq.kind)+')';
+    } else { d.risqF=d.risqT=d.risqI=d.risqC=d.risqW=d.risqRatio=null; d.risqTier=(_rq&&_rq.note)||null; }
+    // ---- Deep Strike Scorecard (PDSL/DSC candidates, ranked) ----
+    var _pdsl=b.pdsl||[];
+    if(_pdsl.length){
+      var _pt='<table class="rpt-mini"><tr><th>Strike</th><th>Kind</th><th>Score</th><th>Tier</th><th>Gradient</th><th>Mass</th><th>DR3</th></tr>';
+      _pdsl.forEach(function(p){ _pt+='<tr><td>'+_px(p.strike)+'</td><td>'+_esc(p.kind)+'</td><td>'+(p.score!=null?p.score:'—')+'/10</td><td>T'+(p.tier!=null?p.tier:'—')+'</td><td>'+_esc(p.gradient||'')+'</td><td>'+(p.mass!=null?_n(p.mass,2):'—')+'</td><td>'+(p.dr3!=null?_n(p.dr3,3):'—')+'</td></tr>'; });
+      d.pdslHtml=_pt+'</table>';
+    } else { d.pdslHtml=null; }
+    // ---- Fibonacci Strike Architecture (PDSL-to-PDSL, not swing-high-to-low) ----
+    var _fb=b.fib||null;
+    if(_fb&&_fb.ok){
+      var _ft='<div class="rk" style="margin-bottom:4px">AL '+_px(_fb.AL.strike)+' (mass '+_n(_fb.AL.mass,2)+') ↔ AH '+_px(_fb.AH.strike)+' (mass '+_n(_fb.AH.mass,2)+') · range '+_n(_fb.f_range,0)+' · price frac '+_n(_fb.price_frac,3)+'</div><table class="rpt-mini"><tr><th>Ratio</th><th>Price</th><th>Role</th></tr>';
+      (_fb.fib||[]).forEach(function(r){ _ft+='<tr><td>'+_n(r.ratio,3)+'</td><td>'+_px(r.price)+'</td><td>'+_esc(r.role)+'</td></tr>'; });
+      d.fibHtml=_ft+'</table>';
+    } else { d.fibHtml=(_fb&&_fb.note)?('<div class="rk">'+_esc(_fb.note)+'</div>'):null; }
     // ---- breach-clock crossings (session points of interest, mapped to clock times) ----
     d.zc=b.zc_t||null; d.poly9=b.p9_t||null; d.tensx=b.tx_t||null; d.zcn=(b.zc_n!=null?_i(b.zc_n):null);
     // ---- taxonomy from producer projection (classification + semantics owned by producer operators) ----
@@ -173,6 +196,8 @@
       for(var j=0;j<g[1].length;j++){ var f=g[1][j]; html+=card(f[0], live?data[f[1]]:null); }
       html+='</div></div>';
     }
+    if(live&&data.pdslHtml){ html+='<div class="rptBreakdown"><div class="rgt">Deep Strike Scorecard — PDSL / DSC candidates</div>'+data.pdslHtml+'</div>'; }
+    if(live&&data.fibHtml){ html+='<div class="rptBreakdown"><div class="rgt">Fibonacci Strike Architecture</div>'+data.fibHtml+'</div>'; }
     if(live&&data.breakdown){ html+='<div class="rptBreakdown"><div class="rgt">Analysis &amp; Execution Breakdown</div>'+data.breakdown+'</div>'; }
     if(rBody) rBody.innerHTML=html;
   }

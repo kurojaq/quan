@@ -9,8 +9,13 @@
    ['Chronometric Speeds', [['Speed of Intent SoI','soi'],['Chronometric Speed Cs','cs'],['Speed of Transaction SoT','sot'],['Speed of Realization SoR','sor']]],
    ['Greeks Exposure', [['Net DDE','netdde'],['Dollar DDE ($)','dollardde'],['Net GEX ($)','netgex'],['Net Vega ($)','netvega'],['Net Theta ($)','nettheta']]],
    ['IV Surface', [['ATM IV (Δ≈0.5)','atmiv'],['25Δ Risk Reversal','rr25'],['25Δ Butterfly','bf25'],['Smile Slope dσ/dK','smile']]],
+   ['Risq — Structural Confidence', [['Risq Ratio ℛₓ','risqRatio'],['Risq Tier','risqTier']]],
    ['Context', [['Forward Price F','fwd'],['Days to Expiry T','dte'],['Active Strikes (IV)','activestk']]]
   ];
+  // Deliberately omitted from the client view: the five raw Risq dimensions, the Deep
+  // Strike Scorecard table, and the Fibonacci quarter-level table — those are operator-
+  // side position-sizing/execution mechanics (Layer A/B/C entries), not the structural
+  // read itself. See js/report.js for the full operator view.
   function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
   function card(label,val){ var v=(val==null||val==='')?'<span class="rdash">—</span>':esc(val);
     return '<div class="rcard"><div class="rk">'+esc(label)+'</div><div class="rv">'+v+'</div></div>'; }
