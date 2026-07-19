@@ -19,7 +19,7 @@
   // Which plan unlocks what. Scout (free/no active sub) gets a limited set.
   // Ladder: scout < operator < prime < desk. Prime adds Execution + realtime;
   // Desk adds team seats + data export/API on top of Prime.
-  var OPERATOR_VIEWS = ['detector', 'chart', 'report', 'polar', 'strike', 'heat', 'compass', 'sim', 'payload', 'split', 'cboe', 'rolling'];
+  var OPERATOR_VIEWS = ['detector', 'chart', 'report', 'polar', 'strike', 'heat', 'compass', 'sim', 'payload', 'split', 'cboe', 'rolling', 'doctrine'];
   var PRIME_VIEWS = OPERATOR_VIEWS.concat(['exec']);
   var ENTITLEMENTS = {
     scout:    ['detector', 'chart'],

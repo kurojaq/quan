@@ -1,5 +1,5 @@
 (function(){
-  const tabs=document.querySelectorAll('.tabbtn'), secs={report:document.getElementById('tabReport'),detector:document.getElementById('tabDetector'),polar:document.getElementById('tabPolar'),strike:document.getElementById('tabStrike'),heat:document.getElementById('tabHeat'),chart:document.getElementById('tabChart'),compass:document.getElementById('tabCompass'),rolling:document.getElementById('tabRolling'),sim:document.getElementById('tabSim'),exec:document.getElementById('tabExec'),wiki:document.getElementById('tabWiki')};
+  const tabs=document.querySelectorAll('.tabbtn'), secs={report:document.getElementById('tabReport'),detector:document.getElementById('tabDetector'),polar:document.getElementById('tabPolar'),strike:document.getElementById('tabStrike'),heat:document.getElementById('tabHeat'),chart:document.getElementById('tabChart'),compass:document.getElementById('tabCompass'),rolling:document.getElementById('tabRolling'),sim:document.getElementById('tabSim'),exec:document.getElementById('tabExec'),doctrine:document.getElementById('tabDoctrine'),wiki:document.getElementById('tabWiki')};
   tabs.forEach(b=>b.addEventListener('click',()=>{ const t=b.dataset.tab;
     if(t==='split'){ tabs.forEach(x=>x.classList.toggle('on',x===b)); if(window.__enterSplit)window.__enterSplit(); return; }
     if(window.__exitSplit)window.__exitSplit();
@@ -15,6 +15,7 @@
     else if(t==='rolling'){ window.__rollingBoot&&window.__rollingBoot(); setTimeout(function(){window.__rollingResize&&window.__rollingResize();},40); }
     else if(t==='sim'){ window.__simBoot&&window.__simBoot(); window.__simRender&&window.__simRender(); }
     else if(t==='exec'){ window.__execBoot&&window.__execBoot(); }
+    else if(t==='doctrine'){ window.__doctrineBoot&&window.__doctrineBoot(); }
     else if(t==='wiki'){ window.__wikiBoot&&window.__wikiBoot(); } }));
   // Report is reachable only as a dropdown view inside Detector now (see detViewSel below); the standalone top-level Report tab button was removed.
   // Both the Detector header and the Report header carry a View dropdown (detViewSel / rptViewSel);
