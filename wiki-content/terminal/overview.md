@@ -47,7 +47,8 @@ Tab strip order: [Detector](/terminal/tabs/detector.md) (default) ·
 [Compass](/terminal/tabs/compass.md) ·
 [Rolling](/terminal/tabs/rolling.md) ·
 [Account Sim](/terminal/tabs/account-sim.md) ·
-[Execution](/terminal/tabs/execution.md) · **+** (split view).
+[Execution](/terminal/tabs/execution.md) ·
+[Doctrine](/terminal/tabs/doctrine.md) · **+** (split view).
 
 **[Report](/terminal/tabs/report.md)** is *not* on the strip — it is
 reached from the Detector's View selector or as a split-view pane.

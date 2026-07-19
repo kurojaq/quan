@@ -1,6 +1,6 @@
 {
   "generated": "2026-07-19",
-  "count": 55,
+  "count": 56,
   "entries": [
     {
       "path": "analytics/chirality.md",
@@ -289,6 +289,12 @@
       "title": "Detector Tab",
       "type": "Market Concept",
       "description": "The default tab \u2014 intermarket breach detection over the loaded option chains."
+    },
+    {
+      "path": "terminal/tabs/doctrine.md",
+      "title": "Doctrine Tab",
+      "type": "Execution Playbook",
+      "description": "The Deep Strike + Risq precision console — the wiki's execution doctrine computed live over engine outputs, ending in an advisory three-layer order plan."
     },
     {
       "path": "terminal/tabs/execution.md",

@@ -2,6 +2,14 @@
 
 ## 2026-07-19
 
+* **Doctrine tab shipped** (repo commit `0a4f458`): the interactive JS
+  counterpart to the report engine's doctrine layers — close-reading
+  prior, whole-ladder Deep Strike scan + scorecard, five-dimension Risq
+  with ℛₓ and mechanical allocation, coherence patterns, entropy-budget
+  ledger, and the three-layer advisory order plan. New concept:
+  [Doctrine tab](/terminal/tabs/doctrine.md); tab strip and indexes
+  updated.
+
 * **Doctrine → shipped**: the report engine already implemented three
   doctrine layers faithfully but never surfaced them; a report-refinement
   pass (repo commit `8112d86`) wired them into the live brief. Marked the

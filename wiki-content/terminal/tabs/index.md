@@ -9,4 +9,5 @@
 * [Rolling](rolling.md) - forward dealer-interest term structure.
 * [Account Sim](account-sim.md) - position/risk simulation.
 * [Execution](execution.md) - Tradovate execution cockpit (demo-first).
+* [Doctrine](doctrine.md) - Deep Strike + Risq precision console over engine outputs.
 * [Report](report.md) - the Chronometric Field Brief (off-strip view).
