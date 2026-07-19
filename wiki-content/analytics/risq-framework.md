@@ -1,9 +1,9 @@
 ---
 type: Risk Model
 title: Risq — The Five-Dimension Risk Framework (base formulas)
-description: The authoritative Risq ontology, the five risk dimensions with formulas and thresholds, and the Risq Ratio — the unified structural edge-to-risk measure that drives position sizing.
+description: The authoritative Risq ontology, the five risk dimensions with formulas and thresholds, and the Risq Ratio — the unified structural edge-to-risk measure that drives position sizing. Now computed live in the report engine.
 tags: [analytics, doctrine, risq, risk-model]
-timestamp: 2026-07-18T00:00:00Z
+timestamp: 2026-07-19T00:00:00Z
 resource: raw/Qu'an Reference Manual - extracted text.txt
 ---
 
@@ -74,12 +74,39 @@ This caps allocation at the base level for ℛₓ≥15 and scales proportionally
 below it — it is structurally impossible to over-allocate relative to
 the edge using this formula.
 
+# Shipped in the report engine (2026-07-19)
+
+`engine/report/quan_risq.py` (commit `8112d86`) computes all five
+dimensions and the Risq Ratio, surfaced as a group on the
+[Report tab](/terminal/tabs/report.md). It is a pure synthesis layer —
+every input already existed in the engine (Jerk/Mass from the scorecard,
+DR3/CW/ZC from the realization fold, Conductance and II/TI from the
+relativistic block, the cascade moments for ℛ_C). Three scope decisions
+diverge from the doctrine's live-intraday framing and are documented in
+the module docstring:
+
+- **Top-candidate only** — the snapshot brief reports Risq for the single
+  highest-scored [PDSL/DSC](/analytics/deep-strike-analysis.md), not
+  per-strike as the live-position doctrine implies.
+- **CW position** uses the last covered value from the realization fold
+  (the most session-complete read a snapshot allows), not a live clock.
+- **Conductance** is kept as the engine's continuous DB35 value rather
+  than bucketed into the doctrine's four discrete `condFactor` tiers
+  (1.10/1.00/0.50/0.35), which the source doesn't specify precisely
+  enough to port faithfully.
+
+Thresholds and tier bands render exactly as the tables above; the
+published client view exposes only the Risq Ratio + tier (see
+[Report tab](/terminal/tabs/report.md)).
+
 # Related
 
 * [TSC interior structure](/analytics/tsc-interior-structure.md), [SOP-Chirality execution protocol](/analytics/sop-chirality-execution-protocol.md) — the two independent *revision* sets to these same five dimensions, found in earlier passes before the base formulas were located.
 * [Risq operational protocol](/analytics/risq-operational-protocol.md) — the Risq Surface (CW×Fibonacci risk geometry), the Entropy Budget, and the pre-/intra-session Risq Protocol built on these formulas.
 * [Information Field & Risk Engine](/analytics/information-field-risk-engine.md) — the separate dealer-basis VaR system; do not conflate with Risq.
+* [Report tab](/terminal/tabs/report.md) — where this now renders.
 
 # Citations
 
 [1] Vault raw source — `raw/Qu'an Reference Manual - extracted text.txt`, "RISQ — A Derivative Risk Framework from the Qu'an," Parts I–II, VII (lines 1480–1526, 1672–1692).
+[2] Qu'an repo — `engine/report/quan_risq.py`, `js/payload-panel.js`, `js/report.js` (commit `8112d86`).

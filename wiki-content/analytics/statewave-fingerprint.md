@@ -27,12 +27,12 @@ in the codebase.
 `js/sop-polar.js`: `swf = soppm.map((s,i)=> s!==0 ? diplTRpd[i]/s : 0)`,
 guarded against division by zero. Source values (`diplTRpd`, `soppm`)
 derive from the session's option chain in the
-[client warehouse](/architecture/client-warehouse.md).
+client warehouse.
 
 # Interpretation
 
 The intended reading (per the planned
-[Chronometric Heatmap full vision](/roadmap/chronometric-heatmap-full-vision.md))
+Chronometric Heatmap full vision)
 is as an **evolving temporal signature** across the session rather than
 an isolated point value — the spec describes SWF as revealing "evolving
 temporal signatures throughout the session rather than isolated

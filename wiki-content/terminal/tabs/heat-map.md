@@ -18,7 +18,7 @@ in-page tab section.
   it never sources data itself.
 - **Auth comes from the parent** — it must run inside the iframe; this is
   an [invariant](/doctrine/invariants.md).
-- Boots its own copy of the [Pyodide engine](/architecture/pyodide-engines.md)
+- Boots its own copy of the Pyodide engine
   (`engine/heatmap/`) and must pass the golden-reference self-test before
   rendering. First load pays the Pyodide download; later loads are warm.
 - A failed data fetch no longer blocks retries — the dedupe key latches on

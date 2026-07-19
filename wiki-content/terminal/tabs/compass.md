@@ -13,7 +13,7 @@ The compass view of session structure.
 # Behavior
 
 - Data tab id `compass`.
-- Fed via `__compassLoadChain` from the [warehouse](/architecture/client-warehouse.md).
+- Fed via `__compassLoadChain` from the warehouse.
 - Price now lives on the [Chart tab](/terminal/tabs/chart.md); the Compass's
   old Price control deep-links there.
 - Module: `js/compass.js`.

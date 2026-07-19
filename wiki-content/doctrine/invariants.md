@@ -9,7 +9,7 @@ timestamp: 2026-07-18T00:00:00Z
 # Rules
 
 1. **Doctrine is frozen.** Analytical doctrine, normalized time systems,
-   and outputs do not change; the four [Pyodide engine copies](/architecture/pyodide-engines.md)
+   and outputs do not change; the four Pyodide engine copies
    stay diverged — never merge them.
 2. **Heat Map runs only in its iframe.** `heatmap.html` always runs inside
    an iframe; auth comes from the parent frame. See [Heat Map](/terminal/tabs/heat-map.md).
@@ -27,7 +27,7 @@ timestamp: 2026-07-18T00:00:00Z
    opt-in and a compliance/liability review.** Subscribers are
    demo-clamped by default; only the operator can go live, gated by the
    single `userMayGoLive()` seam. See [Execution tab](/terminal/tabs/execution.md)
-   and the [Go-Live runbook](/saas/go-live-runbook.md).
+   and the Go-Live runbook.
 
 # Rationale
 

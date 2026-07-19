@@ -21,9 +21,9 @@ bands** (σ=0.025) drawn via `VertBand`.
   spec #4 = the session-time event bands, confirmed shipped as `VertBand`
   in `js/chart-tab.js`).
 - The other three specs describe a much larger vision than what's
-  shipped — see [Bookmap research environment](/roadmap/bookmap-research-environment.md),
-  [Chronometric Heatmap — full vision](/roadmap/chronometric-heatmap-full-vision.md),
-  and [Price tab annotation framework](/roadmap/price-tab-annotation-framework.md)
+  shipped — see Bookmap research environment,
+  Chronometric Heatmap — full vision,
+  and Price tab annotation framework
   for what remains unbuilt.
 
 # Citations

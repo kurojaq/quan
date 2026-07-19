@@ -24,7 +24,7 @@ codebase it is labeled "DS (Difference/Sum)".
 # Data source
 
 Computed in `js/sop-polar.js` from the session's loaded option chain (via
-the [client warehouse](/architecture/client-warehouse.md)); rendered as
+the client warehouse); rendered as
 one of three overlaid series in the "Field Study: DS / Dual Phase / SWF"
 visualization, which also detects **crossing and intersection times**
 between the three series.
@@ -32,8 +32,8 @@ between the three series.
 # Interpretation
 
 The three sheets are read together, not in isolation — the
-[Rolling Analysis Engine's planned integration](/roadmap/rolling-analysis-full-vision.md)
-and the [Chronometric Heatmap's planned full vision](/roadmap/chronometric-heatmap-full-vision.md)
+Rolling Analysis Engine's planned integration
+and the Chronometric Heatmap's planned full vision
 both name DS as part of the "Difference Sum (DS) hierarchy" of higher-order
 derivatives (gradient, velocity, curvature, jerk, snap, crackle, pop) —
 that fuller hierarchy is **not yet shipped**; only the base DS series

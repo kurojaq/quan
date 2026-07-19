@@ -14,7 +14,7 @@ The Strike Compass lives here.
 # Behavior
 
 - Data tab id `strike`.
-- Fed via `__strikeLoadChain` from the [warehouse](/architecture/client-warehouse.md).
+- Fed via `__strikeLoadChain` from the warehouse.
 - Modules: `js/strike-compass.js`, `js/scalar-field.js`.
 
 # Related

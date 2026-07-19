@@ -36,7 +36,7 @@ tracked against the Chronometer Watch.
 `js/sop-polar.js` (`dphase(cc,cd)` → `dualPhase` array, "the 'Dual Phase'
 sheet") and `js/timestate-core.js` (`COL_M`/`COL_S` = `PG/PC Dual Phase
 Tension` / `PC/PG Dual Phase Tension`), both derived from the session's
-option chain in the [client warehouse](/architecture/client-warehouse.md).
+option chain in the client warehouse.
 
 # Interpretation
 

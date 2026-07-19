@@ -9,7 +9,7 @@ timestamp: 2026-07-18T00:00:00Z
 # What it is
 
 The home tab. It runs intermarket breach detection over the chains loaded
-into the [client warehouse](/architecture/client-warehouse.md) for the
+into the client warehouse for the
 selected session, and renders the breach chart.
 
 # Behavior

@@ -1,5 +1,27 @@
 # Update Log
 
+## 2026-07-19
+
+* **Doctrine → shipped**: the report engine already implemented three
+  doctrine layers faithfully but never surfaced them; a report-refinement
+  pass (repo commit `8112d86`) wired them into the live brief. Marked the
+  affected concepts as shipped:
+  * [Report tab](/terminal/tabs/report.md) — added a "What the brief
+    includes" section covering the three new groups + the published-view
+    trim + the "unbracketed Fibonacci" non-bug.
+  * [Risq framework](/analytics/risq-framework.md) — added a "Shipped in
+    the report engine" section documenting `quan_risq.py` and its three
+    scope divergences (top-candidate-only, snapshot CW, continuous
+    conductance).
+  * [Deep Strike Analysis](/analytics/deep-strike-analysis.md) and
+    [Fibonacci Strike Architecture](/analytics/fibonacci-strike-architecture.md)
+    — added shipped callouts (`quan_scorecard.py`, `quan_fib.py`), noting
+    the snapshot max score of 8 and the unbracketed path.
+* **Deploy mirror**: synced the four edited pages into `wiki-content/`
+  and regenerated its `manifest.json` (2 descriptions refreshed). The
+  mirror remains the deliberately-curated Desk subset — `architecture/`,
+  `roadmap/`, and `saas/` stay excluded from the subscriber-facing wiki.
+
 ## 2026-07-18
 
 * **Initialization**: Established the OKF bundle from two raw-inbox source

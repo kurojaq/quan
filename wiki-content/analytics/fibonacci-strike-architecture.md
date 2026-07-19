@@ -3,9 +3,16 @@ type: Reference
 title: Fibonacci Strike Architecture
 description: Fibonacci levels drawn PDSL-to-PDSL rather than swing-high-to-low — the level table, quarter-level microstructure, and the cascading extension rule.
 tags: [analytics, doctrine, fibonacci, pdsl, execution]
-timestamp: 2026-07-18T00:00:00Z
+timestamp: 2026-07-19T00:00:00Z
 resource: raw/Qu'an Reference Manual - extracted text.txt
 ---
+
+> **Shipped (2026-07-19).** `engine/report/quan_fib.py` builds this
+> table — anchor selection, the level/quarter tables, orientation — and
+> it now renders on the [Report tab](/terminal/tabs/report.md) whenever a
+> defended ATT-floor/REP-ceiling bracket exists around price (commit
+> `8112d86`). With no such bracket the brief shows an explicit
+> "unbracketed" note rather than a table.
 
 # Summary
 
@@ -54,3 +61,4 @@ exits** (scale out 25–33% per quarter level as the trade develops).
 # Citations
 
 [1] Vault raw source — `raw/Qu'an Reference Manual - extracted text.txt`, "Qu'an Execution Playbook," Part III (lines 1878–1977).
+[2] Qu'an repo — `engine/report/quan_fib.py` (`build_fib`, `select_anchors`, `fib_table`, `quarter_table`), surfaced via `js/report.js` (commit `8112d86`).

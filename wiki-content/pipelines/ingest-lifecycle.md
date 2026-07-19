@@ -23,7 +23,7 @@ Drive (operator uploads Barchart CSVs, one subfolder per instrument)
   → Report brief → /api/archive (durable history) → publish → view.html
 ```
 
-**Three roads into the [warehouse](/architecture/client-warehouse.md):**
+**Three roads into the warehouse:**
 
 1. Auto-load from the cloud warehouse (normal path, above).
 2. **⛃ Auto-pull** — the `barchart-fetch` Worker downloads toggled
@@ -50,7 +50,7 @@ dates from filenames when index metadata exists — an
 
 # Related
 
-* [Data plane](/architecture/data-plane.md) · [Client warehouse](/architecture/client-warehouse.md) · [Instrument registry](/architecture/instrument-registry.md).
+* Data plane · Client warehouse · Instrument registry.
 
 # Citations
 

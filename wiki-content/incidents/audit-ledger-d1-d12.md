@@ -16,7 +16,7 @@ catalogued twelve defects, several of which had user-visible effects
 
 | # | Defect | Where | Disposition |
 |---|--------|-------|-------------|
-| D1 | Instrument symbol knowledge duplicated in ≥6 places; drifts independently, currencies/metals fall through gaps | workers + js | **Fixed**: single [instrument registry](/architecture/instrument-registry.md) |
+| D1 | Instrument symbol knowledge duplicated in ≥6 places; drifts independently, currencies/metals fall through gaps | workers + js | **Fixed**: single instrument registry |
 | D2 | `frontSymbol()` regex matches only all-letter roots — FX (`e6u26…`) never matches | `js/auto-pull.js` | **Fixed** via registry parsing |
 | D3 | Session date = download date +1 calendar day → Friday chains index under Saturday; Mondays "missing" | `workers/ingest-worker.js` | **Fixed**: weekend-skip on write; read accepts legacy weekend rows |
 | D4 | `WH_KEY` ReferenceError in hydrate purge, swallowed by `catch` → purge never ran | `js/warehouse.js` | **Fixed** |
@@ -31,9 +31,9 @@ catalogued twelve defects, several of which had user-visible effects
 
 # Fix / disposition
 
-Most defects are fixed. The [instrument registry](/architecture/instrument-registry.md)
+Most defects are fixed. The instrument registry
 resolved the D1/D2/D9 symbol-drift cluster; the [ingest lifecycle](/pipelines/ingest-lifecycle.md)
-carries the D3/D8 classification fixes; the [client warehouse](/architecture/client-warehouse.md)
+carries the D3/D8 classification fixes; the client warehouse
 carries D4/D5/D6. D11 and D12 remain open by choice.
 
 # Citations

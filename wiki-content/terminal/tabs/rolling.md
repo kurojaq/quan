@@ -18,7 +18,7 @@ term-structure view.
 - Modules: `js/rolling-engine.js` (core aggregation + weighting +
   heuristics), `js/rolling-viz.js` (visualization/overlays).
 - Slice 1 (core aggregation) shipped; viz, overlays, and reporting are
-  ongoing — see [Rolling Analysis Engine — full vision](/roadmap/rolling-analysis-full-vision.md)
+  ongoing — see Rolling Analysis Engine — full vision
   for the complete 12-objective spec and exactly which pieces remain.
 
 # Citations

@@ -15,7 +15,7 @@ and session-time Gaussian event-highlight bands.
 # Behavior
 
 - Data tab id `chart`.
-- Price is anchored via the [live anchor](/architecture/data-plane.md)
+- Price is anchored via the live anchor
   when `/api/quote` is available.
 - The former Compass "Price" control now just deep-links here.
 - Modules: `js/chart-tab.js`, `js/chart-draw.js`, `js/chart-controls.js`,

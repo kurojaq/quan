@@ -16,10 +16,10 @@ rolling term-structure engine, and account/risk simulation.
 Defining properties:
 
 - **Static** — no build step; one classic `js/` script per feature area,
-  loaded `defer` in dependency order. See [presentation layer](/architecture/presentation-layer.md).
-- **In-browser Python** — analysis runs via Pyodide. See [Pyodide engines](/architecture/pyodide-engines.md).
-- **Cloudflare-hosted** — Pages Functions + standalone Workers. See [data plane](/architecture/data-plane.md).
-- **Subscription SaaS** — hard paywall, four tiers. See [tiers and gating](/saas/tiers-and-gating.md).
+  loaded `defer` in dependency order.
+- **In-browser Python** — analysis runs via Pyodide.
+- **Cloud-hosted** — hosted on managed infrastructure.
+- **Subscription SaaS** — hard paywall, tiered access.
 
 # Pages
 

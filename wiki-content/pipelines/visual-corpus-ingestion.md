@@ -36,7 +36,7 @@ missed:
   term-structure render that a `grep` for "Bookmap"/"heatmap" in
   `js/rolling-viz.js` completely missed, because the code names it
   `density`/`spectral` instead — correcting the
-  [Rolling Analysis Engine roadmap](/roadmap/rolling-analysis-full-vision.md)'s
+  Rolling Analysis Engine roadmap's
   shipped/unshipped split. **Grep for behavior, not just for the words
   you expect** — screenshots are the check against that blind spot.
 

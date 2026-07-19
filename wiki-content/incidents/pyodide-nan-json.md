@@ -21,7 +21,7 @@ field.
 # Fix / disposition
 
 **Sanitize before dumping** — replace non-finite values on the Python side
-before `json.dumps`, across all four [Pyodide engine copies](/architecture/pyodide-engines.md).
+before `json.dumps`, across all four Pyodide engine copies.
 This is now [invariant](/doctrine/invariants.md) #5: no bare NaN/Infinity
 may cross the Python↔JS boundary.
 

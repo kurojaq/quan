@@ -14,7 +14,7 @@ style/markup/script bundle (`payload/`), driven by
 
 # Detail
 
-- Uses its own diverged [Pyodide engine copy](/architecture/pyodide-engines.md)
+- Uses its own diverged Pyodide engine copy
   (`engine/payload/`) — one of the four that must not be merged.
 
 # Citations

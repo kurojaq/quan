@@ -22,7 +22,7 @@ is the terminal's primary window onto the
 # Behavior
 
 - Data tab id `polar`; label "Field Study".
-- Fed via `__polarLoadChain` from the [warehouse](/architecture/client-warehouse.md).
+- Fed via `__polarLoadChain` from the warehouse.
 - Module: `js/sop-polar.js` — search "DS (Difference/Sum)", "Dual Phase",
   "SWF (DIPLTRPD/SOPPM)" to locate the three series.
 - Honors the header **session kind** override (Auto / Full / Early / Closed).

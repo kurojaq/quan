@@ -3,9 +3,16 @@ type: Execution Playbook
 title: Deep Strike Analysis — Close Reading & Pre-Session Blueprint
 description: The four-signal Time State Compass close-reading protocol and the five-layer Deep Strike Analysis that formally defines PDSL/DSC and produces the 0–10 Deep Strike Scorecard.
 tags: [analytics, doctrine, deep-strike, pdsl, execution-playbook]
-timestamp: 2026-07-18T00:00:00Z
+timestamp: 2026-07-19T00:00:00Z
 resource: raw/Qu'an Reference Manual - extracted text.txt
 ---
+
+> **Shipped (2026-07-19).** The five-layer scorecard — the 4-criteria
+> PDSL/DSC test (Mass>±2.0, Kurt>4.5, LR>8.0, |A|>20) and the 0–10 score
+> — is implemented in `engine/report/quan_scorecard.py` and now renders
+> as a ranked table on the [Report tab](/terminal/tabs/report.md) (commit
+> `8112d86`). Snapshot briefs fill the "+2 TSC prior" slot as NEUTRAL
+> (no live close arc), so a snapshot's max scorecard score is 8, not 10.
 
 # Trigger
 
@@ -55,3 +62,4 @@ producing the next session's inherited priors, not a backward summary.
 # Citations
 
 [1] Vault raw source — `raw/Qu'an Reference Manual - extracted text.txt`, "Qu'an Execution Playbook," Parts I–II (lines 1782–1877).
+[2] Qu'an repo — `engine/report/quan_scorecard.py` (`observable_scan`, `score_strike`, `scorecard`), surfaced via `js/report.js` (commit `8112d86`).

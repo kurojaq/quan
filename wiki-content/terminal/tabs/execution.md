@@ -38,9 +38,9 @@ the terminal.
 
 # Related
 
-* [Tick Engine](/architecture/tick-engine.md) — the planned market-data feed for the activation engine's `getPrice()` seam.
-* [Go-Live runbook](/saas/go-live-runbook.md) — the multi-tenant deploy + smoke-test steps.
-* [Tiers and gating](/saas/tiers-and-gating.md) — which tiers unlock this tab.
+* Tick Engine — the planned market-data feed for the activation engine's `getPrice()` seam.
+* Go-Live runbook — the multi-tenant deploy + smoke-test steps.
+* Tiers and gating — which tiers unlock this tab.
 
 # Citations
 

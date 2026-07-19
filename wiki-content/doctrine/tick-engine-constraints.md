@@ -24,7 +24,7 @@ resource: TICK_ENGINE_RESEARCH.md
    The Tradovate MD API allows only one subscription of each type (quote/
    DOM/chart) per contract — this is why no module may poll the broker
    directly; every subsystem subscribes to the
-   [Tick Engine](/architecture/tick-engine.md) instead.
+   Tick Engine instead.
 4. **Never re-poll the live feed.** Because live data is expensive and
    licensed, the engine must consume the feed once and distribute
    internally — re-polling multiplies license-exposure for no benefit.
@@ -48,9 +48,9 @@ constraint is enforceable today, not speculative.
 
 # Related
 
-* [Tick Engine](/architecture/tick-engine.md) — the subsystem these rules govern.
-* [Tradovate Market Data API](/architecture/tradovate-market-data-api.md) — the capability inventory these rules derive from.
-* [Go-Live runbook](/saas/go-live-runbook.md) — the related "subscribers are demo-clamped" business rule for the shipped [Execution](/terminal/tabs/execution.md) engine.
+* Tick Engine — the subsystem these rules govern.
+* Tradovate Market Data API — the capability inventory these rules derive from.
+* Go-Live runbook — the related "subscribers are demo-clamped" business rule for the shipped [Execution](/terminal/tabs/execution.md) engine.
 
 # Citations
 

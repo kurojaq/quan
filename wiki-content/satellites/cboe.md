@@ -10,14 +10,14 @@ resource: cboe.html
 # Summary
 
 `quan_cboe.py` (with `cboe.html` and `js/cboe-*.js`) adapts CBOE
-`quotedata` into the golden-reference frame the [engines](/architecture/pyodide-engines.md)
+`quotedata` into the golden-reference frame the engines
 expect, using P−C (no-premium) logic.
 
 # Detail
 
 - Front end: `cboe.html`, `js/cboe-app.js`, `js/cboe-portfolio.js`.
 - Purpose: let CBOE-sourced chains flow into the same analytical frame as
-  the Barchart-sourced [warehouse](/architecture/client-warehouse.md) data.
+  the Barchart-sourced warehouse data.
 
 # Citations
 
