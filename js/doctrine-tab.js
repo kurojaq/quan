@@ -51,7 +51,10 @@
   // ---- entropy-budget ledger (per instrument+date) ------------------------
   function ebKey(){ const c=ctxNow(); return 'qdoc:eb:'+c.inst+':'+c.date; }
   function ebSpent(){ try{ const v=JSON.parse(localStorage.getItem(ebKey())||'null'); return (v&&v.spent)||[]; }catch(_){ return []; } }
-  function ebLog(layers){ if(!glob||!cr) return; const r=risqFor(sel()); if(!r) return;
+  function ebLog(layers){ if(!glob||!cr) return;
+    // PRAQ No-Brief-No-Trade rule (praq-mission-discipline.md) — soft dependency on the Mission module
+    if(window.__quanBriefClosed&&!window.__quanBriefClosed()){ status('No-Brief-No-Trade: close a Mission Brief first (Mission view).',true); return; }
+    const r=risqFor(sel()); if(!r) return;
     const cost=D().ebCost(layers,r.rC,r.rI);
     const spent=ebSpent(); spent.push({layers:layers,cost:+cost.toFixed(2),at:Date.now()});
     try{ localStorage.setItem(ebKey(),JSON.stringify({spent:spent})); }catch(_){}
@@ -109,6 +112,7 @@
       +(cr.dir!==0?' · <span style="color:'+dirColor(cr.dir)+'">'+dirWord(cr.dir)+'</span>':'')
       +(eb?' &nbsp;·&nbsp; EB '+fmt(ebRun,1)+'/'+fmt(eb.eb0,1)+(locked?' <span style="color:#d9463b">SESSION CLOSED TO NEW INITIATIONS</span>':''):'')):'AWAITING FIELD DATA';
     $('dcSub').textContent=c.inst+(c.date?' · '+c.date:'')+' · condFactor '+condFactor().toFixed(2)+' · CW '+cwPos().toFixed(1);
+    const anch=(scan.length&&glob)?D().fibAnchors(scan):null;
 
     let h='';
     // Close reading
@@ -165,7 +169,6 @@
       if(r.veto) rb+='<div style="'+MONO+'color:#d9463b;margin-top:6px">'+esc(r.veto)+'</div>';
       h+=panel('Risq — pre-trade read @ '+fmt(s.k,1),rb);
 
-      const anch=D().fibAnchors(scan);
       const plan=D().orderPlan(s,anch,{condFactor:condFactor(),risqTier:r.tier,alloc:r.alloc});
       let pb='';
       if(anch) pb+='<div style="'+MONO+'color:var(--dim);margin-bottom:6px">Fib anchors AL '+fmt(anch.al,1)+' → AH '+fmt(anch.ah,1)+' ('+anch.dir+', range '+fmt(anch.range,1)+')</div>';
@@ -182,6 +185,10 @@
           +'<span style="'+MONO+'color:var(--dim);align-self:center">Advisory only — route manually via the Execution tab.</span></div>';
       } else pb+='<div style="'+MONO+'color:#e0a96a">'+esc(plan.note)+'</div>';
       h+=panel('Order architecture — three-layer build @ '+fmt(s.k,1),pb);
+
+      // Risq Surface — the CW × Fibonacci quadrant map, literalized
+      // (risq-operational-protocol.md describes it as "mental, not software-generated")
+      if(anch) h+=panel('Risq surface — CW × Fibonacci quadrants',surfaceSVG(anch,s));
 
       // EB ledger
       let ebB=eb?kv('EB₀ (10 − ZC×1.5 − ℛ_I×2)',fmt(eb.eb0,1)+' · '+esc(eb.grade)):'';
@@ -206,6 +213,38 @@
     const bAB=$('dcEbAB'); if(bAB) bAB.addEventListener('click',()=>ebLog('AB'));
     const bABC=$('dcEbABC'); if(bABC) bABC.addEventListener('click',()=>ebLog('ABC'));
     const bR=$('dcEbReset'); if(bR) bR.addEventListener('click',ebReset);
+
+    // published state for the Mission console (js/doctrine-mission.js)
+    window.__doctrineState=function(){ const ss=sel(); const rr=(ss&&glob)?risqFor(ss):null;
+      return {inst:c.inst, date:c.date, cr:cr, scan:scan, glob:glob, coh:coh, sel:ss, risq:rr,
+        eb:eb, ebRun:ebRun, cond:condFactor(), cw:cwPos(), base:baseAlloc(), anch:anch,
+        plan:(ss&&rr)?D().orderPlan(ss,anch,{condFactor:condFactor(),risqTier:rr.tier,alloc:rr.alloc}):null}; };
+    if(window.__missionOnState) window.__missionOnState();
+  }
+
+  // ---- Risq Surface (CW × Fib quadrant map) -------------------------------
+  function surfaceSVG(anch,s){
+    const W=560,H=240,X0=34,X1=W-14,Y0=12,Y1=H-22;
+    const x=cw=>X0+(cw+1)/2*(X1-X0);
+    const y=f=>Y0+(1.7-f)/1.8*(Y1-Y0);
+    const band=(cwA,cwB,fA,fB,fill,op)=>'<rect x="'+x(cwA)+'" y="'+y(fB)+'" width="'+(x(cwB)-x(cwA))+'" height="'+(y(fA)-y(fB))+'" fill="'+fill+'" opacity="'+op+'"/>';
+    let svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block">';
+    svg+=band(-1,0,0.382,0.618,'#3f9d6b',0.14)+band(0,1,0.382,0.618,'#e8b53a',0.12);
+    svg+=band(0,1,-0.1,0.236,'#d9463b',0.08)+band(0,1,0.786,1.7,'#d9463b',0.08);
+    svg+=band(-1,0,-0.1,0.236,'#6fd3ff',0.07)+band(-1,0,0.786,1.7,'#6fd3ff',0.07);
+    for(const f of [0,0.236,0.382,0.5,0.618,0.786,1,1.272,1.618])
+      svg+='<line x1="'+X0+'" y1="'+y(f)+'" x2="'+X1+'" y2="'+y(f)+'" stroke="var(--line,#333)" stroke-width="0.5"/>'
+        +'<text x="4" y="'+(y(f)+3)+'" fill="var(--dim,#8f8c82)" font-size="8" font-family="Menlo,monospace">'+f.toFixed(3)+'</text>';
+    svg+='<line x1="'+x(0)+'" y1="'+Y0+'" x2="'+x(0)+'" y2="'+Y1+'" stroke="var(--cream,#ddd)" stroke-width="0.7" stroke-dasharray="3 3"/>';
+    for(const cw of [-0.5,0.5]) svg+='<line x1="'+x(cw)+'" y1="'+Y0+'" x2="'+x(cw)+'" y2="'+Y1+'" stroke="var(--line,#333)" stroke-width="0.5"/>';
+    for(const cw of [-1,-0.5,0,0.5,1]) svg+='<text x="'+(x(cw)-8)+'" y="'+(H-8)+'" fill="var(--dim,#8f8c82)" font-size="8" font-family="Menlo,monospace">'+(cw>0?'+':'')+cw.toFixed(1)+'</text>';
+    const q=(cx,f,t)=>'<text x="'+x(cx)+'" y="'+y(f)+'" fill="var(--dim,#8f8c82)" font-size="9" font-family="Menlo,monospace" text-anchor="middle">'+t+'</text>';
+    svg+=q(-0.5,0.5,'I · PREPARATION')+q(0.5,0.5,'II · EXECUTION')+q(0.5,1.45,'III · BOUNDARY')+q(-0.5,1.45,'IV · LOADING')+q(0.5,0.06,'III')+q(-0.5,0.06,'IV');
+    const fp=Math.max(-0.1,Math.min(1.7,(s.k-anch.al)/anch.range));
+    svg+='<circle cx="'+x(cwPos())+'" cy="'+y(fp)+'" r="5" fill="none" stroke="var(--gold,#e8b53a)" stroke-width="1.6"/>'
+      +'<circle cx="'+x(cwPos())+'" cy="'+y(fp)+'" r="1.6" fill="var(--gold,#e8b53a)"/></svg>';
+    return svg+'<div style="'+MONO+'color:var(--dim);margin-top:4px">marker: selected strike '+fmt(s.k,1)+' at Fib '+fmt((s.k-anch.al)/anch.range,3)+' × CW '+cwPos().toFixed(1)
+      +' — pending orders belong in Quadrant I; Quadrant IV holds only Watermark-level (LR&gt;30) overnight exposure at 50% size; no new initiations past CW +0.5.</div>';
   }
 
   function copyPlan(){
@@ -220,9 +259,16 @@
   }
 
   // ---- boot ---------------------------------------------------------------
+  function applyDcView(v){
+    const map={console:'dcBody',mission:'dcMission',archive:'dcArchive'};
+    for(const k in map){ const el=$(map[k]); if(el) el.style.display=(k===v)?'':'none'; }
+    if(v!=='console'&&window.__missionRender) window.__missionRender(v);
+  }
+
   window.__doctrineBoot=function(){
     if(booted){ queueRefresh(); return; } booted=true;
     ['dcCond','dcBase'].forEach(id=>{ const el=$(id); if(el) el.addEventListener('change',()=>render()); });
+    const vw=$('dcView'); if(vw) vw.addEventListener('change',()=>applyDcView(vw.value));
     const cw=$('dcCW'); if(cw) cw.addEventListener('input',()=>{ const o=$('dcCWv'); if(o) o.textContent=parseFloat(cw.value).toFixed(1); render(); });
     const rf=$('dcRefresh'); if(rf) rf.addEventListener('click',refresh);
     window.addEventListener('quan:sop',queueRefresh);

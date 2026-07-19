@@ -294,7 +294,7 @@
       "path": "terminal/tabs/doctrine.md",
       "title": "Doctrine Tab",
       "type": "Execution Playbook",
-      "description": "The Deep Strike + Risq precision console — the wiki's execution doctrine computed live over engine outputs, ending in an advisory three-layer order plan."
+      "description": "The Deep Strike + Risq precision console — the wiki's execution doctrine computed live over engine outputs, with the PRAQ Mission console (PSIS → OPORD → AAR) and the literalized Risq Surface."
     },
     {
       "path": "terminal/tabs/execution.md",

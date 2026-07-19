@@ -1,7 +1,7 @@
 ---
 type: Execution Playbook
 title: Doctrine Tab
-description: The Deep Strike + Risq precision console — the wiki's execution doctrine computed live over engine outputs, ending in an advisory three-layer order plan.
+description: The Deep Strike + Risq precision console — the wiki's execution doctrine computed live over engine outputs, with the PRAQ Mission console (PSIS → OPORD → AAR) and the literalized Risq Surface.
 tags: [terminal, tab, doctrine, deep-strike, risq, execution]
 timestamp: 2026-07-19T00:00:00Z
 ---
@@ -39,6 +39,33 @@ worked by hand from the manuals.
 3. Operator inputs: **condFactor** (manual four-value select until the
    Tick Engine supplies Packet Timing), **CW position** slider for
    intra-session ℛ_T re-reads, and base allocation.
+4. **Risq Surface**: the CW × Fibonacci quadrant map from the
+   [Risq operational protocol](/analytics/risq-operational-protocol.md) —
+   which the source describes as "mental, not software-generated" — is
+   rendered live, with the selected strike's Fib position × the CW slider
+   as the exposure marker across Quadrants I–IV.
+5. **Mission view** (`js/doctrine-mission.js`) — the
+   [PRAQ discipline layer](/analytics/praq-mission-discipline.md) as a
+   working console:
+   * **PSIS**: the five fixed questions auto-answered from the engine
+     state (field map, Inherited Tension Vector, entropy budget, Named
+     Areas of Interest, active constraints), operator-annotated, then
+     explicitly marked complete — no Brief opens before that.
+   * **Mission Brief (OPORD)**: five paragraphs with seed buttons
+     (Situation ← PSIS, Execution ← compiled order plan, Administration ←
+     Risq/EB with the `EB₀ − EB_cost ≥ 0` check). **Closing the Brief
+     flips Strategist → Ground Lead**: the document freezes; the only
+     moves left are execute-as-planned or Abort &amp; Replan (counted as
+     a revision).
+   * **No-Brief-No-Trade, enforced**: the entropy ledger's trade logger
+     refuses to log until a Brief is closed
+     (`window.__quanBriefClosed` seam, soft dependency per invariant #3).
+   * **AAR**: quotes the closed Brief verbatim, records facts (fills,
+     MAE/MFE, exit CW), classifies each gap into exactly one of causes
+     A/B/C, and takes exactly one doctrine change.
+   * **Archive view**: every recorded mission per instrument+date, with
+     Brief/AAR status and revision counts, plus the Sunday weekly
+     aggregate AAR prompts.
 
 # Derivation notes (labeled in the tab footer)
 

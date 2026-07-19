@@ -2,6 +2,15 @@
 
 ## 2026-07-19
 
+* **Mission console shipped**: the Doctrine tab gains Mission/Archive
+  views implementing [PRAQ mission discipline](/analytics/praq-mission-discipline.md)
+  — auto-answered PSIS, five-paragraph OPORD with freeze-on-close role
+  switching, enforced No-Brief-No-Trade, verbatim AAR with A/B/C gap
+  causes, per-session archive — plus the
+  [Risq Surface](/analytics/risq-operational-protocol.md) rendered live
+  as a CW×Fib quadrant map. Concept updated:
+  [Doctrine tab](/terminal/tabs/doctrine.md); shipped-consumer note added
+  to PRAQ.
 * **Doctrine tab shipped** (repo commit `0a4f458`): the interactive JS
   counterpart to the report engine's doctrine layers — close-reading
   prior, whole-ladder Deep Strike scan + scorecard, five-dimension Risq

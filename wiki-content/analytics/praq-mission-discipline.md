@@ -96,6 +96,17 @@ producing three notes — an unseen pattern, a confirmed/disconfirmed
 prospective note, and a recurring self-observation requiring a doctrine
 response.
 
+# Shipped consumer
+
+The [Doctrine tab](/terminal/tabs/doctrine.md)'s Mission view
+(`js/doctrine-mission.js`) implements this layer end-to-end: PSIS
+auto-answered from the doctrine engine's state and operator-confirmed,
+the five-paragraph Brief with close-to-freeze Strategist→Ground-Lead
+switching, the No-Brief-No-Trade rule enforced against the entropy
+ledger, the verbatim-quoting AAR with A/B/C gap classification and the
+one-change rule, and a per-session mission archive. The Field
+Intelligence Log and the psychological protocols remain paper practice.
+
 # Related
 
 * [Deep Strike Analysis](/analytics/deep-strike-analysis.md), [Risq framework](/analytics/risq-framework.md) — the analytical inputs IPS and the Mission Brief consume.

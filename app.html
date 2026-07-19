@@ -584,6 +584,7 @@
       <span class="sub">Doctrine &mdash; Deep Strike &amp; Risq Console</span>
     </div>
     <div class="hdr-right">
+      <div class="slot"><span class="tag">View</span><select class="field" id="dcView"><option value="console" selected>Console</option><option value="mission">Mission</option><option value="archive">Archive</option></select></div>
       <div class="slot"><span class="tag">Conductance</span><select class="field" id="dcCond" title="Manual condFactor until the Tick Engine ships (conductance needs tick-based Packet Timing)"><option value="1.10">1.10 &mdash; full</option><option value="1.00" selected>1.00 &mdash; standard</option><option value="0.50">0.50 &mdash; impaired</option><option value="0.35">0.35 &mdash; closed</option></select></div>
       <div class="slot"><span class="tag">CW</span><input type="range" id="dcCW" min="-1" max="1" step="0.1" value="-1" style="width:120px;accent-color:var(--gold)" autocomplete="off"><span class="tag" id="dcCWv">-1.0</span></div>
       <div class="slot"><span class="tag">Base alloc</span><input type="number" id="dcBase" class="panchor" style="width:60px" value="10" min="1" max="999" step="1" autocomplete="off"></div>
@@ -597,6 +598,8 @@
       <div class="rptSub" id="dcSub">&mdash;</div>
     </div>
     <div class="rptBody" id="dcBody"></div>
+    <div class="rptBody" id="dcMission" style="display:none"></div>
+    <div class="rptBody" id="dcArchive" style="display:none"></div>
   </div>
   </section>
   <section class="tabsec" id="tabWiki">
@@ -645,6 +648,7 @@
 <script src="js/strike-compass.js" defer></script>
 <script src="js/doctrine-engine.js" defer></script>
 <script src="js/doctrine-tab.js" defer></script>
+<script src="js/doctrine-mission.js" defer></script>
 
 <button id="pdTab" class="pdtab" type="button" title="Payload engine"><span class="pdchev" id="pdChev">&#9664;</span><span class="pdtablbl">PAYLOAD</span></button>
 <aside id="pdPanel" class="pdpanel" aria-hidden="true">
