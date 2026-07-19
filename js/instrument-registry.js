@@ -122,6 +122,21 @@
     return (rootOf(sym) + String(monthCode || '') + String(yy || '')).toUpperCase();
   }
 
+  /* Add an instrument at runtime (the CBOE clone creates a ticker per uploaded
+   * dataset). Idempotent; returns the record. Defaults suit options: 100
+   * shares/contract, INDEX family (decimal strikes, no fractional handling). */
+  function register(sym, group, mult, family) {
+    sym = String(sym || '').toUpperCase(); if (!sym) return null;
+    if (BY_SYM[sym]) return BY_SYM[sym];
+    var rec = { group: group || 'Uploaded', sym: sym, mult: mult || 100,
+                family: family || 'INDEX', roots: [sym.toLowerCase()] };
+    BY_SYM[sym] = rec;
+    if (!(rec.roots[0] in BY_ROOT)) BY_ROOT[rec.roots[0]] = sym;
+    if (!GROUPS[rec.group]) { GROUPS[rec.group] = []; GROUP_ORDER.push(rec.group); }
+    GROUPS[rec.group].push(sym);
+    return rec;
+  }
+
   function get(sym) { return BY_SYM[String(sym || '').toUpperCase()] || null; }
   function mult(sym) { var r = get(sym); return r ? r.mult : null; }
   function family(sym) { var r = get(sym); return r ? r.family : 'OTHER'; }
@@ -142,7 +157,7 @@
 
   var api = {
     DEF: DEF, MONTH_CODES: MONTH_CODES,
-    get: get, mult: mult, family: family, groups: groups, familyRoots: familyRoots,
+    get: get, mult: mult, family: family, groups: groups, familyRoots: familyRoots, register: register,
     fromRoot: fromRoot, rootOf: rootOf, contractFor: contractFor, parseContract: parseContract,
     symbols: function () { return Object.keys(BY_SYM); }
   };
