@@ -18,7 +18,10 @@
 (function (g) {
   'use strict';
 
-  var DEF = [
+  // A page may supply its own instrument set BEFORE this script runs (the CBOE
+  // clone sets g.__QUAN_INSTRUMENTS__ to a list of tickers). Defaults to the CME
+  // futures universe below, so app.html / heatmap.html are unaffected.
+  var DEF = g.__QUAN_INSTRUMENTS__ || [
     // group          sym     mult      family    extra barchart roots
     ['Equity Index', 'ES',       50, 'INDEX', []],
     ['Equity Index', 'MES',       5, 'INDEX', ['em']],
