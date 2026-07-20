@@ -339,6 +339,7 @@
         <button class="ctool" id="chartCandlesBtn" type="button" style="display:none" title="Show / hide the candlesticks">Candles</button>
         <button class="ctool" id="chartMonoBtn" type="button" style="display:none" title="Grayscale the heat field">Mono</button>
         <button class="ctool on" id="chartChronoBtn" type="button" title="Chronometric session highlights — event bands (&sigma; in normalized session time) along the Bookmap timeline">Chrono</button>
+        <button class="ctool" id="chartTradovateBtn" type="button" style="display:none" title="Export this bookmap as a Tradovate custom indicator — copies a paste-ready script (the Tradovate twin of the Pine payload)">Tradovate</button>
       </div>
       <div class="slot" id="chartTfRow">
         <button class="ctool chart-tf" data-range="5d" data-interval="1m" type="button">1m</button>
@@ -634,6 +635,7 @@
 <script src="js/chart-draw.js" defer></script>
 <script src="js/scalar-field.js" defer></script>
 <script src="js/chart-heat.js" defer></script>
+<script src="js/tradovate-payload.js" defer></script>
 <script src="js/compass.js" defer></script>
 <script src="js/theme-toggle.js" defer></script>
 <script src="js/split-view.js" defer></script>
@@ -680,6 +682,31 @@
 </aside>
 <script src="js/payload-panel.js" defer></script>
 <script src="js/payload-generator-host.js" defer></script>
+
+<!-- Tradovate Bookmap payload engine — slide-out sidebar (twin of the Payload engine) -->
+<button id="tvTab" class="pdtab" type="button" title="Tradovate Bookmap payload engine" style="top:62%"><span class="pdchev" id="tvChev">&#9664;</span><span class="pdtablbl">TRADOVATE</span></button>
+<aside id="tvPanel" class="pdpanel" aria-hidden="true">
+  <div class="pdhead"><span class="pdttl">Tradovate Bookmap</span><span class="pdr"><span class="pdsync" id="tvSync" style="font-size:10px;color:var(--cream-dim,#a2a2a2);font-family:ui-monospace,Menlo,monospace;margin-right:8px"></span><button id="tvClose" class="pdx" type="button" title="Close">&#215;</button></span></div>
+  <div class="pdbody" style="padding:14px;height:calc(100% - 46px);overflow:auto;box-sizing:border-box">
+    <div id="tvStatus" style="font:11px ui-monospace,Menlo,monospace;color:var(--cream-dim,#a2a2a2);margin-bottom:8px">idle &mdash; generates from the Chart-tab Bookmap snapshots</div>
+    <div id="tvErr" style="color:#e08a6a;font:11px ui-monospace,Menlo,monospace;white-space:pre-wrap;margin-bottom:8px"></div>
+    <div style="margin-bottom:10px;padding:9px;border:1px solid #2a2a2a;border-radius:8px;background:#0f0f0f">
+      <div style="font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--cream-dim,#a2a2a2);margin-bottom:6px">What this does</div>
+      <div style="font-size:11px;line-height:1.5;color:#c9c9c9">Serializes the same bookmap you see on the Chart tab into a <b>Tradovate custom indicator</b> &mdash; every heat metric baked in, so you switch metric from a dropdown <i>inside Tradovate</i>. The Tradovate twin of the Pine payload.</div>
+      <div id="tvSummary" style="font:10px ui-monospace,Menlo,monospace;color:var(--cream-dim,#a2a2a2);margin-top:8px"></div>
+      <div id="tvMetrics" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"></div>
+    </div>
+    <button id="tvGen" type="button" style="background:#173a2e;color:#dcf5e9;border:1px solid #2c6a53;border-radius:7px;padding:8px 14px;font-size:12px;cursor:pointer;font-weight:600">Generate indicator</button>
+    <label style="display:block;font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--cream-dim,#a2a2a2);margin-top:12px">Indicator source</label>
+    <textarea id="tvOut" readonly spellcheck="false" placeholder="(open the Chart tab in Bookmap view, then Generate)" style="width:100%;min-height:150px;background:#0a0a0a;border:1px solid #2a2a2a;border-radius:8px;color:#d3d3d3;font:11px/1.5 ui-monospace,Menlo,monospace;padding:10px;white-space:pre;overflow:auto;resize:vertical;margin-top:4px;box-sizing:border-box"></textarea>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button id="tvCopy" type="button" disabled style="background:#1e1e1e;color:#dedede;border:1px solid #383838;border-radius:7px;padding:7px 12px;font-size:12px;cursor:pointer">Copy script</button>
+      <button id="tvDl" type="button" disabled style="background:#1e1e1e;color:#dedede;border:1px solid #383838;border-radius:7px;padding:7px 12px;font-size:12px;cursor:pointer">Download .js</button>
+    </div>
+    <div style="margin-top:12px;font-size:11px;line-height:1.5;color:#9a9a9a">Paste into Tradovate &rarr; Chart &rarr; <b>Code Explorer</b> &rarr; new indicator &rarr; save. It appears under the <b>Qu'an</b> tag; add it as an overlay.</div>
+  </div>
+</aside>
+<script src="js/tradovate-panel.js" defer></script>
 
 
 

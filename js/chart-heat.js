@@ -656,7 +656,8 @@
     var viewBtns=[].slice.call(document.querySelectorAll('.chart-view')),
         sel=document.getElementById('chartHeatMetric'),
         granWrap=document.getElementById('chartGranWrap'), granIn=document.getElementById('chartGran'), granV=document.getElementById('chartGranV'),
-        candBtn=document.getElementById('chartCandlesBtn'), monoBtn=document.getElementById('chartMonoBtn');
+        candBtn=document.getElementById('chartCandlesBtn'), monoBtn=document.getElementById('chartMonoBtn'),
+        tvBtn=document.getElementById('chartTradovateBtn');
     if(!viewBtns.length) return;
 
     function syncControls(){
@@ -667,6 +668,7 @@
       if(granWrap) granWrap.style.display=bm?'inline-flex':'none';
       if(candBtn){ candBtn.style.display=bm?'':'none'; candBtn.classList.toggle('on',candlesOn); }
       if(monoBtn){ monoBtn.style.display=bm?'':'none'; monoBtn.classList.toggle('on',mono); }
+      if(tvBtn) tvBtn.style.display=bm?'':'none';
       if(granIn) granIn.value=String(granIdx);
       if(granV) granV.textContent='×'+(GRANS[granIdx]||1);
     }
@@ -729,6 +731,13 @@
     if(monoBtn) monoBtn.addEventListener('click',function(){
       mono=!mono; monoBtn.classList.toggle('on',mono);
       savePrefs(); updateLegend(); nudge();
+    });
+    // Tradovate export — opens the dedicated Tradovate Bookmap sidebar (twin of
+    // the Payload engine). The panel (js/tradovate-panel.js) builds the paste-
+    // ready custom indicator from these live heat snapshots.
+    if(tvBtn) tvBtn.addEventListener('click',function(){
+      if(typeof window.__quanOpenTradovatePanel==='function'){ window.__quanOpenTradovatePanel(); }
+      else{ var t=document.getElementById('tvTab'); if(t) t.click(); }
     });
     syncControls();
 
