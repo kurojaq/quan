@@ -156,7 +156,13 @@ function buildSegments(payload, ci) {
             else { lo = (rows[i - 1][0] + k) / 2; hi = (rows[i + 1][0] + k) / 2; }
             cells.push({ pLow: lo, pHigh: hi, t: (rows[i][ci] || 0) / max });
         }
-        out.push({ date: seg.date, t0: seg.t0, anchor: seg.anchor, atm: seg.atm, pdsl: seg.pdsl || [], cells: cells });
+        // sorted level ladder (anchor + atm + pdsl) for the color-flip mechanic
+        var levels = [], pd = seg.pdsl || [], pi;
+        if (isFinite(seg.anchor)) levels.push(seg.anchor);
+        if (isFinite(seg.atm)) levels.push(seg.atm);
+        for (pi = 0; pi < pd.length; pi++) if (isFinite(pd[pi][0])) levels.push(pd[pi][0]);
+        levels.sort(function (a, b) { return a - b; });
+        out.push({ date: seg.date, t0: seg.t0, anchor: seg.anchor, atm: seg.atm, pdsl: pd, cells: cells, levels: levels });
     }
     return out;
 }
@@ -284,6 +290,22 @@ class quanBookmap {
         var ci = colIndexOf(PAYLOAD, this.props.metric);
         this.segs = buildSegments(PAYLOAD, ci);
         this.cfg = { palette: this.props.palette, gamma: this.props.gamma, minValue: this.props.minValue, opacity: this.props.opacity, bandPx: this.props.bandPx };
+        this.colorFlip = this.props.colorFlip !== false;
+        this.flipPalette = this.props.flipPalette;
+    }
+
+    // effective palette for a bar: flips to flipPalette each time price crosses a
+    // level (parity of levels below price), so the field recolours as price
+    // traverses the ladder — the color-flip mechanic.
+    _cfgFor(seg, price) {
+        var pal = this.cfg.palette;
+        if (this.colorFlip && seg.levels && seg.levels.length) {
+            var below = 0, li;
+            for (li = 0; li < seg.levels.length; li++) if (seg.levels[li] < price) below++;
+            if (below % 2 === 1) pal = this.flipPalette;
+        }
+        if (pal === this.cfg.palette) return this.cfg;
+        return { palette: pal, gamma: this.cfg.gamma, minValue: this.cfg.minValue, opacity: this.cfg.opacity, bandPx: this.cfg.bandPx };
     }
 
     map(d) {
@@ -292,12 +314,13 @@ class quanBookmap {
         var seg = segmentAt(this.segs, epoch);
         if (!seg) return {};
 
+        var cfg = this._cfgFor(seg, d.value());
         var items = [];
         if (this.mode === 'bands') {
-            var b = bandItems(d.index(), seg, this.cfg);
+            var b = bandItems(d.index(), seg, cfg);
             for (var bx = 0; bx < b.length; bx++) items.push(b[bx]);
         } else {
-            var f = fieldItem(d.index(), seg, this.cfg);
+            var f = fieldItem(d.index(), seg, cfg);
             if (f) items.push(f);
         }
         if (d.isLast()) {
@@ -321,6 +344,11 @@ module.exports = {
         palette: predef.paramSpecs.enum(
             { thermal: "Thermal", spectral: "Spectral", ice: "Ice", mono: "Mono", magma: "Magma" },
             "thermal"
+        ),
+        colorFlip: predef.paramSpecs.bool(true),                   // flip palette as price crosses levels
+        flipPalette: predef.paramSpecs.enum(
+            { thermal: "Thermal", spectral: "Spectral", ice: "Ice", mono: "Mono", magma: "Magma" },
+            "magma"
         ),
         opacity: predef.paramSpecs.percent(0.5, 0.05, 0.05, 1),    // TRUE transparency in bands mode
         bandPx: predef.paramSpecs.number(16, 1, 2),                // band thickness in px (bands mode)

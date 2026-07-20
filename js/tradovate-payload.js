@@ -197,11 +197,23 @@
   // ---- build the full pasteable indicator source (all metrics baked) ----
   //  Returns a Promise<{ source, payload }>. Default metric = whatever the
   //  terminal Bookmap currently shows, so the indicator opens on that view.
-  function buildIndicator(mode) {
+  //  `metricKeys` (optional) limits which metrics are baked — keep this SMALL
+  //  (max 3) so the pasted indicator stays light and Tradovate doesn't lag.
+  function buildIndicator(mode, metricKeys) {
     var snaps = getSnapshots();
     if (!snaps.length) return Promise.reject(new Error('No bookmap data loaded — open the Chart tab and let the heat snapshots populate first.'));
     var inst = (root.document && document.getElementById('instA') && document.getElementById('instA').value) || 'QUAN';
-    var payload = buildPayload(snaps, metricOptions(), selectedMetric().key, inst);
+    var all = metricOptions();
+    var chosen = all;
+    if (metricKeys && metricKeys.length) {
+      chosen = all.filter(function (m) { return metricKeys.indexOf(m.key) > -1; });
+      if (chosen.length > 3) chosen = chosen.slice(0, 3);
+    }
+    if (!chosen.length) chosen = [selectedMetric()];   // fall back to the live metric
+    var liveKey = selectedMetric().key;
+    var hasLive = chosen.some(function (m) { return m.key === liveKey; });
+    var def = hasLive ? liveKey : chosen[0].key;
+    var payload = buildPayload(snaps, chosen, def, inst);
     return fetch(TEMPLATE_URL, { cache: 'no-store' })
       .then(function (res) { if (!res.ok) throw new Error('template fetch ' + res.status); return res.text(); })
       .then(function (tpl) { return { source: injectMode(injectPayload(tpl, payload), mode), payload: payload, mode: (mode === 'cells' ? 'cells' : 'bands') }; });

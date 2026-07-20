@@ -190,6 +190,15 @@
     return Object.keys(DAYGRIDS).sort().map(function(d){ return {date:d, heatmap:DAYGRIDS[d]}; })
       .filter(function(s){ return s.heatmap&&s.heatmap.rows&&s.heatmap.rows.length; });
   };
+  // Ensure heat grids are loaded (for the Tradovate payload panel opening from
+  // another tab). Resolves the callback once data exists (or after a best-effort
+  // fetch). Safe to call repeatedly.
+  window.__quanEnsureHeatData=function(cb){
+    var have=window.__getChartHeatSnapshots().length;
+    if(have){ if(cb) cb(true); return; }
+    try{ requestData(function(ok){ if(cb) cb(!!ok||!!window.__getChartHeatSnapshots().length); }); }
+    catch(_){ if(cb) cb(false); }
+  };
 
   // ---- data acquisition ----
   function ingest(grid,dateStr){
