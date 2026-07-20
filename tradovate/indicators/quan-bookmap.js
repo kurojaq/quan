@@ -91,13 +91,16 @@ const ColorEngine = (function () {
         }
         return stops[stops.length - 1][1];
     }
-    /* thermal ramp mirrors the terminal's STOPS (chart-heat.js) closely */
+    /* thermal ramp mirrors the terminal's STOPS (chart-heat.js). Low ends are
+       lifted off pure black so low-intensity strikes stay visible — the field
+       reads as a continuous wash (like the terminal) instead of a few bright
+       bands on black. */
     var MAPS = {
-        thermal:   [[0, [6, 12, 24]], [0.2, [10, 36, 70]], [0.45, [14, 90, 160]], [0.68, [30, 150, 210]], [0.84, [90, 210, 235]], [0.93, [255, 205, 70]], [1, [255, 120, 30]]],
-        spectral:  [[0, [10, 10, 40]], [0.22, [24, 72, 180]], [0.42, [16, 170, 168]], [0.6, [120, 200, 60]], [0.8, [240, 190, 40]], [1, [220, 40, 32]]],
-        ice:       [[0, [4, 6, 16]], [0.4, [16, 52, 120]], [0.7, [40, 150, 210]], [1, [224, 244, 255]]],
-        mono:      [[0, [16, 17, 20]], [0.6, [110, 113, 122]], [1, [245, 245, 247]]],
-        magma:     [[0, [6, 6, 10]], [0.35, [122, 20, 90]], [0.6, [224, 86, 90]], [0.82, [246, 160, 90]], [1, [252, 253, 191]]]
+        thermal:   [[0, [22, 52, 96]], [0.25, [24, 88, 150]], [0.5, [30, 150, 210]], [0.72, [90, 210, 235]], [0.86, [230, 210, 120]], [1, [255, 120, 30]]],
+        spectral:  [[0, [40, 44, 110]], [0.25, [30, 110, 200]], [0.45, [16, 170, 168]], [0.62, [120, 200, 60]], [0.8, [240, 190, 40]], [1, [220, 40, 32]]],
+        ice:       [[0, [24, 44, 92]], [0.4, [26, 96, 170]], [0.7, [70, 180, 225]], [1, [224, 244, 255]]],
+        mono:      [[0, [60, 62, 70]], [0.6, [150, 153, 162]], [1, [245, 245, 247]]],
+        magma:     [[0, [60, 26, 74]], [0.35, [150, 40, 110]], [0.6, [224, 86, 90]], [0.82, [246, 170, 100]], [1, [252, 253, 191]]]
     };
     function clamp01(t) { return t < 0 ? 0 : (t > 1 ? 1 : t); }
     function shaped(t, g) { t = clamp01(t); return g === 1 ? t : Math.pow(t, g); }
@@ -350,9 +353,9 @@ module.exports = {
             { thermal: "Thermal", spectral: "Spectral", ice: "Ice", mono: "Mono", magma: "Magma" },
             "magma"
         ),
-        opacity: predef.paramSpecs.percent(0.5, 0.05, 0.05, 1),    // TRUE transparency in bands mode
-        bandPx: predef.paramSpecs.number(16, 1, 2),                // band thickness in px (bands mode)
-        gamma: predef.paramSpecs.number(0.85, 0.05, 0.1),
-        minValue: predef.paramSpecs.percent(0.04, 0.01, 0, 1)
+        opacity: predef.paramSpecs.percent(0.72, 0.05, 0.05, 1),   // TRUE transparency in bands mode
+        bandPx: predef.paramSpecs.number(26, 1, 2),                // band thickness in px (bands mode)
+        gamma: predef.paramSpecs.number(0.55, 0.05, 0.1),          // <1 boosts low values → fuller field
+        minValue: predef.paramSpecs.percent(0, 0.01, 0, 1)         // 0 = colour every strike (continuous wash)
     }
 };
