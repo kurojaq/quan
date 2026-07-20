@@ -155,39 +155,32 @@ function segmentAt(segs, epoch) {
 }
 
 /* ==========================================================================
-   MODULE 3 — ScalarFieldRenderer   segment column -> translucent heat cells
-   Cells are Rectangles inside `Shapes` groups (FillStyle supports opacity, so
-   the candles read through the field). Intensity is quantized into N buckets so
-   each bar emits <= N Shapes groups (perf) instead of one object per cell. The
-   whole column is wrapped in a Container with a negative ZIndex to push the
-   field BEHIND the price where the platform honors it. Rectangle position is the
-   CENTER of the cell (unlike Instancing's corner).
+   MODULE 3 — ScalarFieldRenderer   segment column -> Instancing cells
+   Uses the PROVEN Instancing primitive (batched, per-instance color) so it
+   always renders. Instancing carries no alpha, so "opacity" is faked by
+   blending each cell colour toward the dark chart background: at opacity 1 the
+   colour is full; lower values fade it toward the backdrop so candles/price
+   read clearly. One GPU-batched rectangle per price bin; position is the cell's
+   lower-left corner (Instancing convention), size in domain units so cells tile.
    ========================================================================== */
-var FIELD_BUCKETS = 16;
+var FIELD_BG = { r: 0.05, g: 0.055, b: 0.065 };   // ~Tradovate dark pane background
 function fieldItem(index, seg, cfg) {
-    var buckets = {}, i, bi, c;
-    for (i = 0; i < seg.cells.length; i++) {
-        c = seg.cells[i];
+    var inst = [], al = cfg.opacity;   // NOTE: not `op` — that's the coord helper
+    for (var i = 0; i < seg.cells.length; i++) {
+        var c = seg.cells[i];
         if (c.t < cfg.minValue) continue;
-        bi = Math.round(c.t * (FIELD_BUCKETS - 1));
-        if (bi < 0) bi = 0; else if (bi > FIELD_BUCKETS - 1) bi = FIELD_BUCKETS - 1;
-        (buckets[bi] || (buckets[bi] = [])).push({
-            tag: 'Rectangle',
-            position: { x: du(index), y: du((c.pLow + c.pHigh) / 2) },   // Rectangle = centered
-            size: { width: du(1), height: du(c.pHigh - c.pLow) }
+        var col = ColorEngine.rgb01(cfg.palette, c.t, cfg.gamma);
+        inst.push({
+            position: { x: op(du(index), '-', du(0.5)), y: du(c.pLow) },
+            size: { width: du(1), height: du(c.pHigh - c.pLow) },
+            color: {
+                r: FIELD_BG.r + (col.r - FIELD_BG.r) * al,
+                g: FIELD_BG.g + (col.g - FIELD_BG.g) * al,
+                b: FIELD_BG.b + (col.b - FIELD_BG.b) * al
+            }
         });
     }
-    var groups = [], k;
-    for (k in buckets) {
-        if (!buckets.hasOwnProperty(k)) continue;
-        groups.push({
-            tag: 'Shapes', key: 'qf' + k,
-            primitives: buckets[k],
-            fillStyle: { color: ColorEngine.hex(cfg.palette, (+k) / (FIELD_BUCKETS - 1), cfg.gamma), opacity: cfg.opacity }
-        });
-    }
-    if (!groups.length) return null;
-    return { tag: 'Container', key: 'quanField', children: groups, transformOps: [{ tag: 'ZIndex', zIndex: -50 }] };
+    return inst.length ? { tag: 'Instancing', key: 'quanField', instances: inst } : null;
 }
 
 /* ==========================================================================
