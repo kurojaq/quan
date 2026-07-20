@@ -214,7 +214,9 @@
     var hasLive = chosen.some(function (m) { return m.key === liveKey; });
     var def = hasLive ? liveKey : chosen[0].key;
     var payload = buildPayload(snaps, chosen, def, inst);
-    return fetch(TEMPLATE_URL, { cache: 'no-store' })
+    // cache-buster query defeats any edge/proxy cache so the generator always
+    // injects into the freshest renderer template (not a stale one).
+    return fetch(TEMPLATE_URL + '?v=' + Date.now(), { cache: 'no-store' })
       .then(function (res) { if (!res.ok) throw new Error('template fetch ' + res.status); return res.text(); })
       .then(function (tpl) { return { source: injectMode(injectPayload(tpl, payload), mode), payload: payload, mode: (mode === 'cells' ? 'cells' : 'bands') }; });
   }
