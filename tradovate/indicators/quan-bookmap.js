@@ -180,14 +180,7 @@ function fieldItem(index, seg, cfg) {
             }
         });
     }
-    if (!inst.length) return null;
-    var field = { tag: 'Instancing', key: 'quanFieldInst', instances: inst };
-    // Push the field BEHIND the price: a Container with a negative ZIndex sends
-    // it into the viewport (behind candles) where the platform honors it.
-    // `behind=false` falls back to the flat (always-proven) Instancing so a
-    // build that rejects the Container can recover instantly from the params.
-    if (!cfg.behind) return field;
-    return { tag: 'Container', key: 'quanField', children: [field], transformOps: [{ tag: 'ZIndex', zIndex: -1000 }] };
+    return inst.length ? { tag: 'Instancing', key: 'quanField', instances: inst } : null;
 }
 
 /* ==========================================================================
@@ -238,7 +231,7 @@ class quanBookmap {
         this.pdec = (PAYLOAD.pdec != null) ? PAYLOAD.pdec : 2;
         var ci = colIndexOf(PAYLOAD, this.props.metric);
         this.segs = buildSegments(PAYLOAD, ci);
-        this.cfg = { palette: this.props.palette, gamma: this.props.gamma, minValue: this.props.minValue, opacity: this.props.opacity, behind: this.props.behind !== false };
+        this.cfg = { palette: this.props.palette, gamma: this.props.gamma, minValue: this.props.minValue, opacity: this.props.opacity };
     }
 
     map(d) {
@@ -272,7 +265,6 @@ module.exports = {
             "thermal"
         ),
         opacity: predef.paramSpecs.percent(0.55, 0.05, 0.05, 1),   // field intensity (candles read through)
-        behind: predef.paramSpecs.bool(true),      // render the field behind price (uncheck if it hides)
         gamma: predef.paramSpecs.number(0.85, 0.05, 0.1),
         minValue: predef.paramSpecs.percent(0.04, 0.01, 0, 1)
     }
