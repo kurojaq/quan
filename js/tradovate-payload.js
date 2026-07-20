@@ -182,17 +182,29 @@
     return head.concat(mid, tail).join('\n');
   }
 
+  // ---- swap the baked RENDER_MODE constant between the two sentinels ----
+  function injectMode(template, mode) {
+    mode = (mode === 'heatmap') ? 'heatmap' : 'cells';
+    var lines = template.split('\n'), bi = -1, ei = -1;
+    for (var i = 0; i < lines.length; i++) {
+      if (bi < 0 && lines[i].indexOf('QUAN_MODE_BEGIN') > -1) bi = i;
+      else if (lines[i].indexOf('QUAN_MODE_END') > -1) { ei = i; break; }
+    }
+    if (bi < 0 || ei < 0 || ei <= bi) return template;   // older template: leave as-is
+    return lines.slice(0, bi + 1).concat(['var RENDER_MODE = "' + mode + '";'], lines.slice(ei)).join('\n');
+  }
+
   // ---- build the full pasteable indicator source (all metrics baked) ----
   //  Returns a Promise<{ source, payload }>. Default metric = whatever the
   //  terminal Bookmap currently shows, so the indicator opens on that view.
-  function buildIndicator() {
+  function buildIndicator(mode) {
     var snaps = getSnapshots();
     if (!snaps.length) return Promise.reject(new Error('No bookmap data loaded — open the Chart tab and let the heat snapshots populate first.'));
     var inst = (root.document && document.getElementById('instA') && document.getElementById('instA').value) || 'QUAN';
     var payload = buildPayload(snaps, metricOptions(), selectedMetric().key, inst);
     return fetch(TEMPLATE_URL, { cache: 'no-store' })
       .then(function (res) { if (!res.ok) throw new Error('template fetch ' + res.status); return res.text(); })
-      .then(function (tpl) { return { source: injectPayload(tpl, payload), payload: payload }; });
+      .then(function (tpl) { return { source: injectMode(injectPayload(tpl, payload), mode), payload: payload, mode: (mode === 'heatmap' ? 'heatmap' : 'cells') }; });
   }
 
   // ---- convenience: build + copy to clipboard, resolve with the source ----
@@ -205,7 +217,7 @@
 
   root.QuanTradovatePayload = {
     metricGetter: metricGetter, metricOptions: metricOptions, sessionStart: sessionStart, inferPdec: inferPdec,
-    buildPayload: buildPayload, injectPayload: injectPayload, buildIndicator: buildIndicator,
+    buildPayload: buildPayload, injectPayload: injectPayload, injectMode: injectMode, buildIndicator: buildIndicator,
     getSnapshots: getSnapshots, selectedMetric: selectedMetric, exportIndicator: exportIndicator
   };
   root.__quanExportTradovate = exportIndicator;

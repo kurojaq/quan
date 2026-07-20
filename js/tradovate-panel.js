@@ -9,11 +9,11 @@
       x = document.getElementById('tvClose'), chev = document.getElementById('tvChev'),
       sync = document.getElementById('tvSync'), statusEl = document.getElementById('tvStatus'),
       errEl = document.getElementById('tvErr'), outEl = document.getElementById('tvOut'),
-      genB = document.getElementById('tvGen'), copyB = document.getElementById('tvCopy'),
+      genB = document.getElementById('tvGen'), modeSel = document.getElementById('tvMode'), copyB = document.getElementById('tvCopy'),
       dlB = document.getElementById('tvDl'), summaryEl = document.getElementById('tvSummary'),
       metricsEl = document.getElementById('tvMetrics');
   if (!tab || !panel) return;
-  var open = false, lastSrc = '', lastInst = 'quan';
+  var open = false, lastSrc = '', lastInst = 'quan', lastMode = 'cells';
 
   function setStatus(t) { if (statusEl) statusEl.textContent = t || ''; }
   function setErr(t) { if (errEl) errEl.textContent = t || ''; }
@@ -57,15 +57,17 @@
   function generate() {
     var api = window.QuanTradovatePayload;
     if (!api) { setErr('payload engine (js/tradovate-payload.js) not loaded'); return; }
+    var mode = (modeSel && modeSel.value === 'heatmap') ? 'heatmap' : 'cells';
     setErr(''); setStatus('building…'); genB.disabled = true;
-    api.buildIndicator().then(function (r) {
+    api.buildIndicator(mode).then(function (r) {
       lastSrc = r.source; lastInst = (r.payload && r.payload.inst) || 'quan';
       outEl.value = r.source;
       copyB.disabled = false; dlB.disabled = false;
       try { if (navigator.clipboard) navigator.clipboard.writeText(r.source); } catch (_) {}
+      lastMode = r.mode || 'cells';
       var p = r.payload, strikes = (p.segments[0] && p.segments[0].rows.length) || 0;
       renderMetricChips((p.metrics || []).map(function (m) { return m[1]; }));
-      if (summaryEl) summaryEl.textContent = p.inst + ' · ' + p.segments.length + ' session' + (p.segments.length > 1 ? 's' : '') + ' · ' + (p.metrics || []).length + ' metrics · ~' + strikes + ' strikes';
+      if (summaryEl) summaryEl.textContent = p.inst + ' · ' + (lastMode === 'heatmap' ? 'heat field (behind)' : 'cells (overlay)') + ' · ' + p.segments.length + ' session' + (p.segments.length > 1 ? 's' : '') + ' · ' + (p.metrics || []).length + ' metrics · ~' + strikes + ' strikes';
       setStatus('done — copied to clipboard'); setSync('#v' + p.v);
     }).catch(function (e) {
       setErr(String(e && e.message || e)); setStatus('error');
@@ -75,7 +77,7 @@
   function download() {
     if (!lastSrc) return;
     var u = URL.createObjectURL(new Blob([lastSrc], { type: 'text/javascript' }));
-    var a = document.createElement('a'); a.href = u; a.download = 'quan-bookmap.' + String(lastInst).toLowerCase() + '.tradovate.js';
+    var a = document.createElement('a'); a.href = u; a.download = 'quan-bookmap-' + lastMode + '.' + String(lastInst).toLowerCase() + '.tradovate.js';
     a.click(); setTimeout(function () { URL.revokeObjectURL(u); }, 2000);
   }
 

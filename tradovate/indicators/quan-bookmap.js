@@ -23,6 +23,16 @@
    ============================================================================ */
 const predef = require("./tools/predef");
 const { px, du, op } = require("./tools/graphics");
+const p = require("./tools/plotting");   // createHeatmap/offset/x — heatmap render mode
+
+/* RENDER_MODE is baked by the terminal generator (Bookmap sidebar → Render mode):
+     "cells"   — graphics-API Instancing field (proven everywhere; draws over price)
+     "heatmap" — native canvas.drawHeatmap field (true alpha; can sit behind price)
+   Kept as a generation-time constant (not a live param) so the "cells" output
+   registers NO custom plotter and stays byte-for-byte the proven renderer. */
+//QUAN_MODE_BEGIN
+var RENDER_MODE = "cells";
+//QUAN_MODE_END
 
 /* The terminal generator replaces everything between the two sentinel lines
    below with `const PAYLOAD = {...}`. Shape (v2, all-metrics):
@@ -101,6 +111,11 @@ const ColorEngine = (function () {
         hex: function (name, t, gamma) {
             var c = ramp(MAPS[name] || MAPS.thermal, shaped(t, gamma || 1));
             return '#' + hex2(c[0]) + hex2(c[1]) + hex2(c[2]);
+        },
+        // 8-digit hex with alpha, for canvas.drawHeatmap true transparency
+        hex8: function (name, t, gamma, alpha) {
+            var c = ramp(MAPS[name] || MAPS.thermal, shaped(t, gamma || 1));
+            return '#' + hex2(c[0]) + hex2(c[1]) + hex2(c[2]) + hex2(Math.round(255 * clamp01(alpha)));
         }
     };
 })();
@@ -184,6 +199,44 @@ function fieldItem(index, seg, cfg) {
 }
 
 /* ==========================================================================
+   MODULE 3b — HeatmapRenderer   segment cells -> native canvas.drawHeatmap
+   The Spectrogram-proven path: one color column per bar over a fixed price
+   window [LO,HI] split into HEAT_BINS equal bands. Colors carry true alpha
+   (8-digit hex); empty bands are fully transparent. Being a canvas plotter it
+   can layer behind the candles. resampleColors() pre-bakes each segment's
+   column in init so map() just hands the column to the plotter.
+   ========================================================================== */
+var HEAT_BINS = 96;
+function resampleColors(cells, LO, HI, N, cfg) {
+    var binH = (HI - LO) / N, colors = new Array(N), j, k;
+    for (j = 0; j < N; j++) {
+        var pc = LO + (j + 0.5) * binH, t = 0, found = false;
+        for (k = 0; k < cells.length; k++) {
+            if (pc >= cells[k].pLow && pc < cells[k].pHigh) { t = cells[k].t; found = true; break; }
+        }
+        colors[j] = (!found || t < cfg.minValue)
+            ? '#00000000'
+            : ColorEngine.hex8(cfg.palette, t, cfg.gamma, cfg.opacity * (0.35 + 0.65 * t));
+    }
+    return colors;
+}
+function heatmapPlotter(canvas, inst, history) {
+    var len = history.data.length;
+    if (!len || !inst.segs.length) return;
+    var hm = p.createHeatmap(inst.LO, inst.HI), i, it;
+    for (i = 0; i < len; i++) { it = history.get(i); if (it && it.c) hm.addColumn(p.x.get(it), it.c); }
+    canvas.drawHeatmap(hm.end());
+    // structural levels (most recent segment) as horizontal lines — canvas has no text
+    var seg = inst.segs[inst.segs.length - 1];
+    if (!seg) return;
+    var x0 = p.x.get(history.get(0)), x1 = p.x.get(history.get(len - 1));
+    function hl(price, color) { if (isFinite(price)) canvas.drawLine(p.offset(x0, price), p.offset(x1, price), { color: color, width: 1, opacity: 0.85 }); }
+    if (isFinite(seg.anchor)) hl(seg.anchor, '#ffd24a');
+    if (isFinite(seg.atm) && seg.atm !== seg.anchor) hl(seg.atm, '#c0c8d4');
+    for (var j = 0; j < seg.pdsl.length; j++) hl(seg.pdsl[j][0], (seg.pdsl[j][1] === 'S' || seg.pdsl[j][1] === 'support') ? '#1aa179' : '#d65a1e');
+}
+
+/* ==========================================================================
    MODULE 4 — LevelRenderer   PDSL / anchor / ATM -> LineSegments + Text
    ========================================================================== */
 function levelItems(index, seg, pdec) {
@@ -229,9 +282,20 @@ var DEFAULT_METRIC = PAYLOAD.defaultMetric || (METRICS[0] && METRICS[0][0]) || "
 class quanBookmap {
     init() {
         this.pdec = (PAYLOAD.pdec != null) ? PAYLOAD.pdec : 2;
+        this.mode = RENDER_MODE;
         var ci = colIndexOf(PAYLOAD, this.props.metric);
         this.segs = buildSegments(PAYLOAD, ci);
         this.cfg = { palette: this.props.palette, gamma: this.props.gamma, minValue: this.props.minValue, opacity: this.props.opacity };
+        // global price window for the heatmap render mode, + pre-baked columns
+        this.LO = Infinity; this.HI = -Infinity;
+        for (var s = 0; s < this.segs.length; s++) {
+            var cs = this.segs[s].cells;
+            for (var k = 0; k < cs.length; k++) { if (cs[k].pLow < this.LO) this.LO = cs[k].pLow; if (cs[k].pHigh > this.HI) this.HI = cs[k].pHigh; }
+        }
+        if (!(this.HI > this.LO)) { this.LO = 0; this.HI = 1; }
+        if (this.mode === 'heatmap') {
+            for (var s2 = 0; s2 < this.segs.length; s2++) this.segs[s2].colors = resampleColors(this.segs[s2].cells, this.LO, this.HI, HEAT_BINS, this.cfg);
+        }
     }
 
     map(d) {
@@ -240,6 +304,10 @@ class quanBookmap {
         var seg = segmentAt(this.segs, epoch);
         if (!seg) return {};
 
+        // heatmap mode: hand the pre-baked color column to the custom plotter
+        if (this.mode === 'heatmap') return { c: seg.colors, lo: this.LO, hi: this.HI };
+
+        // cells mode: graphics-API Instancing field + levels (proven path)
         var items = [];
         var f = fieldItem(d.index(), seg, this.cfg);
         if (f) items.push(f);
@@ -258,6 +326,9 @@ module.exports = {
     tags: ["Qu'an"],
     inputType: "any",     // works on any chart: time bars, tick, renko, range, volume…
     areaChoice: "overlay",
+    // heatmap mode draws via a custom plotter (native, can sit behind price);
+    // cells mode registers NO plotter and renders from map()'s graphics.
+    plotter: (RENDER_MODE === "heatmap") ? [predef.plotters.custom(heatmapPlotter)] : undefined,
     params: {
         metric: predef.paramSpecs.enum(METRIC_SET, DEFAULT_METRIC),   // <- the Bookmap metric dropdown
         palette: predef.paramSpecs.enum(
