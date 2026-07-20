@@ -155,20 +155,39 @@ function segmentAt(segs, epoch) {
 }
 
 /* ==========================================================================
-   MODULE 3 — ScalarFieldRenderer   segment column -> Instancing cells
+   MODULE 3 — ScalarFieldRenderer   segment column -> translucent heat cells
+   Cells are Rectangles inside `Shapes` groups (FillStyle supports opacity, so
+   the candles read through the field). Intensity is quantized into N buckets so
+   each bar emits <= N Shapes groups (perf) instead of one object per cell. The
+   whole column is wrapped in a Container with a negative ZIndex to push the
+   field BEHIND the price where the platform honors it. Rectangle position is the
+   CENTER of the cell (unlike Instancing's corner).
    ========================================================================== */
+var FIELD_BUCKETS = 16;
 function fieldItem(index, seg, cfg) {
-    var inst = [];
-    for (var i = 0; i < seg.cells.length; i++) {
-        var c = seg.cells[i];
+    var buckets = {}, i, bi, c;
+    for (i = 0; i < seg.cells.length; i++) {
+        c = seg.cells[i];
         if (c.t < cfg.minValue) continue;
-        inst.push({
-            position: { x: op(du(index), '-', du(0.5)), y: du(c.pLow) },
-            size: { width: du(1), height: du(c.pHigh - c.pLow) },
-            color: ColorEngine.rgb01(cfg.palette, c.t, cfg.gamma)
+        bi = Math.round(c.t * (FIELD_BUCKETS - 1));
+        if (bi < 0) bi = 0; else if (bi > FIELD_BUCKETS - 1) bi = FIELD_BUCKETS - 1;
+        (buckets[bi] || (buckets[bi] = [])).push({
+            tag: 'Rectangle',
+            position: { x: du(index), y: du((c.pLow + c.pHigh) / 2) },   // Rectangle = centered
+            size: { width: du(1), height: du(c.pHigh - c.pLow) }
         });
     }
-    return inst.length ? { tag: 'Instancing', key: 'quanField', instances: inst } : null;
+    var groups = [], k;
+    for (k in buckets) {
+        if (!buckets.hasOwnProperty(k)) continue;
+        groups.push({
+            tag: 'Shapes', key: 'qf' + k,
+            primitives: buckets[k],
+            fillStyle: { color: ColorEngine.hex(cfg.palette, (+k) / (FIELD_BUCKETS - 1), cfg.gamma), opacity: cfg.opacity }
+        });
+    }
+    if (!groups.length) return null;
+    return { tag: 'Container', key: 'quanField', children: groups, transformOps: [{ tag: 'ZIndex', zIndex: -50 }] };
 }
 
 /* ==========================================================================
@@ -219,7 +238,7 @@ class quanBookmap {
         this.pdec = (PAYLOAD.pdec != null) ? PAYLOAD.pdec : 2;
         var ci = colIndexOf(PAYLOAD, this.props.metric);
         this.segs = buildSegments(PAYLOAD, ci);
-        this.cfg = { palette: this.props.palette, gamma: this.props.gamma, minValue: this.props.minValue };
+        this.cfg = { palette: this.props.palette, gamma: this.props.gamma, minValue: this.props.minValue, opacity: this.props.opacity };
     }
 
     map(d) {
@@ -244,7 +263,7 @@ module.exports = {
     description: "Qu'an Bookmap — terminal payload (" + (PAYLOAD.inst || "") + ")",
     calculator: quanBookmap,
     tags: ["Qu'an"],
-    inputType: "bars",
+    inputType: "any",     // works on any chart: time bars, tick, renko, range, volume…
     areaChoice: "overlay",
     params: {
         metric: predef.paramSpecs.enum(METRIC_SET, DEFAULT_METRIC),   // <- the Bookmap metric dropdown
@@ -252,6 +271,7 @@ module.exports = {
             { thermal: "Thermal", spectral: "Spectral", ice: "Ice", mono: "Mono", magma: "Magma" },
             "thermal"
         ),
+        opacity: predef.paramSpecs.percent(0.5, 0.05, 0.05, 1),   // field transparency (candles read through)
         gamma: predef.paramSpecs.number(0.85, 0.05, 0.1),
         minValue: predef.paramSpecs.percent(0.04, 0.01, 0, 1)
     }
