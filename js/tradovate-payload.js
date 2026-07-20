@@ -184,7 +184,7 @@
 
   // ---- swap the baked RENDER_MODE constant between the two sentinels ----
   function injectMode(template, mode) {
-    mode = (mode === 'heatmap') ? 'heatmap' : 'cells';
+    mode = (mode === 'cells') ? 'cells' : 'bands';
     var lines = template.split('\n'), bi = -1, ei = -1;
     for (var i = 0; i < lines.length; i++) {
       if (bi < 0 && lines[i].indexOf('QUAN_MODE_BEGIN') > -1) bi = i;
@@ -204,7 +204,7 @@
     var payload = buildPayload(snaps, metricOptions(), selectedMetric().key, inst);
     return fetch(TEMPLATE_URL, { cache: 'no-store' })
       .then(function (res) { if (!res.ok) throw new Error('template fetch ' + res.status); return res.text(); })
-      .then(function (tpl) { return { source: injectMode(injectPayload(tpl, payload), mode), payload: payload, mode: (mode === 'heatmap' ? 'heatmap' : 'cells') }; });
+      .then(function (tpl) { return { source: injectMode(injectPayload(tpl, payload), mode), payload: payload, mode: (mode === 'cells' ? 'cells' : 'bands') }; });
   }
 
   // ---- convenience: build + copy to clipboard, resolve with the source ----

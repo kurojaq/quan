@@ -23,15 +23,15 @@
    ============================================================================ */
 const predef = require("./tools/predef");
 const { px, du, op } = require("./tools/graphics");
-const p = require("./tools/plotting");   // createHeatmap/offset/x — heatmap render mode
-
-/* RENDER_MODE is baked by the terminal generator (Bookmap sidebar → Render mode):
-     "cells"   — graphics-API Instancing field (proven everywhere; draws over price)
-     "heatmap" — native canvas.drawHeatmap field (true alpha; can sit behind price)
-   Kept as a generation-time constant (not a live param) so the "cells" output
-   registers NO custom plotter and stays byte-for-byte the proven renderer. */
+/* RENDER_MODE is baked by the terminal generator (Bookmap sidebar → Render).
+   Both modes use the PROVEN graphics-return path (no custom plotter — the canvas
+   drawHeatmap path blanks and even hides the price on this build):
+     "bands" — translucent LineSegments bands. LineSegments is the one working
+               primitive with a real alpha channel (lineStyle.opacity), so
+               candles read THROUGH the field and the opacity control works.
+     "cells" — opaque Instancing filled cells (du-scaled). Solid; draws over price. */
 //QUAN_MODE_BEGIN
-var RENDER_MODE = "cells";
+var RENDER_MODE = "bands";
 //QUAN_MODE_END
 
 /* The terminal generator replaces everything between the two sentinel lines
@@ -199,41 +199,39 @@ function fieldItem(index, seg, cfg) {
 }
 
 /* ==========================================================================
-   MODULE 3b — HeatmapRenderer   segment cells -> native canvas.drawHeatmap
-   The Spectrogram-proven path: one color column per bar over a fixed price
-   window [LO,HI] split into HEAT_BINS equal bands. Colors carry true alpha
-   (8-digit hex); empty bands are fully transparent. Being a canvas plotter it
-   can layer behind the candles. resampleColors() pre-bakes each segment's
-   column in init so map() just hands the column to the plotter.
+   MODULE 3b — BandRenderer   segment cells -> translucent LineSegments bands
+   Each price bin becomes a horizontal Line (bandPx thick) spanning the bar, so
+   adjacent bars tile into continuous horizontal bands across the whole session.
+   LineSegments' lineStyle.opacity gives TRUE transparency — the one graphics
+   primitive with a working alpha channel on this build — so candles read
+   through and the opacity control has real effect. One LineSegments group per
+   colour bucket keeps the object count low.
    ========================================================================== */
-var HEAT_BINS = 96;
-function resampleColors(cells, LO, HI, N, cfg) {
-    var binH = (HI - LO) / N, colors = new Array(N), j, k;
-    for (j = 0; j < N; j++) {
-        var pc = LO + (j + 0.5) * binH, t = 0, found = false;
-        for (k = 0; k < cells.length; k++) {
-            if (pc >= cells[k].pLow && pc < cells[k].pHigh) { t = cells[k].t; found = true; break; }
-        }
-        colors[j] = (!found || t < cfg.minValue)
-            ? '#00000000'
-            : ColorEngine.hex8(cfg.palette, t, cfg.gamma, cfg.opacity * (0.35 + 0.65 * t));
+var BAND_BUCKETS = 14;
+function bandItems(index, seg, cfg) {
+    var buckets = {}, i, bi, c;
+    for (i = 0; i < seg.cells.length; i++) {
+        c = seg.cells[i];
+        if (c.t < cfg.minValue) continue;
+        bi = Math.round(c.t * (BAND_BUCKETS - 1));
+        if (bi < 0) bi = 0; else if (bi > BAND_BUCKETS - 1) bi = BAND_BUCKETS - 1;
+        var mid = (c.pLow + c.pHigh) / 2;
+        (buckets[bi] || (buckets[bi] = [])).push({
+            tag: 'Line',
+            a: { x: op(du(index), '-', du(0.5)), y: du(mid) },
+            b: { x: op(du(index), '+', du(0.5)), y: du(mid) }
+        });
     }
-    return colors;
-}
-function heatmapPlotter(canvas, inst, history) {
-    var len = history.data.length;
-    if (!len || !inst.segs.length) return;
-    var hm = p.createHeatmap(inst.LO, inst.HI), i, it;
-    for (i = 0; i < len; i++) { it = history.get(i); if (it && it.c) hm.addColumn(p.x.get(it), it.c); }
-    canvas.drawHeatmap(hm.end());
-    // structural levels (most recent segment) as horizontal lines — canvas has no text
-    var seg = inst.segs[inst.segs.length - 1];
-    if (!seg) return;
-    var x0 = p.x.get(history.get(0)), x1 = p.x.get(history.get(len - 1));
-    function hl(price, color) { if (isFinite(price)) canvas.drawLine(p.offset(x0, price), p.offset(x1, price), { color: color, width: 1, opacity: 0.85 }); }
-    if (isFinite(seg.anchor)) hl(seg.anchor, '#ffd24a');
-    if (isFinite(seg.atm) && seg.atm !== seg.anchor) hl(seg.atm, '#c0c8d4');
-    for (var j = 0; j < seg.pdsl.length; j++) hl(seg.pdsl[j][0], (seg.pdsl[j][1] === 'S' || seg.pdsl[j][1] === 'support') ? '#1aa179' : '#d65a1e');
+    var out = [], k;
+    for (k in buckets) {
+        if (!buckets.hasOwnProperty(k)) continue;
+        out.push({
+            tag: 'LineSegments', key: 'qb' + k,
+            lines: buckets[k],
+            lineStyle: { lineWidth: cfg.bandPx, color: ColorEngine.hex(cfg.palette, (+k) / (BAND_BUCKETS - 1), cfg.gamma), opacity: cfg.opacity }
+        });
+    }
+    return out;
 }
 
 /* ==========================================================================
@@ -285,17 +283,7 @@ class quanBookmap {
         this.mode = RENDER_MODE;
         var ci = colIndexOf(PAYLOAD, this.props.metric);
         this.segs = buildSegments(PAYLOAD, ci);
-        this.cfg = { palette: this.props.palette, gamma: this.props.gamma, minValue: this.props.minValue, opacity: this.props.opacity };
-        // global price window for the heatmap render mode, + pre-baked columns
-        this.LO = Infinity; this.HI = -Infinity;
-        for (var s = 0; s < this.segs.length; s++) {
-            var cs = this.segs[s].cells;
-            for (var k = 0; k < cs.length; k++) { if (cs[k].pLow < this.LO) this.LO = cs[k].pLow; if (cs[k].pHigh > this.HI) this.HI = cs[k].pHigh; }
-        }
-        if (!(this.HI > this.LO)) { this.LO = 0; this.HI = 1; }
-        if (this.mode === 'heatmap') {
-            for (var s2 = 0; s2 < this.segs.length; s2++) this.segs[s2].colors = resampleColors(this.segs[s2].cells, this.LO, this.HI, HEAT_BINS, this.cfg);
-        }
+        this.cfg = { palette: this.props.palette, gamma: this.props.gamma, minValue: this.props.minValue, opacity: this.props.opacity, bandPx: this.props.bandPx };
     }
 
     map(d) {
@@ -304,13 +292,14 @@ class quanBookmap {
         var seg = segmentAt(this.segs, epoch);
         if (!seg) return {};
 
-        // heatmap mode: hand the pre-baked color column to the custom plotter
-        if (this.mode === 'heatmap') return { c: seg.colors, lo: this.LO, hi: this.HI };
-
-        // cells mode: graphics-API Instancing field + levels (proven path)
         var items = [];
-        var f = fieldItem(d.index(), seg, this.cfg);
-        if (f) items.push(f);
+        if (this.mode === 'bands') {
+            var b = bandItems(d.index(), seg, this.cfg);
+            for (var bx = 0; bx < b.length; bx++) items.push(b[bx]);
+        } else {
+            var f = fieldItem(d.index(), seg, this.cfg);
+            if (f) items.push(f);
+        }
         if (d.isLast()) {
             var lv = levelItems(d.index(), seg, this.pdec);
             for (var i = 0; i < lv.length; i++) items.push(lv[i]);
@@ -326,16 +315,15 @@ module.exports = {
     tags: ["Qu'an"],
     inputType: "any",     // works on any chart: time bars, tick, renko, range, volume…
     areaChoice: "overlay",
-    // heatmap mode draws via a custom plotter (native, can sit behind price);
-    // cells mode registers NO plotter and renders from map()'s graphics.
-    plotter: (RENDER_MODE === "heatmap") ? [predef.plotters.custom(heatmapPlotter)] : undefined,
+    // No custom plotter — both modes render from map()'s graphics (proven path).
     params: {
         metric: predef.paramSpecs.enum(METRIC_SET, DEFAULT_METRIC),   // <- the Bookmap metric dropdown
         palette: predef.paramSpecs.enum(
             { thermal: "Thermal", spectral: "Spectral", ice: "Ice", mono: "Mono", magma: "Magma" },
             "thermal"
         ),
-        opacity: predef.paramSpecs.percent(0.55, 0.05, 0.05, 1),   // field intensity (candles read through)
+        opacity: predef.paramSpecs.percent(0.5, 0.05, 0.05, 1),    // TRUE transparency in bands mode
+        bandPx: predef.paramSpecs.number(16, 1, 2),                // band thickness in px (bands mode)
         gamma: predef.paramSpecs.number(0.85, 0.05, 0.1),
         minValue: predef.paramSpecs.percent(0.04, 0.01, 0, 1)
     }

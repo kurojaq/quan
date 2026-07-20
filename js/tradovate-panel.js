@@ -57,7 +57,7 @@
   function generate() {
     var api = window.QuanTradovatePayload;
     if (!api) { setErr('payload engine (js/tradovate-payload.js) not loaded'); return; }
-    var mode = (modeSel && modeSel.value === 'heatmap') ? 'heatmap' : 'cells';
+    var mode = (modeSel && modeSel.value === 'cells') ? 'cells' : 'bands';
     setErr(''); setStatus('building…'); genB.disabled = true;
     api.buildIndicator(mode).then(function (r) {
       lastSrc = r.source; lastInst = (r.payload && r.payload.inst) || 'quan';
@@ -67,7 +67,7 @@
       lastMode = r.mode || 'cells';
       var p = r.payload, strikes = (p.segments[0] && p.segments[0].rows.length) || 0;
       renderMetricChips((p.metrics || []).map(function (m) { return m[1]; }));
-      if (summaryEl) summaryEl.textContent = p.inst + ' · ' + (lastMode === 'heatmap' ? 'heat field (behind)' : 'cells (overlay)') + ' · ' + p.segments.length + ' session' + (p.segments.length > 1 ? 's' : '') + ' · ' + (p.metrics || []).length + ' metrics · ~' + strikes + ' strikes';
+      if (summaryEl) summaryEl.textContent = p.inst + ' · ' + (lastMode === 'bands' ? 'bands (translucent)' : 'cells (solid)') + ' · ' + p.segments.length + ' session' + (p.segments.length > 1 ? 's' : '') + ' · ' + (p.metrics || []).length + ' metrics · ~' + strikes + ' strikes';
       setStatus('done — copied to clipboard'); setSync('#v' + p.v);
     }).catch(function (e) {
       setErr(String(e && e.message || e)); setStatus('error');
