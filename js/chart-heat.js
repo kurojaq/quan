@@ -181,6 +181,15 @@
     for(var i=0;i<segs.length;i++){ if(segs[i].t<=t) g=segs[i].grid; else break; }
     return g;
   }
+  // Expose the current per-date heat grids for external consumers (the Tradovate
+  // payload generator). Same shape the client terminal's __getHeatSnapshots
+  // returns — [{date, heatmap:{meta,rows}}] — but sourced from THIS terminal's
+  // live DAYGRIDS, so it works on the main terminal too (which has no published
+  // __getHeatSnapshots). All dates the Bookmap has ingested are included.
+  window.__getChartHeatSnapshots=function(){
+    return Object.keys(DAYGRIDS).sort().map(function(d){ return {date:d, heatmap:DAYGRIDS[d]}; })
+      .filter(function(s){ return s.heatmap&&s.heatmap.rows&&s.heatmap.rows.length; });
+  };
 
   // ---- data acquisition ----
   function ingest(grid,dateStr){

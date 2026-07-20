@@ -83,7 +83,16 @@
   }
 
   // ---- snapshot acquisition: [{date, heatmap:{meta, rows}}] ----
+  //  Prefer THIS terminal's live grids (__getChartHeatSnapshots, sourced from
+  //  chart-heat's DAYGRIDS); fall back to the client terminal's published
+  //  __getHeatSnapshots / single-date __getHeatSnapshot.
   function getSnapshots() {
+    try {
+      if (typeof root.__getChartHeatSnapshots === 'function') {
+        var live = root.__getChartHeatSnapshots() || [];
+        if (live.length) return live.filter(function (s) { return s && s.date && s.heatmap && s.heatmap.rows && s.heatmap.rows.length; });
+      }
+    } catch (_) {}
     try {
       if (typeof root.__getHeatSnapshots === 'function') {
         var arr = root.__getHeatSnapshots() || [];
