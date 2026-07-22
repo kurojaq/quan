@@ -32,22 +32,64 @@ export async function onRequestGet({ request, env }) {
   if (hit) return hit;
 
   try {
-    const result = await fetchYahooChart(symbol);
-    const meta = result.meta || {};
-    if (meta.regularMarketPrice == null) return dataJson(502, { error: `no price for ${symbol}` });
-    const payload = {
-      symbol,
-      price: meta.regularMarketPrice,
-      previousClose: meta.previousClose ?? null,
-      currency: meta.currency ?? null,
-      exchangeName: meta.exchangeName ?? null,
-      marketTime: meta.regularMarketTime ?? null,
-      time: Math.floor(Date.now() / 1000)
-    };
+    // Try Tick Engine first (Tradovate real-time data)
+    let payload;
+    try {
+      payload = await fetchFromTickEngine(env, symbol);
+    } catch (e) {
+      console.warn(`[/api/quote] Tick Engine unavailable for ${symbol}:`, e.message);
+      // Fallback to Yahoo (for non-Tradovate symbols or during transition)
+      const result = await fetchYahooChart(symbol);
+      const meta = result.meta || {};
+      if (meta.regularMarketPrice == null) return dataJson(502, { error: `no price for ${symbol}` });
+      payload = {
+        symbol,
+        price: meta.regularMarketPrice,
+        previousClose: meta.previousClose ?? null,
+        currency: meta.currency ?? null,
+        exchangeName: meta.exchangeName ?? null,
+        marketTime: meta.regularMarketTime ?? null,
+        time: Math.floor(Date.now() / 1000),
+        source: 'yahoo'
+      };
+    }
+
     const resp = dataJson(200, payload, { 'Cache-Control': `public, max-age=${ttl}` });
     await cache.put(cacheKey, resp.clone());
     return resp;
   } catch (e) {
     return dataJson(502, { error: String((e && e.message) || e) });
   }
+}
+
+/**
+ * Fetch quote from Tick Engine (Tradovate market data)
+ * Returns {symbol, price, bid, ask, bidSize, askSize, timestamp, source}
+ */
+async function fetchFromTickEngine(env, symbol) {
+  if (!env.TICK_ENGINE) {
+    throw new Error('Tick Engine not available');
+  }
+
+  const tickEngineId = env.TICK_ENGINE.idFromName(`${symbol}:live`);
+  const tickEngine = env.TICK_ENGINE.get(tickEngineId);
+
+  const response = await tickEngine.fetch(new Request('https://tick-engine/latest'));
+  const tick = await response.json();
+
+  if (!tick || !tick.price) {
+    throw new Error(`No tick data for ${symbol}`);
+  }
+
+  return {
+    symbol,
+    price: tick.price,
+    bid: tick.bid ?? null,
+    ask: tick.ask ?? null,
+    bidSize: tick.bidSize ?? null,
+    askSize: tick.askSize ?? null,
+    size: tick.size ?? 1,
+    timestamp: tick.timestamp,
+    source: 'tradovate-tick-engine'
+  };
 }

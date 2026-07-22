@@ -1,0 +1,55 @@
+# Wrangler Configuration for Tick Engine
+# Deploy with: wrangler deploy --config workers/wrangler-tick-engine.toml
+
+name = "tick-engine"
+type = "service"
+main = "workers/tick-engine.js"
+
+# Durable Objects binding
+[[durable_objects.bindings]]
+name = "TICK_ENGINE"
+class_name = "TickEngine"
+script_name = "tick-engine"
+
+# Environment-specific configuration
+
+[env.development]
+name = "tick-engine-dev"
+routes = [
+  { pattern = "tick-engine.dev.example.com/*", zone_name = "dev.example.com" }
+]
+
+[env.staging]
+name = "tick-engine-staging"
+routes = [
+  { pattern = "tick-engine-staging.example.com/*", zone_name = "example.com" }
+]
+vars = { DEMO_MODE = "true" }
+
+[env.production]
+name = "tick-engine"
+routes = [
+  { pattern = "tick-engine.example.com/*", zone_name = "example.com" }
+]
+
+# KV namespace bindings (optional, for caching)
+[[kv_namespaces]]
+binding = "TICK_CACHE"
+id = "tick-cache-namespace-id"
+
+# D1 Database bindings (for archive index)
+[[d1_databases]]
+binding = "DB"
+database_name = "quan"
+database_id = "d1-database-id"
+
+# R2 Bucket bindings (for archive storage)
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "quan-ticks"
+
+# Environment variables (secrets)
+# Set with: wrangler secret put TRADOVATE_MDACCESS_TOKEN --config workers/wrangler-tick-engine.toml
+
+# Compatibility date
+compatibility_date = "2024-01-15"
