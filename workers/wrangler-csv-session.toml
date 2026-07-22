@@ -1,19 +1,17 @@
 name = "csv-session-store"
 main = "src/index.ts"
-type = "service"
 compatibility_date = "2024-01-15"
 
 # KV Namespace binding (for session metadata)
 [[kv_namespaces]]
 binding = "KV_STORE"
-id = ""  # Set per environment
-preview_id = ""
+id = "ed665094f4554ef4baed76bbca1397ad"
+preview_id = "9ffda66f529341ecae923ced14239759"
 
 # R2 Bucket binding (for CSV file storage)
 [[r2_buckets]]
 binding = "R2_BUCKET"
 bucket_name = "quan-csv-sessions"
-preview_bucket_name = "quan-csv-sessions-preview"
 
 # Environment variables
 vars = { ENVIRONMENT = "development", INGEST_WORKER_URL = "http://localhost:8787" }
@@ -30,32 +28,14 @@ id = ""
 [[env.development.r2_buckets]]
 binding = "R2_BUCKET"
 bucket_name = "quan-csv-sessions"
-preview_bucket_name = "quan-csv-sessions-preview"
-
-[env.staging]
-vars = { ENVIRONMENT = "staging", INGEST_WORKER_URL = "https://staging-execution-ingest.example.com" }
-
-[[env.staging.kv_namespaces]]
-binding = "KV_STORE"
-id = ""
-
-[[env.staging.r2_buckets]]
-binding = "R2_BUCKET"
-bucket_name = "quan-csv-sessions-staging"
-preview_bucket_name = "quan-csv-sessions-staging-preview"
 
 [env.production]
 vars = { ENVIRONMENT = "production", INGEST_WORKER_URL = "https://api.example.com" }
 
 [[env.production.kv_namespaces]]
 binding = "KV_STORE"
-id = ""
+id = "ed665094f4554ef4baed76bbca1397ad"
 
 [[env.production.r2_buckets]]
 binding = "R2_BUCKET"
 bucket_name = "quan-csv-sessions"
-
-# Routes
-[[routes]]
-pattern = "*/api/csv-session/*"
-zone_id = ""  # Set in deployment

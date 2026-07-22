@@ -91,6 +91,10 @@
 
     function reveal(session){
       window.__authSession = session;
+      // Save token to sessionStorage for CSV session store and other cross-domain APIs
+      if(session && session.access_token) {
+        try { sessionStorage.setItem('auth_token', session.access_token); } catch(e){}
+      }
       if(lock){ lock.classList.add('unlocked'); setTimeout(function(){ lock.style.display='none'; window.__detResize&&window.__detResize(); }, 500); }
     }
     function fail(msg){ if(hint){ hint.textContent = msg; hint.style.color = ''; } if(pwEl && mode!=='reset'){ pwEl.focus(); } }
@@ -170,6 +174,12 @@
     // keep the session token fresh for authenticated API calls
     client.auth.onAuthStateChange(function(evt, session){
       window.__authSession = session;
+      // Sync token to sessionStorage
+      if(session && session.access_token) {
+        try { sessionStorage.setItem('auth_token', session.access_token); } catch(e){}
+      } else {
+        try { sessionStorage.removeItem('auth_token'); } catch(e){}
+      }
       if(evt === 'PASSWORD_RECOVERY'){ isRecovery = true; applyMode('recovery'); }
     });
 
@@ -181,7 +191,10 @@
       client.auth.getSession().then(function(res){ if(res && res.data && res.data.session) reveal(res.data.session); });
     }
 
-    window.__authLogout = function(){ client.auth.signOut().then(function(){ location.reload(); }); };
+    window.__authLogout = function(){
+      try { sessionStorage.removeItem('auth_token'); } catch(e){}
+      client.auth.signOut().then(function(){ location.reload(); });
+    };
   }
 
   if(window.supabase && window.supabase.createClient){ boot(window.supabase); }
