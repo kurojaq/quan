@@ -1,0 +1,38 @@
+name = "execution-ingest"
+main = "src/index.ts"
+type = "service"
+compatibility_date = "2024-01-15"
+
+# Environment variables (override per env)
+vars = { ENVIRONMENT = "development" }
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "quan"
+database_id = ""  # Set per environment
+
+# Environment-specific configurations
+
+[env.development]
+vars = { ENVIRONMENT = "development" }
+d1_databases = [
+  { binding = "DB", database_name = "quan", database_id = "" }
+]
+
+[env.staging]
+vars = { ENVIRONMENT = "staging" }
+d1_databases = [
+  { binding = "DB", database_name = "quan-staging", database_id = "" }
+]
+
+[env.production]
+vars = { ENVIRONMENT = "production" }
+d1_databases = [
+  { binding = "DB", database_name = "quan", database_id = "" }
+]
+
+# Routes
+[[routes]]
+pattern = "*/api/execution/ingest-csv"
+zone_id = ""  # Set in deployment
