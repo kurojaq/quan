@@ -1,11 +1,12 @@
 /* CSV Session Manager — persists CSV files across sessions via Cloudflare KV + R2.
  *
- * Provides UI for:
- * - Uploading CSV files to persistent storage
- * - Listing previously uploaded files
- * - Re-integrating CSV data (re-ingest from R2)
- * - Downloading stored CSVs
- * - Deleting old sessions
+ * Supports two types of CSV data:
+ * 1. Execution Data: Tradovate performance exports (trades, entry/exit, P&L)
+ *    - Can be re-ingested to re-populate execution_ledger
+ *    - Flows through morphology_performance → learning loop
+ * 2. Option Data: Chain data, Greeks, IV surfaces, historical snapshots
+ *    - Stored as reference data (no re-ingest)
+ *    - Supports download for use in charting/analysis
  *
  * Auth token is stored in sessionStorage on login.
  */
@@ -13,8 +14,10 @@
 (function () {
   let manager = {
     apiBase: 'https://csv-session-store-production.jqnboggan.workers.dev',
-    sessions: [],
+    executionSessions: [],
+    optionSessions: [],
     uploading: false,
+    uploadType: 'execution', // 'execution' or 'option'
     reintegratingId: null,
   };
 
@@ -57,16 +60,20 @@
     }
   }
 
-  // Load persisted CSV list
+  // Load persisted CSV list (separate execution and option data)
   async function loadSessions() {
     const response = await apiCall('/api/csv-session/list', { method: 'GET' });
     if (!response) {
-      manager.sessions = [];
+      manager.executionSessions = [];
+      manager.optionSessions = [];
       return;
     }
 
     try {
-      manager.sessions = await response.json();
+      const allSessions = await response.json();
+      // Separate by type
+      manager.executionSessions = (allSessions || []).filter(s => s.type === 'execution' || !s.type); // default to execution for backward compat
+      manager.optionSessions = (allSessions || []).filter(s => s.type === 'option');
       renderSessionsList();
     } catch (e) {
       showStatus(`Failed to load sessions: ${e.message}`, 'error');
@@ -82,19 +89,32 @@
 
     try {
       const csv = await file.text();
+      const type = manager.uploadType || 'execution'; // default to execution
+
       const response = await apiCall('/api/csv-session/upload', {
         method: 'POST',
-        headers: { 'X-File-Name': file.name, 'Content-Type': 'text/csv' },
+        headers: {
+          'X-File-Name': file.name,
+          'X-CSV-Type': type, // execution or option
+          'Content-Type': 'text/csv',
+        },
         body: csv,
       });
 
       if (!response) return;
 
       const session = await response.json();
-      manager.sessions.unshift(session);
+
+      // Add to appropriate list
+      if (type === 'option') {
+        manager.optionSessions.unshift(session);
+      } else {
+        manager.executionSessions.unshift(session);
+      }
       renderSessionsList();
 
-      showStatus(`✅ Uploaded: ${file.name} (${session.rowCount} trades)`, 'success');
+      const typeLabel = type === 'option' ? 'Option Data' : 'Execution';
+      showStatus(`✅ Uploaded: ${file.name} (${session.rowCount || '?'} rows) · ${typeLabel}`, 'success');
     } catch (e) {
       showStatus(`Upload failed: ${e.message}`, 'error');
     } finally {
@@ -154,8 +174,11 @@
   }
 
   // Delete session
-  async function deleteSession(fileId) {
-    const session = manager.sessions.find(s => s.fileId === fileId);
+  async function deleteSession(fileId, type) {
+    type = type || 'execution'; // default to execution
+
+    const sessions = type === 'option' ? manager.optionSessions : manager.executionSessions;
+    const session = sessions.find(s => s.fileId === fileId);
     if (!session) return;
 
     if (!confirm(`Delete "${session.fileName}"? This cannot be undone.`)) return;
@@ -163,7 +186,11 @@
     const response = await apiCall(`/api/csv-session/delete/${fileId}`, { method: 'DELETE' });
     if (!response) return;
 
-    manager.sessions = manager.sessions.filter(s => s.fileId !== fileId);
+    if (type === 'option') {
+      manager.optionSessions = manager.optionSessions.filter(s => s.fileId !== fileId);
+    } else {
+      manager.executionSessions = manager.executionSessions.filter(s => s.fileId !== fileId);
+    }
     renderSessionsList();
 
     showStatus(`✅ Deleted: ${session.fileName}`, 'success');
@@ -178,11 +205,15 @@
       <div class="csv-manager">
         <div class="csv-header">
           <h3>💾 CSV Session Store</h3>
-          <p class="csv-hint">Files persist across logins · 30-day TTL</p>
+          <p class="csv-hint">Execution + Option data · persist across logins · 30-day TTL</p>
         </div>
 
         <div class="csv-upload-section">
-          <div class="upload-box" id="uploadBox">
+          <div class="upload-controls">
+            <select id="csvTypeSelect" class="csv-type-select">
+              <option value="execution">📊 Execution (Tradovate trades)</option>
+              <option value="option">📈 Option Data (chains, Greeks, IV)</option>
+            </select>
             <input type="file" accept=".csv" id="csvFileInput" style="display: none;">
             <button class="csv-upload-btn" id="csvUploadBtn">
               <span id="uploadBtnText">📤 Upload CSV</span>
@@ -190,12 +221,25 @@
           </div>
         </div>
 
+        <div class="csv-status" id="csvStatus" style="display: none;"></div>
+
         <div class="csv-sessions-section">
-          <div id="csvSessionsList"></div>
-          <div id="csvStatus" class="csv-status" style="display: none;"></div>
+          <div class="csv-section">
+            <h4>Execution Data</h4>
+            <div id="csvExecutionList" class="csv-list"></div>
+          </div>
+          <div class="csv-section" style="margin-top: 20px;">
+            <h4>Option Data</h4>
+            <div id="csvOptionList" class="csv-list"></div>
+          </div>
         </div>
       </div>
     `;
+
+    // Wire up type selector
+    document.getElementById('csvTypeSelect').addEventListener('change', (e) => {
+      manager.uploadType = e.target.value;
+    });
 
     // Wire up upload
     document.getElementById('csvFileInput').addEventListener('change', (e) => {
@@ -211,17 +255,34 @@
     loadSessions();
   }
 
-  // Render sessions list
+  // Render sessions list (separate execution and option data)
   function renderSessionsList() {
-    const list = document.getElementById('csvSessionsList');
-    if (!list) return;
+    const execList = document.getElementById('csvExecutionList');
+    const optList = document.getElementById('csvOptionList');
+    if (!execList || !optList) return;
 
-    if (manager.sessions.length === 0) {
-      list.innerHTML = '<div class="csv-empty">No saved CSV files yet. Upload one above.</div>';
-      return;
+    // Render execution data
+    if (manager.executionSessions.length === 0) {
+      execList.innerHTML = '<div class="csv-empty">No execution CSVs yet.</div>';
+    } else {
+      execList.innerHTML = manager.executionSessions.map(session => renderSessionItem(session, 'execution')).join('');
     }
 
-    const html = manager.sessions.map(session => `
+    // Render option data
+    if (manager.optionSessions.length === 0) {
+      optList.innerHTML = '<div class="csv-empty">No option data CSVs yet.</div>';
+    } else {
+      optList.innerHTML = manager.optionSessions.map(session => renderSessionItem(session, 'option')).join('');
+    }
+  }
+
+  // Render a single session item
+  function renderSessionItem(session, type) {
+    const isExecution = type === 'execution';
+    const canReintegrate = isExecution && (session.status === 'uploaded' || session.status === 'failed');
+    const canDownload = isExecution ? (session.status === 'ingested') : true; // option data can always download
+
+    return `
       <div class="csv-item csv-item-${session.status}">
         <div class="csv-item-icon">
           ${session.status === 'uploaded' ? '📤' :
@@ -232,29 +293,27 @@
         <div class="csv-item-info">
           <div class="csv-item-name">${escapeHtml(session.fileName)}</div>
           <div class="csv-item-meta">
-            ${session.rowCount} trades · ${formatBytes(session.fileSize)} · ${formatDate(session.uploadedAt)}
+            ${session.rowCount || '?'} rows · ${formatBytes(session.fileSize)} · ${formatDate(session.uploadedAt)}
           </div>
           ${session.errorMessage ? `<div class="csv-item-error">${escapeHtml(session.errorMessage)}</div>` : ''}
         </div>
         <div class="csv-item-actions">
-          ${session.status === 'uploaded' || session.status === 'failed' ? `
+          ${canReintegrate ? `
             <button class="csv-btn csv-btn-reintegrate" onclick="window.__csvSessionManager.reintegrate('${session.fileId}')" ${manager.reintegratingId === session.fileId ? 'disabled' : ''}>
               ${manager.reintegratingId === session.fileId ? '⏳' : '🔄'} Reintegrate
             </button>
           ` : ''}
-          ${session.status === 'ingested' ? `
+          ${canDownload ? `
             <button class="csv-btn csv-btn-download" onclick="window.__csvSessionManager.downloadCSV('${session.fileId}')">
               ⬇️ Download
             </button>
           ` : ''}
-          <button class="csv-btn csv-btn-delete" onclick="window.__csvSessionManager.deleteSession('${session.fileId}')">
+          <button class="csv-btn csv-btn-delete" onclick="window.__csvSessionManager.deleteSession('${session.fileId}', '${type}')">
             🗑️ Delete
           </button>
         </div>
       </div>
-    `).join('');
-
-    list.innerHTML = html;
+    `;
   }
 
   // Update upload button state
