@@ -206,7 +206,10 @@ async function fetchOptionsChain(symbol, expiration, type = 'monthlies', env, da
           cookieHeader = cookies
             .map(c => `${c.name}=${c.value}`)
             .join('; ');
+          console.log(`[barchart-fetch] Loaded ${cookies.length} cookies from KV`);
         }
+      } else {
+        console.warn('[barchart-fetch] No cookies in KV - API may fail with 401');
       }
     } catch (e) {
       console.warn(`[barchart-fetch] Could not read cookies from KV: ${e.message}`);
@@ -258,9 +261,15 @@ async function fetchOptionsChain(symbol, expiration, type = 'monthlies', env, da
 
           console.log(`[barchart-fetch] Success: ${rows.length} rows (${type})`);
           return rows;
+        } else if (response.status === 401 || response.status === 403) {
+          const text = await response.text().catch(() => '');
+          console.error(`[barchart-fetch] Auth error ${response.status}: ${text.substring(0, 200)}`);
+          throw new Error(`Authentication failed (${response.status}). Check that cookies are valid and seeded in Auth tab.`);
         } else if (response.status === 404) {
           throw new Error(`Not found (404): Symbol or expiration not available`);
         } else {
+          const text = await response.text().catch(() => '');
+          console.error(`[barchart-fetch] HTTP ${response.status}: ${text.substring(0, 200)}`);
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
       } catch (e) {
