@@ -535,59 +535,53 @@ async function run(env, jobsOverride, opts = {}) {
 }
 
 // On-demand options extraction for the Barchart importer
+// Downloads the actual CSV file from Barchart instead of parsing HTML
 async function fetchOptionsViaRenderer(env, symbol, expiration, dataType) {
   let browser;
   try {
     browser = await puppeteer.launch(env.BROWSER);
     const page = await browser.newPage();
+    await page.setUserAgent(BC.userAgent);
     page.setDefaultTimeout(45000);
     page.setDefaultNavigationTimeout(45000);
 
-    const pageUrl = `https://www.barchart.com/futures/quotes/${symbol}/${dataType === 'greeks' ? 'volatility-greeks' : 'options'}/${expiration}?moneyness=allRows&futuresOptionsView=split`;
+    const tab = dataType === 'greeks' ? 'volatility-greeks' : 'options';
+    const pageUrl = `https://www.barchart.com/futures/quotes/${symbol}/${tab}/${expiration}?moneyness=allRows&futuresOptionsView=split`;
     console.log(`[barchart-fetch] Rendering: ${pageUrl}`);
 
+    // Navigate and wait for page to fully load
     await page.goto(pageUrl, { waitUntil: 'networkidle2' });
+    await wait(2000); // Extra wait to ensure download button is rendered
 
-    // Wait for the data table to load
-    await page.waitForSelector('[role="grid"], table, .data-table', { timeout: 10000 }).catch(() => null);
+    // Use the existing captureDownload function to get the CSV
+    const csv = await captureDownload(page);
 
-    // Extract options data from the rendered page
-    const options = await page.evaluate(() => {
-      const rows = [];
+    if (!csv || csv.length < 32) {
+      throw new Error('Downloaded CSV is empty');
+    }
 
-      // Try multiple selectors for the options table
-      const tables = document.querySelectorAll('table, [role="grid"]');
-      for (const table of tables) {
-        const cells = table.querySelectorAll('tr');
-        for (const row of cells) {
-          const tds = row.querySelectorAll('td');
-          if (tds.length < 3) continue;
+    console.log(`[barchart-fetch] Downloaded ${csv.length} bytes of CSV data`);
 
-          // Parse: strike | call data | put data (or similar structure)
-          const text = Array.from(tds).map(t => t.textContent.trim());
-          const strikeMatch = text[0].match(/[\d.]+/);
-          if (strikeMatch) {
-            rows.push({
-              strikePrice: strikeMatch[0],
-              optionType: text[1]?.includes('Call') ? 'Call' : text[1]?.includes('Put') ? 'Put' : 'Mixed',
-              lastPrice: text[2] || '',
-              delta: text[3] || '',
-              gamma: text[4] || '',
-              vega: text[5] || '',
-              theta: text[6] || '',
-              rawRow: text
-            });
-          }
-        }
-      }
+    // Parse CSV into objects (simple parse: header row, then data rows)
+    const lines = csv.split('\n').filter(l => l.trim());
+    if (lines.length < 2) {
+      throw new Error('CSV has no data rows');
+    }
 
-      return rows.length > 0 ? rows : [];
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+    const options = lines.slice(1).map(line => {
+      const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+      const obj = {};
+      headers.forEach((h, i) => {
+        obj[h] = values[i] || '';
+      });
+      return obj;
     });
 
-    console.log(`[barchart-fetch] Extracted ${options.length} options from rendered page`);
+    console.log(`[barchart-fetch] Parsed ${options.length} options from CSV`);
     return options;
   } catch (err) {
-    console.error(`[barchart-fetch] Render error: ${err.message}`);
+    console.error(`[barchart-fetch] Renderer error: ${err.message}`);
     throw err;
   } finally {
     if (browser) await browser.close().catch(() => {});
