@@ -552,30 +552,51 @@ async function fetchOptionsViaRenderer(env, symbol, expiration, dataType) {
     browser = await puppeteer.launch(env.BROWSER);
     const page = await browser.newPage();
     await page.setUserAgent(BC.userAgent);
-    page.setDefaultTimeout(45000);
-    page.setDefaultNavigationTimeout(45000);
+    page.setDefaultTimeout(60000);
+    page.setDefaultNavigationTimeout(60000);
 
     const tab = dataType === 'greeks' ? 'volatility-greeks' : 'options';
     const pageUrl = `https://www.barchart.com/futures/quotes/${symbol}/${tab}/${expiration}?moneyness=allRows&futuresOptionsView=split`;
-    console.log(`[barchart-fetch] Rendering: ${pageUrl}`);
+    console.log(`[barchart-fetch] Navigating to: ${pageUrl}`);
 
     // Navigate and wait for page to fully load
     await page.goto(pageUrl, { waitUntil: 'networkidle2' });
-    await wait(2000); // Extra wait to ensure download button is rendered
+    console.log('[barchart-fetch] Page loaded, waiting for data table...');
 
+    // Wait for the options data table to render (critical!)
+    // Look for table rows with data
+    try {
+      await page.waitForFunction(
+        () => {
+          const rows = document.querySelectorAll('tr');
+          // Need at least header + 1 data row
+          return rows.length > 1;
+        },
+        { timeout: 30000 }
+      );
+    } catch (_) {
+      console.log('[barchart-fetch] Warning: table data not detected, proceeding anyway');
+    }
+
+    await wait(2000); // Extra wait for data to fully render
+
+    console.log('[barchart-fetch] Data loaded, clicking download button...');
     // Use the existing captureDownload function to get the CSV
     const csv = await captureDownload(page);
 
-    if (!csv || csv.length < 32) {
-      throw new Error('Downloaded CSV is empty');
+    if (!csv || csv.trim().length === 0) {
+      throw new Error('Downloaded CSV is empty/blank');
     }
 
     console.log(`[barchart-fetch] Downloaded ${csv.length} bytes of CSV data`);
 
     // Parse CSV into objects (simple parse: header row, then data rows)
     const lines = csv.split('\n').filter(l => l.trim());
+    console.log(`[barchart-fetch] CSV has ${lines.length} lines`);
+
     if (lines.length < 2) {
-      throw new Error('CSV has no data rows');
+      console.log('[barchart-fetch] CSV content (first 500 chars):', csv.substring(0, 500));
+      throw new Error(`CSV has no data rows (only ${lines.length} lines)`);
     }
 
     const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
@@ -588,7 +609,7 @@ async function fetchOptionsViaRenderer(env, symbol, expiration, dataType) {
       return obj;
     });
 
-    console.log(`[barchart-fetch] Parsed ${options.length} options from CSV`);
+    console.log(`[barchart-fetch] Successfully parsed ${options.length} options from CSV`);
     return options;
   } catch (err) {
     console.error(`[barchart-fetch] Renderer error: ${err.message}`);
