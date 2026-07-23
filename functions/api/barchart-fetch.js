@@ -1,17 +1,17 @@
 /* /api/barchart-fetch — server-side bridge for seamless Barchart CSV fetching.
 
-   Browser-side Barchart requests hit CORS blocks; this endpoint routes them
-   server-to-server, bypassing browser CORS. Mimics the autopull worker's
-   job pattern but for on-demand UI fetches (not scheduled).
+   Routes through the autopull Worker (workers/barchart-fetch.js) which has
+   proven Browser Rendering + Barchart auth. This endpoint translates on-demand
+   UI requests into autopull jobs and returns the CSV.
 
-   GET  /api/barchart-fetch?symbol=ZNU26&expiration=aug-26
-        -> { data: [{...options...}], count: 100 }
+   GET  /api/barchart-fetch?symbol=ZNU26&expiration=aug-26&dataType=prices
+        -> { status, csvUrl }
 
-   GET  /api/barchart-fetch?symbol=ZNU26&expiration=aug-26&format=csv
-        -> text/csv response (RFC 4180 formatted)
+   POST /api/barchart-fetch?action=seed-cookies
+        -> { ok, count }
 
-   Auth: operator only (gated by requireOperator).
-   CORS: open (all origins welcome; sensitive data stays behind auth gate).
+   POST /api/barchart-fetch?action=clear-cookies
+        -> { ok }
 */
 
 import { json, badRequest, serverError, requireOperator } from './_shared.js';
@@ -366,29 +366,64 @@ export async function onRequestPost({ request, env }) {
         try {
           cookies = JSON.parse(cookies);
         } catch (_) {
-          return badRequest('cookies must be JSON');
+          return badRequest('Invalid JSON: cookies must be a JSON array');
         }
       }
       if (!Array.isArray(cookies)) return badRequest('cookies[] required (exported JSON array)');
+
+      // Clean and validate cookies
       const clean = cookies
         .filter((c) => c && c.name && c.value != null)
         .map((c) => ({
-          name: String(c.name),
-          value: String(c.value),
-          domain: c.domain,
-          path: c.path,
+          name: String(c.name).trim(),
+          value: String(c.value).trim(),
+          domain: c.domain || '.barchart.com',
+          path: c.path || '/',
           expires: c.expires != null ? c.expires : c.expirationDate,
-          httpOnly: c.httpOnly,
-          secure: c.secure,
-          sameSite: c.sameSite
-        }));
-      if (!clean.length) return badRequest('no valid {name,value} cookies found');
+          httpOnly: c.httpOnly || false,
+          secure: c.secure || true,
+          sameSite: c.sameSite || 'Lax'
+        }))
+        .filter(c => c.name.length > 0 && c.value.length > 0);
+
+      if (!clean.length) {
+        return badRequest(
+          'No valid cookies found. Expected format: [{"name":"...", "value":"..."}, ...] ' +
+          'Make sure cookies are from barchart.com domain'
+        );
+      }
+
+      console.log(`[barchart-fetch] Seeding ${clean.length} cookies to KV`);
       await env.QUAN_PUBLISH.put('autopull:cookies', JSON.stringify(clean));
+
+      // Test the cookies by trying to fetch
+      try {
+        const testCookie = clean.map(c => `${c.name}=${c.value}`).join('; ');
+        const testUrl = 'https://www.barchart.com/my/quotes'; // Auth-required page
+        const testRes = await fetch(testUrl, {
+          headers: {
+            'Cookie': testCookie,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+        console.log(`[barchart-fetch] Cookie test: ${testRes.status}`);
+        if (testRes.status === 401) {
+          return json({
+            ok: true,
+            count: clean.length,
+            warning: 'Cookies seeded but may be expired. Test download to verify.'
+          }, 200);
+        }
+      } catch (e) {
+        console.warn(`[barchart-fetch] Cookie test fetch failed: ${e.message}`);
+      }
+
       return json({ ok: true, count: clean.length });
     }
 
     if (action === 'clear-cookies') {
       if (env.QUAN_PUBLISH) await env.QUAN_PUBLISH.delete('autopull:cookies');
+      console.log('[barchart-fetch] Cookies cleared');
       return json({ ok: true });
     }
 
