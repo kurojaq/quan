@@ -521,6 +521,66 @@ async function run(env, jobsOverride, opts = {}) {
   return status;
 }
 
+// On-demand options extraction for the Barchart importer
+async function fetchOptionsViaRenderer(env, symbol, expiration, dataType) {
+  let browser;
+  try {
+    browser = await puppeteer.launch(env.BROWSER);
+    const page = await browser.newPage();
+    page.setDefaultTimeout(45000);
+    page.setDefaultNavigationTimeout(45000);
+
+    const pageUrl = `https://www.barchart.com/futures/quotes/${symbol}/${dataType === 'greeks' ? 'volatility-greeks' : 'options'}/${expiration}?moneyness=allRows&futuresOptionsView=split`;
+    console.log(`[barchart-fetch] Rendering: ${pageUrl}`);
+
+    await page.goto(pageUrl, { waitUntil: 'networkidle2' });
+
+    // Wait for the data table to load
+    await page.waitForSelector('[role="grid"], table, .data-table', { timeout: 10000 }).catch(() => null);
+
+    // Extract options data from the rendered page
+    const options = await page.evaluate(() => {
+      const rows = [];
+
+      // Try multiple selectors for the options table
+      const tables = document.querySelectorAll('table, [role="grid"]');
+      for (const table of tables) {
+        const cells = table.querySelectorAll('tr');
+        for (const row of cells) {
+          const tds = row.querySelectorAll('td');
+          if (tds.length < 3) continue;
+
+          // Parse: strike | call data | put data (or similar structure)
+          const text = Array.from(tds).map(t => t.textContent.trim());
+          const strikeMatch = text[0].match(/[\d.]+/);
+          if (strikeMatch) {
+            rows.push({
+              strikePrice: strikeMatch[0],
+              optionType: text[1]?.includes('Call') ? 'Call' : text[1]?.includes('Put') ? 'Put' : 'Mixed',
+              lastPrice: text[2] || '',
+              delta: text[3] || '',
+              gamma: text[4] || '',
+              vega: text[5] || '',
+              theta: text[6] || '',
+              rawRow: text
+            });
+          }
+        }
+      }
+
+      return rows.length > 0 ? rows : [];
+    });
+
+    console.log(`[barchart-fetch] Extracted ${options.length} options from rendered page`);
+    return options;
+  } catch (err) {
+    console.error(`[barchart-fetch] Render error: ${err.message}`);
+    throw err;
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+  }
+}
+
 export default {
   async scheduled(_event, env, ctx) {
     ctx.waitUntil(run(env));
@@ -530,6 +590,35 @@ export default {
   //        how /api/autopull's operator-gated "Pull today" action reaches us
   //        without ever exposing this Worker's URL/secret to the browser.
   async fetch(request, env) {
+    const url = new URL(request.url);
+
+    // On-demand options fetching via browser rendering (for the importer)
+    if (request.method === 'POST' && url.pathname === '/fetch-options') {
+      try {
+        const body = await request.json().catch(() => ({}));
+        const { symbol, expiration, dataType } = body;
+
+        if (!symbol || !expiration) {
+          return new Response(JSON.stringify({ error: 'symbol and expiration required' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        const options = await fetchOptionsViaRenderer(env, symbol, expiration, dataType || 'prices');
+        return new Response(JSON.stringify({ data: options, count: options.length }), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      } catch (err) {
+        console.error(`[barchart-fetch] /fetch-options error: ${err.message}`);
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // Scheduled/on-demand full pulls (original autopull logic)
     if (request.method === 'POST') {
       // Auth: if AUTOPULL_KEY is set, require it. If it's unset, allow — this is
       // the Service-binding setup, where the Worker has NO public route and is
