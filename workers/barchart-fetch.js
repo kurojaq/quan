@@ -52,7 +52,7 @@ const BC = {
     loggedInMarker: '[data-ng-if="user.isLoggedIn"], .bc-user-nav, a[href="/logout"]',
     // The "⤓ download" control on an options page (captureDownload also has a
     // text-based fallback if this selector misses).
-    download: 'a.bc-download, button[data-bc-download], a[href*="download"]',
+    download: 'a.bc-download, button[data-bc-download], a[href*="download"], [class*="download"], .bc-download-link',
     // The expiry is chosen by two CUSTOM (non-<select>) dropdowns above the chain
     // table: "Options Type" = the day-of-week series ("Monday Weekly Options"),
     // and "Week N: Mon YYYY". resolveExpiryPage() drives them by visible text
@@ -352,18 +352,31 @@ async function captureDownload(page) {
     };
     page.on('response', onResponse);
   });
+
+  // Wait for download button and ensure page is fully rendered
+  await wait(1000);
   await page.waitForSelector(BC.sel.download, { timeout: BC.navTimeoutMs }).catch(() => {});
+
   const btn = await page.$(BC.sel.download);
   if (btn) {
     await btn.click().catch(() => {});
   } else {
-    // Fallback: click the element whose visible text is "download" (the ⤓ link).
-    await page.evaluate(() => {
-      const el = Array.from(document.querySelectorAll('a,button')).find(
-        (e) => (e.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase() === 'download'
-      );
-      if (el) el.click();
+    // Fallback: find and click any element containing "download" text
+    const clicked = await page.evaluate(() => {
+      const buttons = Array.from(document.querySelectorAll('a, button, [role="button"], [class*="button"], [class*="link"]'));
+      const downloadEl = buttons.find((e) => {
+        const text = (e.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        return text.includes('download') || text === '↓' || e.classList.toString().includes('download');
+      });
+      if (downloadEl) {
+        downloadEl.click();
+        return true;
+      }
+      return false;
     });
+    if (!clicked) {
+      throw new Error('Download button not found');
+    }
   }
   return csvBody;
 }
