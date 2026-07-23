@@ -182,9 +182,8 @@ async function fetchOptionsChain(symbol, expiration, type = 'monthlies') {
 }
 
 export async function onRequestGet({ request, env }) {
-  // Gate to operator only
-  const gate = await requireOperator(env, request);
-  if (gate instanceof Response) return gate;
+  // Public endpoint — Barchart data is already public on their site
+  // No auth required, but could add rate limiting if needed
 
   try {
     const url = new URL(request.url);
