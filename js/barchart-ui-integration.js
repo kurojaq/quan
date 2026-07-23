@@ -474,7 +474,7 @@
         hint.style.display = 'block';
         symbolInput.placeholder = 'BNIN26 (symbol encodes week)';
         if (expLabel) expLabel.textContent = 'Week (optional)';
-        expirationSelect.innerHTML = '<option value="">Auto-detect from symbol</option>';
+        expirationSelect.innerHTML = '<option value="auto" selected>Auto-detect from symbol</option>';
       } else {
         hint.style.display = 'none';
         symbolInput.placeholder = 'ZNU26, ESZ26, etc.';
@@ -577,9 +577,8 @@
       if (!symbol) return;
 
       if (type === 'weeklies') {
-        // For weeklies, symbol encodes the expiration - no dropdown needed
-        expirationSelect.innerHTML = '<option value="">Auto-detect from symbol</option>';
-        log('Weekly symbol already encodes expiration', 'info');
+        // For weeklies, symbol encodes the expiration - dropdown just shows "auto"
+        expirationSelect.innerHTML = '<option value="auto" selected>Auto-detect from symbol</option>';
         return;
       }
 
