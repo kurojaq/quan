@@ -118,7 +118,9 @@ export async function onRequestGet({ request, env }) {
       return badRequest('invalid symbol format (e.g., BGU26, ESZ26)');
     }
 
-    if (!/^[a-z]{3}-\d{2}$/.test(expiration)) {
+    // Normalize expiration: accept both "AUG-26" and "aug-26"
+    const normalizedExpiration = expiration.toLowerCase();
+    if (!/^[a-z]{3}-\d{2}$/.test(normalizedExpiration)) {
       return badRequest('invalid expiration format (e.g., aug-26, sep-26)');
     }
 
@@ -126,7 +128,7 @@ export async function onRequestGet({ request, env }) {
       return badRequest('dataType must be "prices" or "greeks"');
     }
 
-    console.log(`[barchart-fetch] Fetching ${symbol} ${expiration} (${dataType}) via browser render`);
+    console.log(`[barchart-fetch] Fetching ${symbol} ${normalizedExpiration} (${dataType}) via browser render`);
 
     // Call BARCHART Worker via service binding to do browser rendering
     if (!env.BARCHART) {
@@ -136,7 +138,7 @@ export async function onRequestGet({ request, env }) {
       );
     }
 
-    const pageUrl = buildBarchartPageUrl(symbol, expiration, dataType);
+    const pageUrl = buildBarchartPageUrl(symbol, normalizedExpiration, dataType);
     console.log(`[barchart-fetch] Page URL: ${pageUrl}`);
 
     // Call the Worker to render the page and extract data
@@ -146,7 +148,7 @@ export async function onRequestGet({ request, env }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           symbol,
-          expiration,
+          expiration: normalizedExpiration,
           dataType,
           pageUrl
         })
@@ -172,14 +174,14 @@ export async function onRequestGet({ request, env }) {
         headers: {
           'Content-Type': 'text/csv;charset=utf-8',
           'Cache-Control': 'no-store',
-          'Content-Disposition': `attachment; filename="${symbol}_${expiration}_${dataType}.csv"`
+          'Content-Disposition': `attachment; filename="${symbol}_${normalizedExpiration}_${dataType}.csv"`
         }
       });
     } else {
       // Default JSON
       return json({
         symbol,
-        expiration,
+        expiration: normalizedExpiration,
         dataType,
         count: rows.length,
         data: rows
