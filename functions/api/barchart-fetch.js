@@ -197,8 +197,9 @@ export async function onRequestGet({ request, env }) {
     }
 
     // Validate inputs (prevent injection)
-    if (!/^[A-Z0-9]{2,4}$/.test(symbol)) {
-      return badRequest('invalid symbol format');
+    // Allow futures contracts like BGU26 (2+ letters, month code, year digits)
+    if (!/^[A-Z0-9]{2,6}$/.test(symbol)) {
+      return badRequest('invalid symbol format (e.g., BGU26, ESZ26)');
     }
     // Accept both format: "aug-26" (monthlies) and "01/17/26" (weeklies)
     if (!/^[a-z]{3}-\d{2}$/.test(expiration) && !/^\d{2}_\d{2}_\d{2}$/.test(expiration) && !/^\d{2}\/\d{2}\/\d{2}$/.test(expiration)) {
