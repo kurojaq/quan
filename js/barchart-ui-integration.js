@@ -473,13 +473,15 @@
       if (isWeekly) {
         hint.style.display = 'block';
         symbolInput.placeholder = 'BNIN26 (symbol encodes week)';
-        if (expLabel) expLabel.textContent = 'Week (optional)';
-        expirationSelect.innerHTML = '<option value="auto" selected>Auto-detect from symbol</option>';
+        if (expLabel) expLabel.textContent = 'Week';
+        expirationSelect.innerHTML = '<option value="">Loading weekly expirations...</option>';
+        loadExpirations(); // Load weekly expirations
       } else {
         hint.style.display = 'none';
         symbolInput.placeholder = 'ZNU26, ESZ26, etc.';
         if (expLabel) expLabel.textContent = 'Expiration';
-        loadExpirations(); // Reload monthly expirations
+        expirationSelect.innerHTML = '<option value="">Loading expirations...</option>';
+        loadExpirations(); // Load monthly expirations
       }
     });
 
@@ -576,19 +578,19 @@
       const type = typeSelect.value; // 'monthlies' or 'weeklies'
       if (!symbol) return;
 
-      if (type === 'weeklies') {
-        // For weeklies, symbol encodes the expiration - dropdown just shows "auto"
-        expirationSelect.innerHTML = '<option value="auto" selected>Auto-detect from symbol</option>';
-        return;
-      }
-
       log('Loading expirations...');
       try {
-        const expirations = await FETCHER.getAvailableExpirations(symbol);
+        const expirations = await FETCHER.getAvailableExpirations(symbol, { type });
+        if (expirations.length === 0) {
+          expirationSelect.innerHTML = '<option value="">No expirations found</option>';
+          log('No expirations found', 'error');
+          return;
+        }
         expirationSelect.innerHTML = expirations
-          .map((exp) => `<option value="${exp}">${exp}</option>`)
+          .map((exp, idx) => `<option value="${exp}" ${idx === 0 ? 'selected' : ''}>${exp}</option>`)
           .join('');
-        log(`Loaded ${expirations.length} monthly expirations`, 'success');
+        const typeLabel = type === 'weeklies' ? 'weekly' : 'monthly';
+        log(`Loaded ${expirations.length} ${typeLabel} expirations`, 'success');
       } catch (error) {
         log(`Failed to load expirations: ${error.message}`, 'error');
       }

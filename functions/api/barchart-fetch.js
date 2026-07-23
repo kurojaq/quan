@@ -21,7 +21,7 @@ const getTab = (dataType) => {
 // Build Barchart page URL (the Worker will render this and extract data)
 const buildBarchartPageUrl = (symbol, expiration, dataType = 'prices') => {
   const tab = getTab(dataType);
-  // For weeklies without explicit expiration, omit the expiration segment (symbol encodes it)
+  // Include expiration in URL path (works for both monthly mmm-yy and weekly MM/DD/YY formats)
   const expirationPath = expiration ? `/${expiration}` : '';
   return `https://www.barchart.com/futures/quotes/${symbol}/${tab}${expirationPath}?moneyness=allRows&futuresOptionsView=split`;
 };
@@ -117,14 +117,9 @@ export async function onRequestGet({ request, env }) {
       return badRequest('symbol query param required');
     }
 
-    // For monthlies: expiration required. For weeklies: encoded in symbol (expiration can be "auto" or empty).
-    if (type === 'monthlies' && !expiration) {
-      return badRequest('expiration required for monthlies (e.g., aug-26)');
-    }
-
-    // For weeklies, "auto" or missing expiration is fine (symbol encodes it)
-    if (type === 'weeklies' && expiration === 'auto') {
-      expiration = '';
+    // Both monthlies and weeklies require expiration
+    if (!expiration) {
+      return badRequest(`expiration required for ${type} (e.g., ${type === 'monthlies' ? 'aug-26' : '07/28/26'})`);
     }
 
     if (!/^[A-Z0-9]{2,6}$/.test(symbol)) {
