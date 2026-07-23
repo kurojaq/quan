@@ -123,7 +123,7 @@
               margin-bottom: 4px;
               font-weight: 600;
             ">Symbol</label>
-            <input id="barchartSymbol" type="text" placeholder="ZNU26" style="
+            <input id="barchartSymbol" type="text" placeholder="ZNU26 (monthly) or BNIN26 (weekly)" style="
               width: 100%;
               box-sizing: border-box;
               background: rgba(255,255,255,0.05);
@@ -134,6 +134,12 @@
               font-size: 12px;
               font-family: ui-monospace, Menlo, monospace;
             ">
+            <div id="barchartSymbolHint" style="
+              display: none;
+              font-size: 9px;
+              color: var(--cream-dim);
+              margin-top: 4px;
+            ">Weeklies: root + week code + year (e.g., BNIN26 for T-Note week)</div>
           </div>
 
           <!-- Expiration Dropdown -->
@@ -457,6 +463,23 @@
 
     tabImportBtn.addEventListener('click', () => switchTab('import'));
     tabAuthBtn.addEventListener('click', () => switchTab('auth'));
+
+    // Show/hide expiration dropdown and hint based on type selection
+    typeSelect.addEventListener('change', () => {
+      const isWeekly = typeSelect.value === 'weeklies';
+      const hint = document.getElementById('barchartSymbolHint');
+      if (isWeekly) {
+        expirationSelect.style.display = 'none';
+        expirationSelect.parentElement.style.display = 'none';
+        hint.style.display = 'block';
+        symbolInput.placeholder = 'BNIN26, BNIQ26, etc.';
+      } else {
+        expirationSelect.style.display = 'block';
+        expirationSelect.parentElement.style.display = 'block';
+        hint.style.display = 'none';
+        symbolInput.placeholder = 'ZNU26, ESZ26, etc.';
+      }
+    });
 
     // Toggle panel visibility
     toggleBtn.addEventListener('click', () => {
