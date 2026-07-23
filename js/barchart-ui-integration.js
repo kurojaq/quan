@@ -464,20 +464,22 @@
     tabImportBtn.addEventListener('click', () => switchTab('import'));
     tabAuthBtn.addEventListener('click', () => switchTab('auth'));
 
-    // Show/hide expiration dropdown and hint based on type selection
+    // Update labels and placeholders based on type selection
     typeSelect.addEventListener('change', () => {
       const isWeekly = typeSelect.value === 'weeklies';
       const hint = document.getElementById('barchartSymbolHint');
+      const expLabel = expirationSelect.parentElement.querySelector('label');
+
       if (isWeekly) {
-        expirationSelect.style.display = 'none';
-        expirationSelect.parentElement.style.display = 'none';
         hint.style.display = 'block';
-        symbolInput.placeholder = 'BNIN26, BNIQ26, etc.';
+        symbolInput.placeholder = 'BNIN26 (symbol encodes week)';
+        if (expLabel) expLabel.textContent = 'Week (optional)';
+        expirationSelect.innerHTML = '<option value="">Auto-detect from symbol</option>';
       } else {
-        expirationSelect.style.display = 'block';
-        expirationSelect.parentElement.style.display = 'block';
         hint.style.display = 'none';
         symbolInput.placeholder = 'ZNU26, ESZ26, etc.';
+        if (expLabel) expLabel.textContent = 'Expiration';
+        loadExpirations(); // Reload monthly expirations
       }
     });
 
@@ -574,13 +576,20 @@
       const type = typeSelect.value; // 'monthlies' or 'weeklies'
       if (!symbol) return;
 
+      if (type === 'weeklies') {
+        // For weeklies, symbol encodes the expiration - no dropdown needed
+        expirationSelect.innerHTML = '<option value="">Auto-detect from symbol</option>';
+        log('Weekly symbol already encodes expiration', 'info');
+        return;
+      }
+
       log('Loading expirations...');
       try {
-        const expirations = await FETCHER.getAvailableExpirations(symbol, { type });
+        const expirations = await FETCHER.getAvailableExpirations(symbol);
         expirationSelect.innerHTML = expirations
-          .map((exp, idx) => `<option value="${exp}">${exp}</option>`)
+          .map((exp) => `<option value="${exp}">${exp}</option>`)
           .join('');
-        log(`Loaded ${expirations.length} ${type}`, 'success');
+        log(`Loaded ${expirations.length} monthly expirations`, 'success');
       } catch (error) {
         log(`Failed to load expirations: ${error.message}`, 'error');
       }
@@ -592,20 +601,50 @@
       const type = typeSelect.value;
       const dataType = dataTypeSelect.value;
 
-      if (!symbol || !expiration) {
+      if (!symbol || (type === 'monthlies' && !expiration)) {
         log('Please select symbol and expiration', 'error');
         return;
       }
 
       downloadBtn.disabled = true;
-      log(`Fetching ${symbol} ${expiration} (${type}, ${dataType})...`);
+      log(`Fetching ${symbol} ${expiration || type === 'weeklies' ? '' : 'N/A'} (${type}, ${dataType})...`);
 
       try {
-        await FETCHER.downloadOptionsCSV(symbol, expiration, { type, dataType });
-        const filename = `${symbol}_${expiration}_${dataType}.csv`;
+        const csv = await FETCHER.fetchOptionsCSV(symbol, expiration, { type, dataType });
+        const filename = expiration ? `${symbol}_${expiration}_${dataType}.csv` : `${symbol}_${dataType}.csv`;
+
+        // Try to auto-import to terminal first
+        if (global.__csvSessionManager && global.__csvSessionManager.importCSV) {
+          try {
+            await global.__csvSessionManager.importCSV(csv, {
+              type: 'option_data',
+              symbol: symbol,
+              expiration: expiration,
+              optionType: type,
+              dataType: dataType,
+              filename: filename
+            });
+            log(`Imported to terminal: ${filename}`, 'success');
+            return;
+          } catch (importErr) {
+            console.warn('[Barchart] Auto-import failed, falling back to download:', importErr);
+            log('Auto-import unavailable, downloading instead...', 'info');
+          }
+        }
+
+        // Fallback: browser download
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
         log(`Downloaded: ${filename}`, 'success');
       } catch (error) {
-        log(`Download failed: ${error.message}`, 'error');
+        log(`Failed: ${error.message}`, 'error');
       } finally {
         downloadBtn.disabled = false;
       }
