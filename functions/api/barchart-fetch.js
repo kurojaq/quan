@@ -16,24 +16,40 @@
 
 import { json, badRequest, serverError, requireOperator } from './_shared.js';
 
-// API patterns for standard monthly options
-const MONTHLY_PATTERNS = [
-  (symbol, expiration) => `https://www.barchart.com/api/quotes/options/futures/${symbol}/${expiration}`,
-  (symbol, expiration) => `https://www.barchart.com/v1/futures/${symbol}/options?expiration=${expiration}`,
-  (symbol, expiration) => `https://www.barchart.com/ajax/options/futures/${symbol}?expiration=${expiration}`
-];
+// Real Barchart API endpoint discovered from HAR file inspection
+// Returns options chain grouped by strike price
+const buildBarchartUrl = (symbol, expiration) => {
+  const fields = [
+    'optionType',
+    'lastPrice',
+    'volume',
+    'openInterest',
+    'premium',
+    'strikePrice',
+    'longSymbol',
+    'symbolName',
+    'symbolType',
+    'impliedVolatility', // Greeks
+    'delta',
+    'gamma',
+    'vega',
+    'theta',
+    'rho'
+  ].join(',');
 
-// API patterns for weekly options (expire every Friday)
-// Weeklies often use different URL structure or parameters
-const WEEKLY_PATTERNS = [
-  (symbol, expiration) => `https://www.barchart.com/api/quotes/options/futures/${symbol}/${expiration}?weekly=true`,
-  (symbol, expiration) => `https://www.barchart.com/v1/futures/${symbol}/options?expiration=${expiration}&weekly=true`,
-  (symbol, expiration) => `https://www.barchart.com/ajax/options/futures/${symbol}?expiration=${expiration}&weekly=true`,
-  // Fallback: try same patterns as monthlies in case Barchart handles both
-  (symbol, expiration) => `https://www.barchart.com/api/quotes/options/futures/${symbol}/${expiration}`,
-  (symbol, expiration) => `https://www.barchart.com/v1/futures/${symbol}/options?expiration=${expiration}`,
-  (symbol, expiration) => `https://www.barchart.com/ajax/options/futures/${symbol}?expiration=${expiration}`
-];
+  const params = new URLSearchParams({
+    symbol: symbol,
+    list: 'futures.options',
+    fields: fields,
+    groupBy: 'strikePrice',
+    meta: 'field.shortName,field.description,field.type',
+    orderBy: 'strikePrice',
+    orderDir: 'asc',
+    raw: '1'
+  });
+
+  return `https://www.barchart.com/proxies/core-api/v1/quotes/get?${params.toString()}`;
+};
 
 const REQUEST_TIMEOUT = 10000; // 10 seconds
 const MAX_RETRIES = 3;
@@ -43,47 +59,68 @@ const cache = {};
 const CACHE_TTL = 60000; // 60 seconds
 
 function extractOptionRows(response) {
-  // Format 1: Direct array
+  // Barchart API format: { count, total, data: { "50.00": [...calls/puts...], "50.50": [...] } }
+  // Flatten strikes into single array
+  if (response && response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+    const rows = [];
+    for (const strikeKey in response.data) {
+      const optionGroup = response.data[strikeKey];
+      if (Array.isArray(optionGroup)) {
+        rows.push(...optionGroup);
+      }
+    }
+    if (rows.length > 0) return rows;
+  }
+
+  // Fallback: Direct array
   if (Array.isArray(response)) return response;
-  // Format 2: Wrapped in various properties
+  // Fallback: Wrapped in various properties
   if (Array.isArray(response.data)) return response.data;
   if (Array.isArray(response.options)) return response.options;
   if (Array.isArray(response.results)) return response.results;
   if (Array.isArray(response.rows)) return response.rows;
   if (Array.isArray(response.chain)) return response.chain;
-  // Format 3: Deeply nested
-  if (response.options && Array.isArray(response.options.chain)) return response.options.chain;
   return null;
 }
 
 function convertToCSV(optionRows) {
   if (!optionRows || !Array.isArray(optionRows) || optionRows.length === 0) return '';
 
+  // Build CSV from Barchart API response format
+  // Each row is an option (call or put) with fields like strikePrice, optionType, lastPrice, etc.
   const headers = [
     'Strike',
-    'CallSymbol', 'CallBid', 'CallAsk', 'CallLast', 'CallBidSize', 'CallAskSize',
-    'CallVolume', 'CallOpenInterest', 'CallIV', 'CallDelta', 'CallGamma',
-    'CallVega', 'CallTheta', 'CallRho',
-    'PutSymbol', 'PutBid', 'PutAsk', 'PutLast', 'PutBidSize', 'PutAskSize',
-    'PutVolume', 'PutOpenInterest', 'PutIV', 'PutDelta', 'PutGamma',
-    'PutVega', 'PutTheta', 'PutRho'
+    'Type',
+    'Symbol',
+    'LastPrice',
+    'Volume',
+    'OpenInterest',
+    'Premium',
+    'Delta',
+    'Gamma',
+    'Vega',
+    'Theta',
+    'Rho',
+    'ImpliedVol'
   ];
 
   const rows = optionRows.map(opt => {
-    const call = opt.call || {};
-    const put = opt.put || {};
+    // Use raw numeric values if available, fall back to formatted strings
+    const raw = opt.raw || opt;
     return [
-      opt.strike || '',
-      call.symbol || '', call.bid || '', call.ask || '', call.last || '',
-      call.bid_size || call.bidSize || '', call.ask_size || call.askSize || '',
-      call.volume || '', call.open_interest || call.openInterest || '',
-      call.iv || '', call.delta || '', call.gamma || '',
-      call.vega || '', call.theta || '', call.rho || '',
-      put.symbol || '', put.bid || '', put.ask || '', put.last || '',
-      put.bid_size || put.bidSize || '', put.ask_size || put.askSize || '',
-      put.volume || '', put.open_interest || put.openInterest || '',
-      put.iv || '', put.delta || '', put.gamma || '',
-      put.vega || '', put.theta || '', put.rho || ''
+      raw.strikePrice || opt.strikePrice || '',
+      raw.optionType || opt.optionType || '',
+      raw.longSymbol || opt.longSymbol || '',
+      raw.lastPrice || opt.lastPrice || '',
+      raw.volume || opt.volume || '',
+      raw.openInterest || opt.openInterest || '',
+      raw.premium || opt.premium || '',
+      raw.delta || opt.delta || '',
+      raw.gamma || opt.gamma || '',
+      raw.vega || opt.vega || '',
+      raw.theta || opt.theta || '',
+      raw.rho || opt.rho || '',
+      raw.impliedVolatility || opt.impliedVolatility || ''
     ];
   });
 
@@ -111,18 +148,13 @@ async function fetchOptionsChain(symbol, expiration, type = 'monthlies') {
     }
   }
 
-  // Choose patterns based on option type
-  const patterns = type === 'weeklies' ? WEEKLY_PATTERNS : MONTHLY_PATTERNS;
-
-  // Try patterns with exponential backoff
-  let lastError = null;
-  let patternIndex = 0;
+  // Build URL using the real Barchart API endpoint
+  const url = buildBarchartUrl(symbol, expiration);
+  console.log(`[barchart-fetch] Fetching: ${symbol} ${expiration} (${type})`);
+  console.log(`[barchart-fetch] URL: ${url.substring(0, 100)}...`);
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      const url = patterns[patternIndex % patterns.length](symbol, expiration);
-      console.log(`[barchart-fetch] Attempt ${attempt + 1}/${MAX_RETRIES} (${type}): ${url.substring(0, 80)}...`);
-
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
@@ -155,7 +187,7 @@ async function fetchOptionsChain(symbol, expiration, type = 'monthlies') {
           console.log(`[barchart-fetch] Success: ${rows.length} rows (${type})`);
           return rows;
         } else if (response.status === 404) {
-          throw new Error(`Not found (404): ${url}`);
+          throw new Error(`Not found (404): Symbol or expiration not available`);
         } else {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
@@ -164,21 +196,18 @@ async function fetchOptionsChain(symbol, expiration, type = 'monthlies') {
         throw e;
       }
     } catch (error) {
-      lastError = error;
-      console.warn(`[barchart-fetch] Attempt ${attempt + 1} failed: ${error.message}`);
-
-      // Try next pattern
-      patternIndex++;
+      console.warn(`[barchart-fetch] Attempt ${attempt + 1}/${MAX_RETRIES} failed: ${error.message}`);
 
       // Exponential backoff before retry
       if (attempt < MAX_RETRIES - 1) {
         const delay = Math.pow(2, attempt) * 1000;
+        console.log(`[barchart-fetch] Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        throw error;
       }
     }
   }
-
-  throw new Error(`Failed to fetch after ${MAX_RETRIES} attempts: ${lastError?.message}`);
 }
 
 export async function onRequestGet({ request, env }) {
