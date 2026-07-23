@@ -26,7 +26,7 @@
    * Fetch option chain from server-side API (bypasses CORS)
    * @param {string} symbol - Futures contract symbol (e.g., "ZNU26")
    * @param {string} expiration - Expiration date (e.g., "aug-26")
-   * @param {object} options - Fetch options (useCache)
+   * @param {object} options - Fetch options (type: 'monthlies'|'weeklies')
    * @returns {Promise<Array>} Array of option rows
    */
   async function fetchOptionsChain(symbol, expiration, options = {}) {
@@ -35,8 +35,14 @@
     }
 
     try {
-      const url = `${API_ENDPOINT}?symbol=${encodeURIComponent(symbol)}&expiration=${encodeURIComponent(expiration)}`;
-      console.log(`[Barchart] Fetching: ${symbol} ${expiration}`);
+      const type = options.type || 'monthlies';
+      const params = new URLSearchParams({
+        symbol: symbol,
+        expiration: expiration,
+        type: type
+      });
+      const url = `${API_ENDPOINT}?${params.toString()}`;
+      console.log(`[Barchart] Fetching: ${symbol} ${expiration} (${type})`);
 
       const response = await fetch(url, {
         method: 'GET',
@@ -73,7 +79,8 @@
       throw new Error('Symbol required');
     }
 
-    const cacheKey = `exp:${symbol}`;
+    const type = options.type || 'monthlies';
+    const cacheKey = `exp:${symbol}:${type}`;
     const useCache = options.useCache !== false;
 
     // Check cache
@@ -84,17 +91,17 @@
       }
     }
 
-    // Try to fetch with common expirations (fallback)
-    const commonExpirations = generateCommonExpirations();
+    // Generate expirations based on type
+    const expirations = type === 'weeklies'
+      ? generateWeeklyExpirations()
+      : generateCommonExpirations();
 
-    // In a real implementation, we'd scrape/call an API to get actual expirations
-    // For now, return common futures expirations
     cache.expirations[cacheKey] = {
-      data: commonExpirations,
+      data: expirations,
       timestamp: Date.now()
     };
 
-    return commonExpirations;
+    return expirations;
   }
 
   function generateCommonExpirations() {
@@ -109,6 +116,33 @@
       const yy = String(year).slice(-2);
       for (const month of months) {
         expirations.push(`${month}-${yy}`);
+      }
+    }
+
+    return expirations;
+  }
+
+  function generateWeeklyExpirations() {
+    // Weekly options expire every Friday
+    const expirations = [];
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    // Generate next 12 Fridays (roughly 3 months of weeklies)
+    let current = new Date(now);
+    let count = 0;
+    while (count < 12) {
+      // Find next Friday
+      const day = current.getDay();
+      const daysUntilFriday = day === 5 ? 7 : (5 - day + 7) % 7;
+      current.setDate(current.getDate() + (daysUntilFriday || 7));
+
+      if (current > now) {
+        const m = String(current.getMonth() + 1).padStart(2, '0');
+        const d = String(current.getDate()).padStart(2, '0');
+        const y = String(current.getFullYear()).slice(-2);
+        expirations.push(`${m}/${d}/${y}`);
+        count++;
       }
     }
 
@@ -130,8 +164,15 @@
      */
     fetchOptionsCSV: async (symbol, expiration, options = {}) => {
       try {
-        const url = `${API_ENDPOINT}?symbol=${encodeURIComponent(symbol)}&expiration=${encodeURIComponent(expiration)}&format=csv`;
-        console.log(`[Barchart] Fetching CSV: ${symbol} ${expiration}`);
+        const type = options.type || 'monthlies';
+        const params = new URLSearchParams({
+          symbol: symbol,
+          expiration: expiration,
+          type: type,
+          format: 'csv'
+        });
+        const url = `${API_ENDPOINT}?${params.toString()}`;
+        console.log(`[Barchart] Fetching CSV: ${symbol} ${expiration} (${type})`);
 
         const response = await fetch(url, {
           method: 'GET',

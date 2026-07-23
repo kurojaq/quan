@@ -114,6 +114,32 @@
             </select>
           </div>
 
+          <!-- Type Selector (Monthlies vs Weeklies) -->
+          <div style="margin-bottom: 12px;">
+            <label style="
+              display: block;
+              font-size: 10px;
+              text-transform: uppercase;
+              letter-spacing: 0.04em;
+              color: var(--cream-dim);
+              margin-bottom: 4px;
+              font-weight: 600;
+            ">Type</label>
+            <select id="barchartType" style="
+              width: 100%;
+              box-sizing: border-box;
+              background: rgba(255,255,255,0.05);
+              border: 0.5px solid rgba(255,255,255,0.1);
+              border-radius: var(--radius-sm);
+              color: var(--cream);
+              padding: 8px 10px;
+              font-size: 12px;
+            ">
+              <option value="monthlies">Monthlies (Standard)</option>
+              <option value="weeklies">Weeklies (Day-to-Day)</option>
+            </select>
+          </div>
+
           <!-- View Selector -->
           <div style="margin-bottom: 12px;">
             <label style="
@@ -240,6 +266,7 @@
     const toggleBtn = document.getElementById('barchartToggleBtn');
     const closeBtn = document.getElementById('barchartClose');
     const symbolInput = document.getElementById('barchartSymbol');
+    const typeSelect = document.getElementById('barchartType');
     const expirationSelect = document.getElementById('barchartExpiration');
     const viewSelect = document.getElementById('barchartView');
     const downloadBtn = document.getElementById('barchartDownloadBtn');
@@ -258,9 +285,10 @@
       toggleBtn.style.display = 'flex';
     });
 
-    // Load expirations when symbol changes
+    // Load expirations when symbol or type changes
     symbolInput.addEventListener('change', loadExpirations);
     symbolInput.addEventListener('blur', loadExpirations);
+    typeSelect.addEventListener('change', loadExpirations);
 
     // Download CSV
     downloadBtn.addEventListener('click', async () => {
@@ -282,15 +310,16 @@
 
     async function loadExpirations() {
       const symbol = symbolInput.value.trim().toUpperCase();
+      const type = typeSelect.value; // 'monthlies' or 'weeklies'
       if (!symbol) return;
 
       log('Loading expirations...');
       try {
-        const expirations = await FETCHER.getAvailableExpirations(symbol);
+        const expirations = await FETCHER.getAvailableExpirations(symbol, { type });
         expirationSelect.innerHTML = expirations
           .map((exp, idx) => `<option value="${exp}">${exp}</option>`)
           .join('');
-        log(`Loaded ${expirations.length} expirations`, 'success');
+        log(`Loaded ${expirations.length} ${type}`, 'success');
       } catch (error) {
         log(`Failed to load expirations: ${error.message}`, 'error');
       }
@@ -299,6 +328,7 @@
     async function handleDownload() {
       const symbol = symbolInput.value.trim().toUpperCase();
       const expiration = expirationSelect.value;
+      const type = typeSelect.value;
 
       if (!symbol || !expiration) {
         log('Please select symbol and expiration', 'error');
@@ -306,10 +336,10 @@
       }
 
       downloadBtn.disabled = true;
-      log(`Fetching ${symbol} ${expiration}...`);
+      log(`Fetching ${symbol} ${expiration} (${type})...`);
 
       try {
-        await FETCHER.downloadOptionsCSV(symbol, expiration);
+        await FETCHER.downloadOptionsCSV(symbol, expiration, { type });
         log(`Downloaded: ${symbol}_${expiration}.csv`, 'success');
       } catch (error) {
         log(`Download failed: ${error.message}`, 'error');
@@ -321,6 +351,7 @@
     async function handleImport() {
       const symbol = symbolInput.value.trim().toUpperCase();
       const expiration = expirationSelect.value;
+      const type = typeSelect.value;
 
       if (!symbol || !expiration) {
         log('Please select symbol and expiration', 'error');
@@ -328,23 +359,24 @@
       }
 
       importBtn.disabled = true;
-      log(`Importing ${symbol} ${expiration}...`);
+      log(`Importing ${symbol} ${expiration} (${type})...`);
 
       try {
-        const csv = await FETCHER.fetchOptionsCSV(symbol, expiration);
+        const csv = await FETCHER.fetchOptionsCSV(symbol, expiration, { type });
 
         // Create blob and upload via csv-session-manager if available
         if (global.__csvSessionManager && global.__csvSessionManager.importCSV) {
           await global.__csvSessionManager.importCSV(csv, {
             type: 'option_data',
             symbol: symbol,
-            expiration: expiration
+            expiration: expiration,
+            optionType: type
           });
           log(`Imported to terminal: ${symbol}`, 'success');
         } else {
           // Fallback: trigger download
           log('CSV manager not available, downloading instead...', 'info');
-          await FETCHER.downloadOptionsCSV(symbol, expiration);
+          await FETCHER.downloadOptionsCSV(symbol, expiration, { type });
         }
       } catch (error) {
         log(`Import failed: ${error.message}`, 'error');

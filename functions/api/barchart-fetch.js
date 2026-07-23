@@ -16,7 +16,20 @@
 
 import { json, badRequest, serverError, requireOperator } from './_shared.js';
 
-const API_PATTERNS = [
+// API patterns for standard monthly options
+const MONTHLY_PATTERNS = [
+  (symbol, expiration) => `https://www.barchart.com/api/quotes/options/futures/${symbol}/${expiration}`,
+  (symbol, expiration) => `https://www.barchart.com/v1/futures/${symbol}/options?expiration=${expiration}`,
+  (symbol, expiration) => `https://www.barchart.com/ajax/options/futures/${symbol}?expiration=${expiration}`
+];
+
+// API patterns for weekly options (expire every Friday)
+// Weeklies often use different URL structure or parameters
+const WEEKLY_PATTERNS = [
+  (symbol, expiration) => `https://www.barchart.com/api/quotes/options/futures/${symbol}/${expiration}?weekly=true`,
+  (symbol, expiration) => `https://www.barchart.com/v1/futures/${symbol}/options?expiration=${expiration}&weekly=true`,
+  (symbol, expiration) => `https://www.barchart.com/ajax/options/futures/${symbol}?expiration=${expiration}&weekly=true`,
+  // Fallback: try same patterns as monthlies in case Barchart handles both
   (symbol, expiration) => `https://www.barchart.com/api/quotes/options/futures/${symbol}/${expiration}`,
   (symbol, expiration) => `https://www.barchart.com/v1/futures/${symbol}/options?expiration=${expiration}`,
   (symbol, expiration) => `https://www.barchart.com/ajax/options/futures/${symbol}?expiration=${expiration}`
@@ -82,12 +95,12 @@ function convertToCSV(optionRows) {
   return csvContent;
 }
 
-async function fetchOptionsChain(symbol, expiration) {
+async function fetchOptionsChain(symbol, expiration, type = 'monthlies') {
   if (!symbol || !expiration) {
     throw new Error('Symbol and expiration required');
   }
 
-  const cacheKey = `${symbol}:${expiration}`;
+  const cacheKey = `${symbol}:${expiration}:${type}`;
 
   // Check cache
   if (cache[cacheKey]) {
@@ -98,14 +111,17 @@ async function fetchOptionsChain(symbol, expiration) {
     }
   }
 
+  // Choose patterns based on option type
+  const patterns = type === 'weeklies' ? WEEKLY_PATTERNS : MONTHLY_PATTERNS;
+
   // Try patterns with exponential backoff
   let lastError = null;
   let patternIndex = 0;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      const url = API_PATTERNS[patternIndex % API_PATTERNS.length](symbol, expiration);
-      console.log(`[barchart-fetch] Attempt ${attempt + 1}/${MAX_RETRIES}: ${url.substring(0, 80)}...`);
+      const url = patterns[patternIndex % patterns.length](symbol, expiration);
+      console.log(`[barchart-fetch] Attempt ${attempt + 1}/${MAX_RETRIES} (${type}): ${url.substring(0, 80)}...`);
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
@@ -136,7 +152,7 @@ async function fetchOptionsChain(symbol, expiration) {
             timestamp: Date.now()
           };
 
-          console.log(`[barchart-fetch] Success: ${rows.length} rows`);
+          console.log(`[barchart-fetch] Success: ${rows.length} rows (${type})`);
           return rows;
         } else if (response.status === 404) {
           throw new Error(`Not found (404): ${url}`);
@@ -174,6 +190,7 @@ export async function onRequestGet({ request, env }) {
     const url = new URL(request.url);
     const symbol = url.searchParams.get('symbol');
     const expiration = url.searchParams.get('expiration');
+    const type = url.searchParams.get('type') || 'monthlies';
     const format = url.searchParams.get('format') || 'json';
 
     if (!symbol || !expiration) {
@@ -184,12 +201,16 @@ export async function onRequestGet({ request, env }) {
     if (!/^[A-Z0-9]{2,4}$/.test(symbol)) {
       return badRequest('invalid symbol format');
     }
-    if (!/^[a-z]{3}-\d{2}$/.test(expiration) && !/^\d{2}_\d{2}_\d{2}$/.test(expiration)) {
-      return badRequest('invalid expiration format');
+    // Accept both format: "aug-26" (monthlies) and "01/17/26" (weeklies)
+    if (!/^[a-z]{3}-\d{2}$/.test(expiration) && !/^\d{2}_\d{2}_\d{2}$/.test(expiration) && !/^\d{2}\/\d{2}\/\d{2}$/.test(expiration)) {
+      return badRequest('invalid expiration format (try "aug-26" or "01/17/26")');
+    }
+    if (!['monthlies', 'weeklies'].includes(type)) {
+      return badRequest('type must be "monthlies" or "weeklies"');
     }
 
     // Fetch the chain
-    const rows = await fetchOptionsChain(symbol, expiration);
+    const rows = await fetchOptionsChain(symbol, expiration, type);
 
     // Return in requested format
     if (format === 'csv') {
