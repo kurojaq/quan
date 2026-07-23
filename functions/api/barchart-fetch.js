@@ -18,24 +18,43 @@ import { json, badRequest, serverError, requireOperator } from './_shared.js';
 
 // Real Barchart API endpoint discovered from HAR file inspection
 // Returns options chain grouped by strike price
-const buildBarchartUrl = (symbol, expiration) => {
-  const fields = [
-    'optionType',
-    'lastPrice',
-    'volume',
-    'openInterest',
-    'premium',
-    'strikePrice',
-    'longSymbol',
-    'symbolName',
-    'symbolType',
-    'impliedVolatility', // Greeks
-    'delta',
-    'gamma',
-    'vega',
-    'theta',
-    'rho'
-  ].join(',');
+const buildBarchartUrl = (symbol, expiration, dataType = 'prices') => {
+  let fields;
+
+  if (dataType === 'greeks') {
+    // Volatility & Greeks fields
+    fields = [
+      'strikePrice',
+      'symbolName',
+      'baseSymbol',
+      'lastPrice',
+      'optImpliedVolatility',
+      'delta',
+      'gamma',
+      'theta',
+      'vega',
+      'impliedVolatilitySkew',
+      'optionType',
+      'tradeTime',
+      'longSymbol',
+      'daysToExpiration',
+      'expirationDate',
+      'averageVolatility'
+    ].join(',');
+  } else {
+    // Option prices fields (default)
+    fields = [
+      'optionType',
+      'lastPrice',
+      'volume',
+      'openInterest',
+      'premium',
+      'strikePrice',
+      'longSymbol',
+      'symbolName',
+      'symbolType'
+    ].join(',');
+  }
 
   const params = new URLSearchParams({
     symbol: symbol,
@@ -83,46 +102,74 @@ function extractOptionRows(response) {
   return null;
 }
 
-function convertToCSV(optionRows) {
+function convertToCSV(optionRows, dataType = 'prices') {
   if (!optionRows || !Array.isArray(optionRows) || optionRows.length === 0) return '';
 
-  // Build CSV from Barchart API response format
-  // Each row is an option (call or put) with fields like strikePrice, optionType, lastPrice, etc.
-  const headers = [
-    'Strike',
-    'Type',
-    'Symbol',
-    'LastPrice',
-    'Volume',
-    'OpenInterest',
-    'Premium',
-    'Delta',
-    'Gamma',
-    'Vega',
-    'Theta',
-    'Rho',
-    'ImpliedVol'
-  ];
+  let headers, buildRow;
 
-  const rows = optionRows.map(opt => {
-    // Use raw numeric values if available, fall back to formatted strings
-    const raw = opt.raw || opt;
-    return [
-      raw.strikePrice || opt.strikePrice || '',
-      raw.optionType || opt.optionType || '',
-      raw.longSymbol || opt.longSymbol || '',
-      raw.lastPrice || opt.lastPrice || '',
-      raw.volume || opt.volume || '',
-      raw.openInterest || opt.openInterest || '',
-      raw.premium || opt.premium || '',
-      raw.delta || opt.delta || '',
-      raw.gamma || opt.gamma || '',
-      raw.vega || opt.vega || '',
-      raw.theta || opt.theta || '',
-      raw.rho || opt.rho || '',
-      raw.impliedVolatility || opt.impliedVolatility || ''
+  if (dataType === 'greeks') {
+    // Greeks CSV format
+    headers = [
+      'Strike',
+      'Type',
+      'Symbol',
+      'LastPrice',
+      'ImpliedVol',
+      'Delta',
+      'Gamma',
+      'Vega',
+      'Theta',
+      'IVSkew',
+      'TradeTime',
+      'DaysToExp',
+      'AvgVolatility'
     ];
-  });
+
+    buildRow = (opt) => {
+      const raw = opt.raw || opt;
+      return [
+        raw.strikePrice || opt.strikePrice || '',
+        raw.optionType || opt.optionType || '',
+        raw.longSymbol || opt.longSymbol || '',
+        raw.lastPrice || opt.lastPrice || '',
+        raw.optImpliedVolatility || opt.optImpliedVolatility || '',
+        raw.delta || opt.delta || '',
+        raw.gamma || opt.gamma || '',
+        raw.vega || opt.vega || '',
+        raw.theta || opt.theta || '',
+        raw.impliedVolatilitySkew || opt.impliedVolatilitySkew || '',
+        raw.tradeTime || opt.tradeTime || '',
+        raw.daysToExpiration || opt.daysToExpiration || '',
+        raw.averageVolatility || opt.averageVolatility || ''
+      ];
+    };
+  } else {
+    // Prices CSV format (default)
+    headers = [
+      'Strike',
+      'Type',
+      'Symbol',
+      'LastPrice',
+      'Volume',
+      'OpenInterest',
+      'Premium'
+    ];
+
+    buildRow = (opt) => {
+      const raw = opt.raw || opt;
+      return [
+        raw.strikePrice || opt.strikePrice || '',
+        raw.optionType || opt.optionType || '',
+        raw.longSymbol || opt.longSymbol || '',
+        raw.lastPrice || opt.lastPrice || '',
+        raw.volume || opt.volume || '',
+        raw.openInterest || opt.openInterest || '',
+        raw.premium || opt.premium || ''
+      ];
+    };
+  }
+
+  const rows = optionRows.map(buildRow);
 
   const csvContent = [
     headers.map(h => `"${h}"`).join(','),
@@ -167,7 +214,7 @@ async function fetchOptionsChain(symbol, expiration, type = 'monthlies', env) {
   }
 
   // Build URL using the real Barchart API endpoint
-  const url = buildBarchartUrl(symbol, expiration);
+  const url = buildBarchartUrl(symbol, expiration, type);
   console.log(`[barchart-fetch] Fetching: ${symbol} ${expiration} (${type})`);
   console.log(`[barchart-fetch] URL: ${url.substring(0, 100)}...`);
   console.log(`[barchart-fetch] Auth: ${cookieHeader ? 'cookies from autopull' : 'public (no auth)'}`);
@@ -244,6 +291,7 @@ export async function onRequestGet({ request, env }) {
     const symbol = url.searchParams.get('symbol');
     const expiration = url.searchParams.get('expiration');
     const type = url.searchParams.get('type') || 'monthlies';
+    const dataType = url.searchParams.get('dataType') || 'prices';
     const format = url.searchParams.get('format') || 'json';
 
     if (!symbol || !expiration) {
@@ -262,19 +310,22 @@ export async function onRequestGet({ request, env }) {
     if (!['monthlies', 'weeklies'].includes(type)) {
       return badRequest('type must be "monthlies" or "weeklies"');
     }
+    if (!['prices', 'greeks'].includes(dataType)) {
+      return badRequest('dataType must be "prices" or "greeks"');
+    }
 
     // Fetch the chain (with env for cookie access)
     const rows = await fetchOptionsChain(symbol, expiration, type, env);
 
     // Return in requested format
     if (format === 'csv') {
-      const csv = convertToCSV(rows);
+      const csv = convertToCSV(rows, dataType);
       return new Response(csv, {
         status: 200,
         headers: {
           'Content-Type': 'text/csv;charset=utf-8',
           'Cache-Control': 'no-store',
-          'Content-Disposition': `attachment; filename="${symbol}_${expiration}.csv"`
+          'Content-Disposition': `attachment; filename="${symbol}_${expiration}_${dataType}.csv"`
         }
       });
     } else {
@@ -282,12 +333,59 @@ export async function onRequestGet({ request, env }) {
       return json({
         symbol,
         expiration,
+        dataType,
         count: rows.length,
         data: rows
       });
     }
   } catch (error) {
     console.error('[barchart-fetch] Error:', error);
+    return serverError(error.message);
+  }
+}
+
+export async function onRequestPost({ request, env }) {
+  try {
+    const url = new URL(request.url);
+    const action = url.searchParams.get('action');
+
+    if (action === 'seed-cookies') {
+      if (!env.QUAN_PUBLISH) return serverError('KV not bound');
+      const body = await request.json().catch(() => ({}));
+      let cookies = body.cookies;
+      if (typeof cookies === 'string') {
+        try {
+          cookies = JSON.parse(cookies);
+        } catch (_) {
+          return badRequest('cookies must be JSON');
+        }
+      }
+      if (!Array.isArray(cookies)) return badRequest('cookies[] required (exported JSON array)');
+      const clean = cookies
+        .filter((c) => c && c.name && c.value != null)
+        .map((c) => ({
+          name: String(c.name),
+          value: String(c.value),
+          domain: c.domain,
+          path: c.path,
+          expires: c.expires != null ? c.expires : c.expirationDate,
+          httpOnly: c.httpOnly,
+          secure: c.secure,
+          sameSite: c.sameSite
+        }));
+      if (!clean.length) return badRequest('no valid {name,value} cookies found');
+      await env.QUAN_PUBLISH.put('autopull:cookies', JSON.stringify(clean));
+      return json({ ok: true, count: clean.length });
+    }
+
+    if (action === 'clear-cookies') {
+      if (env.QUAN_PUBLISH) await env.QUAN_PUBLISH.delete('autopull:cookies');
+      return json({ ok: true });
+    }
+
+    return badRequest('unknown action (try seed-cookies or clear-cookies)');
+  } catch (error) {
+    console.error('[barchart-fetch] POST Error:', error);
     return serverError(error.message);
   }
 }

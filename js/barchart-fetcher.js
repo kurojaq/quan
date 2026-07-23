@@ -26,7 +26,7 @@
    * Fetch option chain from server-side API (bypasses CORS)
    * @param {string} symbol - Futures contract symbol (e.g., "ZNU26")
    * @param {string} expiration - Expiration date (e.g., "aug-26")
-   * @param {object} options - Fetch options (type: 'monthlies'|'weeklies')
+   * @param {object} options - Fetch options (type: 'monthlies'|'weeklies', dataType: 'prices'|'greeks')
    * @returns {Promise<Array>} Array of option rows
    */
   async function fetchOptionsChain(symbol, expiration, options = {}) {
@@ -36,13 +36,15 @@
 
     try {
       const type = options.type || 'monthlies';
+      const dataType = options.dataType || 'prices';
       const params = new URLSearchParams({
         symbol: symbol,
         expiration: expiration,
-        type: type
+        type: type,
+        dataType: dataType
       });
       const url = `${API_ENDPOINT}?${params.toString()}`;
-      console.log(`[Barchart] Fetching: ${symbol} ${expiration} (${type})`);
+      console.log(`[Barchart] Fetching: ${symbol} ${expiration} (${type}, ${dataType})`);
 
       const response = await fetch(url, {
         method: 'GET',
@@ -165,14 +167,16 @@
     fetchOptionsCSV: async (symbol, expiration, options = {}) => {
       try {
         const type = options.type || 'monthlies';
+        const dataType = options.dataType || 'prices';
         const params = new URLSearchParams({
           symbol: symbol,
           expiration: expiration,
           type: type,
+          dataType: dataType,
           format: 'csv'
         });
         const url = `${API_ENDPOINT}?${params.toString()}`;
-        console.log(`[Barchart] Fetching CSV: ${symbol} ${expiration} (${type})`);
+        console.log(`[Barchart] Fetching CSV: ${symbol} ${expiration} (${type}, ${dataType})`);
 
         const response = await fetch(url, {
           method: 'GET',

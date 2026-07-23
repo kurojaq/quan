@@ -38,33 +38,80 @@
         font-family: ui-monospace, Menlo, monospace;
         display: none;
       ">
-        <!-- Header -->
+        <!-- Header with Tabs -->
         <div style="
-          padding: 12px 14px;
+          padding: 0;
           border-bottom: 0.5px solid var(--glass-line);
           display: flex;
           justify-content: space-between;
-          align-items: center;
+          align-items: stretch;
           font-weight: 600;
           font-size: 11px;
           text-transform: uppercase;
           letter-spacing: 0.05em;
         ">
-          <span>📊 Barchart Importer</span>
+          <div style="flex: 1; display: flex;">
+            <button id="barchartTabImport" class="barchart-tab" data-tab="import" style="
+              flex: 1;
+              background: transparent;
+              border: none;
+              border-bottom: 2px solid #6fa3ff;
+              color: #6fa3ff;
+              padding: 12px;
+              cursor: pointer;
+              font-size: 11px;
+            ">Import</button>
+            <button id="barchartTabAuth" class="barchart-tab" data-tab="auth" style="
+              flex: 1;
+              background: transparent;
+              border: none;
+              border-bottom: 2px solid transparent;
+              color: var(--cream-dim);
+              padding: 12px;
+              cursor: pointer;
+              font-size: 11px;
+            ">Auth</button>
+          </div>
           <button id="barchartClose" type="button" style="
             background: none;
             border: none;
             color: var(--cream-dim);
             cursor: pointer;
             font-size: 16px;
-            padding: 0;
-            width: 20px;
-            height: 20px;
+            padding: 12px 14px;
+            width: auto;
+            height: auto;
           ">✕</button>
         </div>
 
-        <!-- Content -->
-        <div style="padding: 12px 14px;">
+        <!-- Content (tabbed) -->
+        <div id="barchartImportTab" class="barchart-content-tab" style="padding: 12px 14px; display: block;">
+          <!-- Data Type Selector -->
+          <div style="margin-bottom: 12px;">
+            <label style="
+              display: block;
+              font-size: 10px;
+              text-transform: uppercase;
+              letter-spacing: 0.04em;
+              color: var(--cream-dim);
+              margin-bottom: 4px;
+              font-weight: 600;
+            ">Data Type</label>
+            <select id="barchartDataType" style="
+              width: 100%;
+              box-sizing: border-box;
+              background: rgba(255,255,255,0.05);
+              border: 0.5px solid rgba(255,255,255,0.1);
+              border-radius: var(--radius-sm);
+              color: var(--cream);
+              padding: 8px 10px;
+              font-size: 12px;
+            ">
+              <option value="prices">Option Prices</option>
+              <option value="greeks">Volatility & Greeks</option>
+            </select>
+          </div>
+
           <!-- Symbol Input -->
           <div style="margin-bottom: 10px;">
             <label style="
@@ -222,6 +269,113 @@
             Ready
           </div>
         </div>
+
+        <!-- Auth Tab Content -->
+        <div id="barchartAuthTab" class="barchart-content-tab" style="padding: 12px 14px; display: none;">
+          <div style="margin-bottom: 12px;">
+            <div style="color: var(--cream-dim); font-size: 10px; line-height: 1.5; margin-bottom: 8px;">
+              To fetch options data, Barchart requires a valid session cookie.
+            </div>
+          </div>
+
+          <!-- Cookie Instructions -->
+          <div style="
+            background: rgba(255,255,255,0.02);
+            border: 0.5px solid rgba(255,255,255,0.05);
+            border-radius: var(--radius-sm);
+            padding: 8px;
+            font-size: 9px;
+            color: var(--cream-dim);
+            margin-bottom: 12px;
+            line-height: 1.6;
+          ">
+            <strong style="color: var(--cream);">Steps:</strong><br>
+            1. Log into barchart.com<br>
+            2. Open DevTools (F12)<br>
+            3. Go to Application → Cookies<br>
+            4. Install Cookie-Editor extension or export cookies as JSON<br>
+            5. Paste JSON below and click "Seed"
+          </div>
+
+          <!-- Cookies Textarea -->
+          <div style="margin-bottom: 12px;">
+            <label style="
+              display: block;
+              font-size: 10px;
+              text-transform: uppercase;
+              letter-spacing: 0.04em;
+              color: var(--cream-dim);
+              margin-bottom: 4px;
+              font-weight: 600;
+            ">Session Cookies (JSON)</label>
+            <textarea id="barchartCookies" placeholder="[ { &quot;name&quot;:&quot;...&quot;, &quot;value&quot;:&quot;...&quot; }, ... ]" style="
+              width: 100%;
+              height: 80px;
+              background: rgba(255,255,255,0.05);
+              border: 0.5px solid rgba(255,255,255,0.1);
+              outline: none;
+              border-radius: var(--radius-sm);
+              color: var(--cream);
+              font-size: 10px;
+              font-family: monospace;
+              padding: 8px;
+              box-sizing: border-box;
+            "></textarea>
+          </div>
+
+          <!-- Seed Buttons -->
+          <div style="
+            display: flex;
+            gap: 6px;
+            margin-bottom: 12px;
+          ">
+            <button id="barchartSeedBtn" type="button" style="
+              flex: 1;
+              background: rgba(95,208,138,0.2);
+              border: 0.5px solid rgba(95,208,138,0.5);
+              color: #5fd08a;
+              border-radius: var(--radius-sm);
+              padding: 8px 10px;
+              font-size: 11px;
+              font-weight: 600;
+              cursor: pointer;
+              text-transform: uppercase;
+              letter-spacing: 0.04em;
+              transition: all 0.2s ease;
+            ">
+              ✓ Seed Cookies
+            </button>
+            <button id="barchartClearBtn" type="button" style="
+              flex: 1;
+              background: rgba(224,138,106,0.2);
+              border: 0.5px solid rgba(224,138,106,0.5);
+              color: #e08a6a;
+              border-radius: var(--radius-sm);
+              padding: 8px 10px;
+              font-size: 11px;
+              font-weight: 600;
+              cursor: pointer;
+              text-transform: uppercase;
+              letter-spacing: 0.04em;
+              transition: all 0.2s ease;
+            ">
+              ✕ Clear
+            </button>
+          </div>
+
+          <!-- Status -->
+          <div id="barchartAuthStatus" style="
+            background: rgba(255,255,255,0.02);
+            border: 0.5px solid rgba(255,255,255,0.05);
+            border-radius: var(--radius-sm);
+            padding: 8px;
+            font-size: 10px;
+            line-height: 1.4;
+            color: var(--cream-dim);
+          ">
+            Ready
+          </div>
+        </div>
       </div>
 
       <!-- Toggle Button (Fixed, always visible) -->
@@ -265,13 +419,44 @@
     const panel = document.getElementById('barchartImportPanel');
     const toggleBtn = document.getElementById('barchartToggleBtn');
     const closeBtn = document.getElementById('barchartClose');
+    const importTab = document.getElementById('barchartImportTab');
+    const authTab = document.getElementById('barchartAuthTab');
+    const tabImportBtn = document.getElementById('barchartTabImport');
+    const tabAuthBtn = document.getElementById('barchartTabAuth');
     const symbolInput = document.getElementById('barchartSymbol');
     const typeSelect = document.getElementById('barchartType');
+    const dataTypeSelect = document.getElementById('barchartDataType');
     const expirationSelect = document.getElementById('barchartExpiration');
     const viewSelect = document.getElementById('barchartView');
     const downloadBtn = document.getElementById('barchartDownloadBtn');
     const importBtn = document.getElementById('barchartImportBtn');
     const statusDiv = document.getElementById('barchartStatus');
+    const seedBtn = document.getElementById('barchartSeedBtn');
+    const clearBtn = document.getElementById('barchartClearBtn');
+    const cookiesTA = document.getElementById('barchartCookies');
+    const authStatusDiv = document.getElementById('barchartAuthStatus');
+
+    // Tab switching
+    const switchTab = (tab) => {
+      if (tab === 'import') {
+        importTab.style.display = 'block';
+        authTab.style.display = 'none';
+        tabImportBtn.style.borderBottomColor = '#6fa3ff';
+        tabImportBtn.style.color = '#6fa3ff';
+        tabAuthBtn.style.borderBottomColor = 'transparent';
+        tabAuthBtn.style.color = 'var(--cream-dim)';
+      } else {
+        importTab.style.display = 'none';
+        authTab.style.display = 'block';
+        tabImportBtn.style.borderBottomColor = 'transparent';
+        tabImportBtn.style.color = 'var(--cream-dim)';
+        tabAuthBtn.style.borderBottomColor = '#6fa3ff';
+        tabAuthBtn.style.color = '#6fa3ff';
+      }
+    };
+
+    tabImportBtn.addEventListener('click', () => switchTab('import'));
+    tabAuthBtn.addEventListener('click', () => switchTab('auth'));
 
     // Toggle panel visibility
     toggleBtn.addEventListener('click', () => {
@@ -308,6 +493,59 @@
       console.log(`[Barchart] ${message}`);
     }
 
+    function logAuth(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      const color = type === 'error' ? '#e08a6a' : (type === 'success' ? '#5fd08a' : '#6fa3ff');
+      authStatusDiv.innerHTML = `<span style="color: ${color}">[${timestamp}] ${message}</span>`;
+      console.log(`[Barchart Auth] ${message}`);
+    }
+
+    // Seed cookies to KV
+    seedBtn.addEventListener('click', async () => {
+      const raw = (cookiesTA.value || '').trim();
+      if (!raw) {
+        logAuth('Please paste cookies JSON first', 'error');
+        return;
+      }
+
+      logAuth('Seeding cookies...');
+      seedBtn.disabled = true;
+      try {
+        const r = await fetch('/api/barchart-fetch?action=seed-cookies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cookies: raw })
+        });
+        const d = await r.json().catch(() => ({ error: 'Invalid response' }));
+        if (r.ok) {
+          logAuth(`Seeded ${d.count || '?'} cookies ✓`, 'success');
+          cookiesTA.value = '';
+        } else {
+          logAuth(`Error: ${d.error || r.status}`, 'error');
+        }
+      } catch (e) {
+        logAuth(`Network error: ${e.message}`, 'error');
+      } finally {
+        seedBtn.disabled = false;
+      }
+    });
+
+    // Clear cookies
+    clearBtn.addEventListener('click', async () => {
+      logAuth('Clearing cookies...');
+      clearBtn.disabled = true;
+      try {
+        const r = await fetch('/api/barchart-fetch?action=clear-cookies', {
+          method: 'POST'
+        });
+        logAuth(r.ok ? 'Cleared ✓' : 'Error', r.ok ? 'success' : 'error');
+      } catch (e) {
+        logAuth(`Network error: ${e.message}`, 'error');
+      } finally {
+        clearBtn.disabled = false;
+      }
+    });
+
     async function loadExpirations() {
       const symbol = symbolInput.value.trim().toUpperCase();
       const type = typeSelect.value; // 'monthlies' or 'weeklies'
@@ -329,6 +567,7 @@
       const symbol = symbolInput.value.trim().toUpperCase();
       const expiration = expirationSelect.value;
       const type = typeSelect.value;
+      const dataType = dataTypeSelect.value;
 
       if (!symbol || !expiration) {
         log('Please select symbol and expiration', 'error');
@@ -336,11 +575,12 @@
       }
 
       downloadBtn.disabled = true;
-      log(`Fetching ${symbol} ${expiration} (${type})...`);
+      log(`Fetching ${symbol} ${expiration} (${type}, ${dataType})...`);
 
       try {
-        await FETCHER.downloadOptionsCSV(symbol, expiration, { type });
-        log(`Downloaded: ${symbol}_${expiration}.csv`, 'success');
+        await FETCHER.downloadOptionsCSV(symbol, expiration, { type, dataType });
+        const filename = `${symbol}_${expiration}_${dataType}.csv`;
+        log(`Downloaded: ${filename}`, 'success');
       } catch (error) {
         log(`Download failed: ${error.message}`, 'error');
       } finally {
@@ -352,6 +592,7 @@
       const symbol = symbolInput.value.trim().toUpperCase();
       const expiration = expirationSelect.value;
       const type = typeSelect.value;
+      const dataType = dataTypeSelect.value;
 
       if (!symbol || !expiration) {
         log('Please select symbol and expiration', 'error');
@@ -359,10 +600,10 @@
       }
 
       importBtn.disabled = true;
-      log(`Importing ${symbol} ${expiration} (${type})...`);
+      log(`Importing ${symbol} ${expiration} (${type}, ${dataType})...`);
 
       try {
-        const csv = await FETCHER.fetchOptionsCSV(symbol, expiration, { type });
+        const csv = await FETCHER.fetchOptionsCSV(symbol, expiration, { type, dataType });
 
         // Create blob and upload via csv-session-manager if available
         if (global.__csvSessionManager && global.__csvSessionManager.importCSV) {
@@ -370,13 +611,14 @@
             type: 'option_data',
             symbol: symbol,
             expiration: expiration,
-            optionType: type
+            optionType: type,
+            dataType: dataType
           });
           log(`Imported to terminal: ${symbol}`, 'success');
         } else {
           // Fallback: trigger download
           log('CSV manager not available, downloading instead...', 'info');
-          await FETCHER.downloadOptionsCSV(symbol, expiration, { type });
+          await FETCHER.downloadOptionsCSV(symbol, expiration, { type, dataType });
         }
       } catch (error) {
         log(`Import failed: ${error.message}`, 'error');
