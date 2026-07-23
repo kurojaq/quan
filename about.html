@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<!-- ==========================================================================
+     ABOUT — Hūs Rihtlǽfan (www.husrihtlaefan.org/about).
+     Founder's note. Reuses css/landing.css wholesale (same nav/footer as
+     index.html) with a small embedded block for the essay layout only.
+     ========================================================================== -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>About — Hūs Rihtlǽfan</title>
+<meta name="description" content="How Hūs Rihtlǽfan and The Qu'an came to be built — a founder's note from Jaquan Boggan.">
+<meta name="theme-color" content="#050506">
+<meta property="og:title" content="About — Hūs Rihtlǽfan">
+<meta property="og:description" content="Built off the clock, for one book, before it was ever offered to anyone else's.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="/logo.png">
+<link rel="icon" type="image/png" href="/logo.png">
+<link rel="shortcut icon" href="/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/landing.css">
+<style>
+  /* ---- essay layout only; everything else (nav, footer, tokens) comes from landing.css ---- */
+  .essay-head{padding:100px 0 8px;text-align:center;}
+  .essay-head .eyebrow{margin-bottom:20px;}
+  .essay-head h1{font-size:clamp(32px,5vw,52px);line-height:1.08;letter-spacing:-0.02em;
+    font-weight:700;margin:0 auto 18px;max-width:20ch;}
+  .essay-head .dek{font-size:15px;color:var(--muted);max-width:46ch;margin:0 auto;}
+  .essay{max-width:640px;margin:0 auto;padding:64px 24px 40px;}
+  .essay p{font-size:16.5px;line-height:1.75;color:var(--ink-dim);margin:0 0 26px;}
+  .essay p:first-of-type::first-letter{
+    float:left;font-size:58px;line-height:0.82;font-weight:700;color:var(--ink);
+    padding:6px 8px 0 0;font-family:var(--font-sans);}
+  .essay .sig{margin-top:44px;padding-top:26px;border-top:0.5px solid var(--line);}
+  .essay .sig .name{font-size:14px;font-weight:600;color:var(--ink);letter-spacing:.01em;}
+  .essay .sig .role{font-size:12.5px;color:var(--faint);margin-top:4px;}
+  .essay .pull{margin:48px 0;font-size:20px;line-height:1.5;color:var(--ink);font-weight:500;
+    letter-spacing:-0.01em;border-left:2px solid var(--line-2);padding-left:22px;}
+  .essay-cta{text-align:center;padding:16px 24px 88px;}
+  .essay-cta .btn{margin:0 6px;}
+  @media (max-width:560px){
+    .essay{padding:48px 20px 24px;}
+    .essay p{font-size:15.5px;}
+  }
+</style>
+</head>
+<body>
+<div class="bg-field"></div>
+<div class="bg-grid"></div>
+
+<!-- ===== nav (identical to index.html) ===== -->
+<header class="nav">
+  <div class="nav-in">
+    <a class="brand" href="/">
+      <span class="glyph">Q</span>
+      <span>The&nbsp;Qu'an</span>
+    </a>
+    <nav class="nav-links">
+      <a href="/#instruments">Instruments</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/blog">Daily Brief</a>
+      <a href="/about" aria-current="page">About</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn-ghost btn-sm" href="/app">Sign in</a>
+      <a class="btn btn-primary btn-sm" href="/#pricing">Subscribe</a>
+    </div>
+  </div>
+</header>
+
+<section class="essay-head">
+  <div class="wrap">
+    <div class="eyebrow">The house</div>
+    <h1>Everything here was built off the clock.</h1>
+    <p class="dek">A note on how Hūs Rihtlǽfan, and the terminal at its center, came to exist.</p>
+  </div>
+</section>
+
+<article class="essay">
+  <p>Jaquan Boggan grew up in the Bronx and came up through Mount Vernon — the kind of places that teach you to read a room before anyone explains what's in it. Nothing in that path pointed toward derivatives. For years the work was hospital kitchens, deli counters, a city help desk, a bookstore, a coworking floor — jobs built on the same unglamorous discipline: keep the rotation straight, keep the queue moving, notice what's about to go wrong before it does. It is not the résumé of a trader. It is the résumé of someone who was paying attention long before the markets were the thing he paid attention to.</p>
+
+  <p>The market work started the same way everything else here did — off the clock, self-taught, out of curiosity rather than a career plan. Option chains, at first, were just another system to take apart: rows of numbers that, read closely enough, told you where the pressure actually sat. There was no desk to learn from and no formal training to lean on. There was Python, a spreadsheet, and a habit carried over from every job before it — the refusal to look away from the detail everyone else skips.</p>
+
+  <p class="pull">Each instrument was built to answer one honest question for one book, before it was ever offered to anyone else's.</p>
+
+  <p>What grew out of that habit is Hūs Rihtlǽfan, and the terminal at its center — The Qu'an. It reads dealer positioning the way a desk would: the Intermarket Breach Detector watches structural coherence across correlated instruments, Field Study renders the pressure itself as a polar disk, the Deep Strike Heat Map carries its own dealer watermark strike by strike, a Bookmap-style chart blends that same heat field behind live price, and the Tri-Horizon Compass measures what a session promised against what it actually realized. None of it was designed to be sold first. It was designed to be right.</p>
+
+  <p>The same instinct runs under the design as under the math. Years of drawing, graphic work and music production left a low tolerance for anything cluttered or loud — which is most of why the terminal reads the way it does: quiet, dark, exact, nothing on screen that isn't earning its place. Baking bread taught the same lesson the option chains eventually did: the process doesn't forgive shortcuts, and the good outcomes are the patient ones.</p>
+
+  <p>Hūs Rihtlǽfan publishes what it finds — a daily field brief, free to read, no account required — and licenses the instruments behind it to any book that can put the same read to use. The house doesn't take a shortcut in the product that it wouldn't take with its own capital.</p>
+
+  <div class="sig">
+    <div class="name">Jaquan Boggan</div>
+    <div class="role">Founder, H&#363;s Rihtl&#509;fan</div>
+  </div>
+</article>
+
+<div class="essay-cta">
+  <a class="btn btn-ghost btn-lg" href="/blog">Read the Daily Brief</a>
+  <a class="btn btn-primary btn-lg" href="/#pricing">Explore the instruments</a>
+</div>
+
+<hr class="divider">
+
+<!-- ===== footer (identical to index.html) ===== -->
+<footer>
+  <div class="wrap">
+    <div class="foot-in">
+      <div class="foot-brand">
+        <a class="brand" href="/"><span class="glyph">Q</span><span>The&nbsp;Qu'an</span></a>
+        <p>Proprietary dealer-positioning instruments for options &amp; futures. Structure, breach and risk — one read.</p>
+      </div>
+      <div class="foot-col">
+        <h4>Product</h4>
+        <a href="/#instruments">Instruments</a>
+        <a href="/#pricing">Pricing</a>
+        <a href="/blog">Daily Brief</a>
+        <a href="/app">Launch terminal</a>
+      </div>
+      <div class="foot-col">
+        <h4>Account</h4>
+        <a href="/app">Sign in</a>
+        <a href="/#pricing">Subscribe</a>
+        <a href="/app#billing">Billing</a>
+      </div>
+      <div class="foot-col">
+        <h4>House</h4>
+        <a href="/about">About</a>
+        <a href="https://husrihtlaefan.org">H&#363;s Rihtl&#509;fan</a>
+        <a href="/#faq">FAQ</a>
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
+      </div>
+    </div>
+  </div>
+  <div class="foot-bottom">
+    <small>© <span id="yr"></span> H&#363;s Rihtl&#509;fan · The Qu'an</small>
+    <small>Built for traders, not tourists.</small>
+  </div>
+</footer>
+
+<script>document.getElementById('yr').textContent=new Date().getFullYear();</script>
+</body>
+</html>

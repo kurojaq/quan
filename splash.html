@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<!-- ==========================================================================
+     HŪS RIHTLǢFAN — house splash (husrihtlaefan.org apex).
+     Served at the apex root via functions/_middleware.js once the apex is
+     attached to the Pages project. Ultra-minimal: the house mark, one line,
+     and quiet doors into the properties.
+     ========================================================================== -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hūs Rihtlǣfan</title>
+<meta name="description" content="Hūs Rihtlǣfan — a private research house. Structure, time, and the field. Home of The Qu'an terminal and the Daily Field Brief.">
+<meta name="theme-color" content="#050506">
+<meta property="og:title" content="Hūs Rihtlǣfan">
+<meta property="og:description" content="A private research house. Structure, time, and the field.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="/logo.png">
+<link rel="icon" type="image/png" href="/logo.png">
+<link rel="shortcut icon" href="/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#050506; --ink:#f5f5f7; --dim:rgba(235,235,245,0.62); --faint:rgba(235,235,245,0.34);
+    --fill:rgba(255,255,255,0.055); --fill-2:rgba(255,255,255,0.095);
+    --ease:cubic-bezier(0.2,0.7,0.2,1);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter',system-ui,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-0.011em;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    min-height:100vh;min-height:100dvh;overflow:hidden;position:relative;
+  }
+  /* ambient field */
+  .aura{position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:
+      radial-gradient(900px 520px at 50% 38%, rgba(255,255,255,0.05), transparent 62%),
+      radial-gradient(1400px 800px at 50% 120%, rgba(255,255,255,0.025), transparent 60%);}
+  .grid{position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.3;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size:72px 72px;
+    -webkit-mask-image:radial-gradient(circle at 50% 42%, #000 0%, transparent 68%);
+    mask-image:radial-gradient(circle at 50% 42%, #000 0%, transparent 68%);}
+  main{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;text-align:center;
+    padding:48px 24px;animation:rise 1.1s var(--ease) both;}
+  @keyframes rise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+  .mark{width:min(420px,72vw);height:auto;margin-bottom:30px;
+    filter:drop-shadow(0 8px 48px rgba(255,255,255,0.09));
+    animation:float 7s ease-in-out infinite;}
+  @keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
+  /* the mark IS the wordmark — keep the h1 for assistive tech only */
+  h1{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;margin:0;}
+  .line{margin:0;font-size:clamp(13px,1.7vw,15px);color:var(--dim);font-weight:400;letter-spacing:.02em;}
+  .doors{margin-top:58px;display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+  .door{display:inline-flex;align-items:baseline;gap:9px;text-decoration:none;color:var(--dim);
+    background:var(--fill);border-radius:999px;padding:13px 24px;font-size:13px;font-weight:500;
+    transition:background .25s var(--ease),color .25s var(--ease),transform .15s var(--ease);}
+  .door:hover{background:var(--fill-2);color:var(--ink);transform:translateY(-1px);}
+  .door .k{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);}
+  footer{position:fixed;left:0;right:0;bottom:0;z-index:1;display:flex;justify-content:center;gap:10px;
+    padding:22px 24px calc(22px + env(safe-area-inset-bottom));
+    font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);}
+  @media (prefers-reduced-motion:reduce){ .mark,main{animation:none;} }
+</style>
+</head>
+<body>
+<div class="aura"></div>
+<div class="grid"></div>
+<main>
+  <img class="mark" src="logo.png" alt="Hūs Rihtlǣfan">
+  <h1>H&#363;s Rihtl&#483;fan</h1>
+  <p class="line">A private research house. Structure, time, and the field.</p>
+  <nav class="doors">
+    <a class="door" href="https://www.husrihtlaefan.org"><span class="k">Terminal</span>The Qu'an &rarr;</a>
+    <a class="door" href="https://blog.husrihtlaefan.org"><span class="k">Research</span>Daily Field Brief &rarr;</a>
+    <a class="door" href="https://client.husrihtlaefan.org"><span class="k">Clients</span>Client access &rarr;</a>
+  </nav>
+</main>
+<footer>&copy; <span id="yr"></span> H&#363;s Rihtl&#483;fan</footer>
+<script>document.getElementById('yr').textContent=new Date().getFullYear();</script>
+</body>
+</html>

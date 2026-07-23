@@ -1,19 +1,25 @@
 <!DOCTYPE html>
 <!-- ==========================================================================
-     THE QU'AN — public landing / marketing page.
+     THE QU'AN — public landing / marketing page (www.husrihtlaefan.org).
      The product itself (the terminal) lives at /app (app.html).
-     Pricing tiers + Stripe checkout are wired in js/pricing.js.
+     Pricing: one subscription per instrument + The Terminal bundle + Desk.
+     Amounts/copy live in js/pricing.js (PLANS); checkout plan keys map to
+     STRIPE_PRICE_<PLAN>_<CYCLE> env vars server-side (functions/api/_shared.js).
+     The Daily Field Brief (/blog) and published client reports are complimentary.
      ========================================================================== -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>The Qu'an — Dealer-Positioning Terminal for Options & Futures</title>
-<meta name="description" content="Chain-derived structural levels, an intermarket breach detector, a polar field view, strike-field heat maps, live charting and account risk simulation — one terminal, no install.">
+<title>The Qu'an — Proprietary Market Instruments · Options &amp; Futures</title>
+<meta name="description" content="Proprietary dealer-positioning instruments for options & futures — breach detection, strike-field heat maps, a Bookmap-grade price blend, the Tri-Horizon Compass. Subscribe per instrument or take the full terminal. The Daily Field Brief is complimentary.">
 <meta name="theme-color" content="#050506">
-<meta property="og:title" content="The Qu'an — Dealer-Positioning Terminal">
-<meta property="og:description" content="Read the field the way the desks do. Structural levels, breach detection and risk simulation in one terminal.">
+<meta property="og:title" content="The Qu'an — Proprietary Market Instruments">
+<meta property="og:description" content="Price is the last thing to move. The Qu'an reads what moves first — subscribe per instrument, or take the full terminal.">
 <meta property="og:type" content="website">
+<meta property="og:image" content="/logo.png">
+<link rel="icon" type="image/png" href="/logo.png">
+<link rel="shortcut icon" href="/logo.png">
 <link rel="preconnect" href="https://guyscjcqvgffitsxuzxx.supabase.co">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,18 +34,18 @@
 <header class="nav">
   <div class="nav-in">
     <a class="brand" href="/">
-      <span class="glyph">Q</span>
-      <span>The&nbsp;Qu'an</span>
+      <img src="/logo.png" alt="HUSRITHLÆFAN" class="logo">
     </a>
     <nav class="nav-links">
-      <a href="#features">Terminal</a>
+      <a href="#instruments">Instruments</a>
       <a href="#pricing">Pricing</a>
       <a href="/blog">Daily Brief</a>
+      <a href="/about">About</a>
       <a href="#faq">FAQ</a>
     </nav>
     <div class="nav-cta">
       <a class="btn btn-ghost btn-sm" href="/app">Sign in</a>
-      <a class="btn btn-primary btn-sm" href="#pricing">Start free</a>
+      <a class="btn btn-primary btn-sm" href="#pricing">Subscribe</a>
     </div>
   </div>
 </header>
@@ -47,18 +53,18 @@
 <!-- ===== hero ===== -->
 <section class="hero">
   <div class="wrap">
-    <div class="eyebrow">Dealer-positioning terminal · Options &amp; Futures</div>
-    <h1>Read the field <span class="thin">the way the desks do.</span></h1>
+    <div class="eyebrow">Hūs Rihtlǽfan · Proprietary market instruments</div>
+    <h1>Price is the last<br>thing to move.</h1>
     <p class="sub">
-      Qu'an turns raw option chains into structural levels, breach signals and risk you can
-      actually trade against — an intermarket detector, a polar field view, strike-field heat maps,
-      live charting and account simulation, all in one terminal. No install. Nothing to configure.
+      Dealer positioning moves first. The Qu'an reads it — raw option chains turned into
+      structural levels, breach signals, heat fields and regime — in instruments built for one
+      desk and now offered to yours. In the browser. Nothing to install.
     </p>
     <div class="hero-cta">
-      <a class="btn btn-primary btn-lg" href="#pricing">Start your 14-day trial</a>
+      <a class="btn btn-primary btn-lg" href="#pricing">Explore the instruments</a>
       <a class="btn btn-ghost btn-lg" href="/app">Launch terminal</a>
     </div>
-    <div class="hero-note"><b>No card for the trial.</b> &nbsp;Cancel anytime · Data stays in your browser</div>
+    <div class="hero-note"><b>The Daily Field Brief is complimentary.</b>&nbsp; Instruments are subscribed individually — or as the full terminal.</div>
   </div>
 
   <!-- lightweight, on-brand product mock (no heavy screenshot to ship) -->
@@ -66,11 +72,11 @@
     <div class="preview-frame">
       <div class="preview-bar">
         <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-        <span class="tag">quan.app / terminal — ES · Daily</span>
+        <span class="tag">app.husrihtlaefan.org — NQ · Daily</span>
       </div>
       <div class="preview-tabs">
-        <span>Detector</span><span>Report</span><span>Field Study</span>
-        <span>Strike Field</span><span>Heat Map</span><span>Chart</span><span>Compass</span><span>Account Sim</span>
+        <span>Detector</span><span>Field Study</span><span>Strike Field</span>
+        <span>Heat Map</span><span>Chart</span><span>Compass</span><span>Account Sim</span><span>Execution</span>
       </div>
       <div class="preview-body">
         <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
@@ -81,46 +87,66 @@
   </div>
 </section>
 
+<!-- ===== house quote ===== -->
+<section class="quoteblock">
+  <div class="wrap">
+    <blockquote>
+      &ldquo;Every session has a structure decided before the open.<br class="qbr">The work is reading it.&rdquo;
+    </blockquote>
+    <div class="qattr">Desk Notes &middot; H&#363;s Rihtl&#509;fan</div>
+  </div>
+</section>
+
 <hr class="divider">
 
-<!-- ===== features ===== -->
-<section class="section" id="features">
+<!-- ===== instruments ===== -->
+<section class="section" id="instruments">
   <div class="wrap">
     <div class="section-head">
-      <div class="eyebrow">The terminal</div>
-      <h2>Eight views. One coherent read. One click to execute.</h2>
-      <p>Every tab draws from the same chain-derived engine, so the story stays consistent from the first structural level to the final risk sizing — and, on Prime, straight through to a live broker order.</p>
+      <div class="eyebrow">The instruments</div>
+      <h2>Built on one desk. Proven in one book.</h2>
+      <p>Each instrument stands alone and earns its own subscription — yet every one draws from the same chain-derived engine, so the read stays coherent from the first structural level to the routed order.</p>
     </div>
     <div class="features">
       <div class="feature">
         <div class="ic">◆</div>
         <h3>Intermarket Breach Detector</h3>
-        <p>Watches structural levels across correlated instruments and flags the moment price breaches the field that dealers are defending.</p>
-      </div>
-      <div class="feature">
-        <div class="ic">❋</div>
-        <h3>Report</h3>
-        <p>A desk-grade briefing: classification, key levels, and the reasoning behind them — printable to a clean one-page PDF.</p>
+        <p>Watches structural coherence across correlated instruments and flags the moment price breaches the field dealers are defending — with the session breach clock and 9th-order intersections.</p>
       </div>
       <div class="feature">
         <div class="ic">◉</div>
-        <h3>Field Study &amp; Polar Disk</h3>
-        <p>The positioning field rendered as a polar SOP disk — pressure, alignment and rotation at a glance.</p>
+        <h3>Field Study</h3>
+        <p>The positioning field rendered as a polar SOP disk — pressure, alignment and rotation at a glance, with the family decomposition underneath.</p>
+      </div>
+      <div class="feature">
+        <div class="ic">▥</div>
+        <h3>Strike Field</h3>
+        <p>Strike-space structure in full: SOP curves, wall clusters and the session's gravity, drawn from the same engine the brief is written from.</p>
       </div>
       <div class="feature">
         <div class="ic">▦</div>
-        <h3>Strike Field &amp; Heat Map</h3>
-        <p>Strike-by-strike pressure and open-interest walls as a live heat map, so support and resistance stop being guesses.</p>
+        <h3>Deep Strike Heat Map</h3>
+        <p>The dealer watermark, strike by strike — every engine column as a live heat grid, with PDSL support and resistance ranked and readable.</p>
       </div>
       <div class="feature">
         <div class="ic">∿</div>
-        <h3>Live Chart &amp; Anchor</h3>
-        <p>Real-time price via the Qu'an quote proxy, with a session anchor that pins the whole field to where price actually is.</p>
+        <h3>Bookmap Chart</h3>
+        <p>The heat field blended behind live price — walls burning through time, volume as depth, the day isolated in color. A positioning Bookmap, not an order-flow one.</p>
       </div>
       <div class="feature">
         <div class="ic">⟐</div>
-        <h3>Compass &amp; Account Sim</h3>
-        <p>The Tri-Horizon Compass for regime, plus an account simulator that turns a read into position size and risk.</p>
+        <h3>Tri-Horizon Compass</h3>
+        <p>Two-session promise against realization — the regime read before the open, scrubbed through time with live price overlay.</p>
+      </div>
+      <div class="feature">
+        <div class="ic">❋</div>
+        <h3>Report &amp; Account Sim <span class="incl">included</span></h3>
+        <p>Every instrument carries the desk-grade daily brief, PDF export, live chart &amp; anchor, and the account simulator that turns a read into size and risk.</p>
+      </div>
+      <div class="feature">
+        <div class="ic">➤</div>
+        <h3>Execution Engine <span class="soon">in development</span></h3>
+        <p>The read, routed — Tradovate order lifecycle under bounded risk, with server-side activation conditions that fire even with the browser closed.</p>
       </div>
     </div>
   </div>
@@ -133,8 +159,8 @@
   <div class="wrap">
     <div class="section-head">
       <div class="eyebrow">Pricing</div>
-      <h2>Start free. Upgrade when the read pays for itself.</h2>
-      <p>Browser-native — no downloads, no install. Every paid plan starts with a 14-day full-access trial. Change or cancel anytime.</p>
+      <h2>One subscription per instrument.<br>Or the whole terminal.</h2>
+      <p>These are proprietary instruments, not features — each earns its keep alone. Subscribe to the one your book needs, stack them as you go, or take The Terminal and hold the complete read.</p>
     </div>
 
     <div style="text-align:center">
@@ -144,76 +170,97 @@
       </div>
     </div>
 
-    <div class="pricing">
-      <!-- Scout / free -->
-      <div class="plan" data-plan="scout">
-        <div class="pname">Scout</div>
-        <div class="ptag">Learn the field with a live terminal and delayed data.</div>
-        <div class="price"><span class="amt" data-price>$0</span><span class="per" data-per>/forever</span></div>
-        <div class="pricenote" data-note>14-day full-access trial included</div>
-        <a class="btn btn-ghost btn-block" href="/app" data-checkout="scout">Start free</a>
-        <ul>
-          <li><span class="ck">✓</span> Detector &amp; live Chart</li>
-          <li><span class="ck">✓</span> One instrument</li>
-          <li><span class="ck">✓</span> 15-min delayed quotes</li>
-          <li><span class="ck">✓</span> Manual chain upload</li>
-          <li class="off"><span class="ck">—</span> Report, Field, Heat Map, Compass</li>
-          <li class="off"><span class="ck">—</span> Account Sim &amp; live anchor</li>
-        </ul>
+    <!-- per-instrument subscriptions -->
+    <div class="toolgrid">
+      <div class="tool" data-plan="detector">
+        <div class="tname">Breach Detector</div>
+        <div class="ttag">Intermarket coherence, watched live.</div>
+        <div class="tprice"><span data-price>$99</span><span class="per" data-per>/month</span></div>
+        <a class="btn btn-ghost btn-block btn-sm" href="#" data-checkout="detector">Subscribe</a>
       </div>
+      <div class="tool" data-plan="field">
+        <div class="tname">Field Study</div>
+        <div class="ttag">The polar disk of the positioning field.</div>
+        <div class="tprice"><span data-price>$99</span><span class="per" data-per>/month</span></div>
+        <a class="btn btn-ghost btn-block btn-sm" href="#" data-checkout="field">Subscribe</a>
+      </div>
+      <div class="tool" data-plan="strike">
+        <div class="tname">Strike Field</div>
+        <div class="ttag">Strike-space structure &amp; wall clusters.</div>
+        <div class="tprice"><span data-price>$99</span><span class="per" data-per>/month</span></div>
+        <a class="btn btn-ghost btn-block btn-sm" href="#" data-checkout="strike">Subscribe</a>
+      </div>
+      <div class="tool" data-plan="heat">
+        <div class="tname">Deep Strike Heat Map</div>
+        <div class="ttag">The dealer watermark, ranked by strike.</div>
+        <div class="tprice"><span data-price>$99</span><span class="per" data-per>/month</span></div>
+        <a class="btn btn-ghost btn-block btn-sm" href="#" data-checkout="heat">Subscribe</a>
+      </div>
+      <div class="tool" data-plan="bookmap">
+        <div class="tname">Bookmap Chart</div>
+        <div class="ttag">The heat field blended behind price.</div>
+        <div class="tprice"><span data-price>$99</span><span class="per" data-per>/month</span></div>
+        <a class="btn btn-ghost btn-block btn-sm" href="#" data-checkout="bookmap">Subscribe</a>
+      </div>
+      <div class="tool" data-plan="compass">
+        <div class="tname">Tri-Horizon Compass</div>
+        <div class="ttag">Regime before the open.</div>
+        <div class="tprice"><span data-price>$99</span><span class="per" data-per>/month</span></div>
+        <a class="btn btn-ghost btn-block btn-sm" href="#" data-checkout="compass">Subscribe</a>
+      </div>
+    </div>
+    <div class="toolnote">Every instrument includes the daily Report with PDF export, live chart &amp; session anchor, and the Account Simulator.</div>
 
-      <!-- Operator / featured -->
-      <div class="plan featured" data-plan="operator">
-        <div class="badge">Most popular</div>
-        <div class="pname">Operator</div>
-        <div class="ptag">The full analytical terminal for a serious independent trader.</div>
-        <div class="price"><span class="amt" data-price>$99</span><span class="per" data-per>/month</span></div>
+    <!-- bundles -->
+    <div class="bundles">
+      <div class="bundle featured" data-plan="terminal">
+        <div class="badge">The complete read</div>
+        <div class="bhead">
+          <div>
+            <div class="pname">The Terminal</div>
+            <div class="ptag">Every instrument, one seat — the full Qu'an, including the Execution Engine when it arrives.</div>
+          </div>
+          <div class="price"><span class="amt" data-price>$249</span><span class="per" data-per>/month</span></div>
+        </div>
         <div class="pricenote" data-note>Billed monthly · cancel anytime</div>
-        <a class="btn btn-primary btn-block" href="#" data-checkout="operator">Start 14-day trial</a>
-        <ul>
-          <li><span class="ck">✓</span> <b>All eight analysis views</b></li>
-          <li><span class="ck">✓</span> All instruments · live quotes &amp; anchor</li>
+        <ul class="brow">
+          <li><span class="ck">✓</span> All six instruments</li>
           <li><span class="ck">✓</span> Report PDF · payload generator · split view</li>
           <li><span class="ck">✓</span> Roaming cloud workspace &amp; brief archive</li>
-          <li class="off"><span class="ck">—</span> Execution engine &amp; realtime rooms</li>
-          <li class="off"><span class="ck">—</span> Team seats &amp; data export</li>
-        </ul>
-      </div>
-
-      <!-- Prime / execution -->
-      <div class="plan" data-plan="prime">
-        <div class="badge">Exclusive</div>
-        <div class="pname">Prime</div>
-        <div class="ptag">The read routed straight to a live broker order.</div>
-        <div class="price"><span class="amt" data-price>$249</span><span class="per" data-per>/month</span></div>
-        <div class="pricenote" data-note>Billed monthly · cancel anytime</div>
-        <a class="btn btn-primary btn-block" href="#" data-checkout="prime">Start 14-day trial</a>
-        <ul>
-          <li><span class="ck">✓</span> Everything in Operator</li>
-          <li><span class="ck">✓</span> <b>Execution engine</b> — Tradovate order routing</li>
-          <li><span class="ck">✓</span> Activation-condition automation</li>
-          <li><span class="ck">✓</span> Realtime price rooms · priority data proxy</li>
           <li><span class="ck">✓</span> Client publish links</li>
-          <li><span class="ck">✓</span> Tick Engine early access</li>
+          <li><span class="ck">✓</span> Execution Engine on arrival</li>
+          <li><span class="ck">✓</span> Priority data proxy</li>
         </ul>
+        <a class="btn btn-primary btn-block" href="#" data-checkout="terminal">Take the Terminal</a>
       </div>
 
-      <!-- Desk / team -->
-      <div class="plan" data-plan="desk">
-        <div class="pname">Desk</div>
-        <div class="ptag">Shared terminal, execution &amp; data for a trading desk.</div>
-        <div class="price"><span class="amt" data-price>$699</span><span class="per" data-per>/month</span></div>
+      <div class="bundle" data-plan="desk">
+        <div class="bhead">
+          <div>
+            <div class="pname">Desk</div>
+            <div class="ptag">The Terminal for a small desk — five seats, shared sessions, export.</div>
+          </div>
+          <div class="price"><span class="amt" data-price>$699</span><span class="per" data-per>/month</span></div>
+        </div>
         <div class="pricenote" data-note>Up to 5 seats · billed monthly</div>
-        <a class="btn btn-ghost btn-block" href="#" data-checkout="desk">Start 14-day trial</a>
-        <ul>
-          <li><span class="ck">✓</span> Everything in Prime</li>
+        <ul class="brow">
+          <li><span class="ck">✓</span> Everything in The Terminal</li>
           <li><span class="ck">✓</span> Up to 5 team seats</li>
           <li><span class="ck">✓</span> Shared Desk sessions (realtime collab)</li>
           <li><span class="ck">✓</span> Data export / API access</li>
-          <li><span class="ck">✓</span> Priority data &amp; support</li>
-          <li><span class="ck">✓</span> Onboarding session</li>
+          <li><span class="ck">✓</span> Priority support &amp; onboarding</li>
         </ul>
+        <a class="btn btn-ghost btn-block" href="#" data-checkout="desk">Build a Desk</a>
       </div>
+    </div>
+
+    <!-- complimentary -->
+    <div class="freestrip">
+      <div class="fs-l">
+        <div class="pname">The Daily Field Brief</div>
+        <div class="ptag">The house read, published after each session — classification, structure and the reasoning. Complimentary, no account required. Client report links are complimentary too.</div>
+      </div>
+      <a class="btn btn-ghost" href="/blog">Read today's brief &rarr;</a>
     </div>
   </div>
 </section>
@@ -225,28 +272,48 @@
   <div class="wrap">
     <div class="section-head">
       <div class="eyebrow">FAQ</div>
-      <h2>Questions, answered.</h2>
+      <h2>The documentation, in brief.</h2>
     </div>
     <div class="faq">
       <details>
+        <summary>What is The Qu'an?<span class="plus">+</span></summary>
+        <div class="ans">The Qu'an is Hūs Rihtlǽfan's dealer-positioning terminal for options and futures — a set of proprietary instruments that turn raw option chains into structural levels, breach signals, heat fields and regime. It was built for the house's own book first; the instruments are offered by subscription, individually or as the full terminal.</div>
+      </details>
+      <details>
         <summary>Do I need to install anything?<span class="plus">+</span></summary>
-        <div class="ans">No. Qu'an runs entirely in your browser — the analysis engine executes in-page via Pyodide. Any modern browser on desktop or mobile works.</div>
+        <div class="ans">No. Everything runs in your browser — the analysis engine executes in-page (via Pyodide), the charts render locally, and the terminal works on any modern desktop or mobile browser. There is no download, no plugin, and nothing to configure.</div>
+      </details>
+      <details>
+        <summary>Where does the data come from?<span class="plus">+</span></summary>
+        <div class="ans">Two places. Option chains and greeks come from your own exports (or the house auto-pull, on the terminal), and are processed <em>locally in your browser</em>. Live quotes and price history come from the Qu'an's own gated data proxy at the edge. No third-party terminal or data subscription is required.</div>
       </details>
       <details>
         <summary>Where does my data go?<span class="plus">+</span></summary>
-        <div class="ans">Chains and greeks you upload are processed locally in your browser and are not sent to our servers. Only your account and subscription state live in our database.</div>
+        <div class="ans">Chains and greeks you load are analyzed in-page and are not sent to our servers. Only your account and subscription state live in our database. The optional roaming workspace syncs your terminal state across devices under your own row-level-secured account — and can simply be left off.</div>
       </details>
       <details>
-        <summary>What does the free trial include?<span class="plus">+</span></summary>
-        <div class="ans">Fourteen days of full access to whichever plan you start — Operator, Prime or Desk. A card is added at signup but isn't charged until day 15; cancel anytime before then and you pay nothing. Prefer no card? Stay on the free Scout tier.</div>
+        <summary>How do per-instrument subscriptions work?<span class="plus">+</span></summary>
+        <div class="ans">Each instrument — Breach Detector, Field Study, Strike Field, Deep Strike Heat Map, Bookmap Chart, Tri-Horizon Compass — carries its own subscription and unlocks immediately in the terminal. Stack instruments as your process grows, or take The Terminal, which includes all of them (and the Execution Engine when it arrives). Every instrument includes the daily Report, PDF export, live chart &amp; anchor, and the Account Simulator.</div>
       </details>
       <details>
-        <summary>Can I cancel or switch plans?<span class="plus">+</span></summary>
-        <div class="ans">Anytime, from the billing portal in your account. Upgrades apply immediately; cancellations keep access until the end of the period you've paid for.</div>
+        <summary>What's complimentary?<span class="plus">+</span></summary>
+        <div class="ans">The Daily Field Brief — the house read published after each session — is free to the public at the blog, no account needed. Client report links (the read-only client terminal with report, heat map and price) are likewise complimentary for the clients that receive them.</div>
+      </details>
+      <details>
+        <summary>What is the Bookmap Chart?<span class="plus">+</span></summary>
+        <div class="ans">A composite view that paints the strike-by-strike heat field <em>behind</em> live price — walls glowing through time, the selected session isolated in color, traded volume as depth bubbles, and a right-anchored call/put profile. It reads like Bookmap, but it maps dealer positioning rather than resting orders — structure, not just flow.</div>
+      </details>
+      <details>
+        <summary>What will the Execution Engine do?<span class="plus">+</span></summary>
+        <div class="ans">It routes the read: staged tickets, activation conditions evaluated server-side (they fire even with your browser closed), and a full order lifecycle against Tradovate under bounded risk. It is in active development and will be included with The Terminal and Desk on arrival.</div>
+      </details>
+      <details>
+        <summary>How do trials and billing work?<span class="plus">+</span></summary>
+        <div class="ans">Every subscription starts with a 14-day full-access trial. A card is added at signup but isn't charged until day 15 — cancel before then and you pay nothing. Annual billing is two months free. Manage, switch or cancel anytime from the billing portal; upgrades apply immediately, cancellations keep access to the end of the paid period.</div>
       </details>
       <details>
         <summary>Is this financial advice?<span class="plus">+</span></summary>
-        <div class="ans">No. Qu'an is an analytics tool. It surfaces structure and risk; it does not tell you what to trade. See the disclaimer below.</div>
+        <div class="ans">No. The Qu'an is an analytics and visualization suite. It surfaces structure and risk; it does not tell you what to trade, and the Daily Field Brief is research commentary, not a recommendation. See the risk disclosure below.</div>
       </details>
     </div>
   </div>
@@ -257,9 +324,9 @@
 <!-- ===== final cta ===== -->
 <section class="finalcta">
   <div class="wrap">
-    <h2>See the field on your next session.</h2>
-    <p>Spin up the terminal in seconds. Fourteen days of full access, no card, no install.</p>
-    <a class="btn btn-primary btn-lg" href="#pricing">Start your trial</a>
+    <h2>Read the next session before it trades.</h2>
+    <p>Pick your instrument — or take the whole terminal. Fourteen days of full access either way.</p>
+    <a class="btn btn-primary btn-lg" href="#pricing">Explore the instruments</a>
   </div>
 </section>
 
@@ -268,24 +335,26 @@
   <div class="wrap">
     <div class="foot-in">
       <div class="foot-brand">
-        <a class="brand" href="/"><span class="glyph">Q</span><span>The&nbsp;Qu'an</span></a>
-        <p>A dealer-positioning terminal for options &amp; futures. Structure, breach and risk — one read.</p>
+        <a class="brand" href="/"><img src="/logo.png" alt="HUSRITHLÆFAN" class="logo"></a>
+        <p>Proprietary dealer-positioning instruments for options &amp; futures. Structure, breach and risk — one read.</p>
       </div>
       <div class="foot-col">
         <h4>Product</h4>
-        <a href="#features">Terminal</a>
+        <a href="#instruments">Instruments</a>
         <a href="#pricing">Pricing</a>
         <a href="/blog">Daily Brief</a>
-        <a href="/app">Launch app</a>
+        <a href="/app">Launch terminal</a>
       </div>
       <div class="foot-col">
         <h4>Account</h4>
         <a href="/app">Sign in</a>
-        <a href="#pricing">Start free</a>
+        <a href="#pricing">Subscribe</a>
         <a href="/app#billing">Billing</a>
       </div>
       <div class="foot-col">
-        <h4>Legal</h4>
+        <h4>House</h4>
+        <a href="/about">About</a>
+        <a href="https://husrihtlaefan.org">H&#363;s Rihtl&#509;fan</a>
         <a href="#faq">FAQ</a>
         <a href="/terms">Terms</a>
         <a href="/privacy">Privacy</a>
@@ -293,7 +362,7 @@
     </div>
   </div>
   <div class="foot-bottom">
-    <small>© <span id="yr"></span> Hūs Rihtlǽfan · The Qu'an</small>
+    <small>© <span id="yr"></span> H&#363;s Rihtl&#509;fan · The Qu'an</small>
     <small>Built for traders, not tourists.</small>
   </div>
   <p class="disclaimer">
