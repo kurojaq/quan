@@ -107,28 +107,37 @@ export async function onRequestGet({ request, env }) {
     const url = new URL(request.url);
     const symbol = url.searchParams.get('symbol');
     const expiration = url.searchParams.get('expiration');
+    const type = url.searchParams.get('type') || 'monthlies';
     const dataType = url.searchParams.get('dataType') || 'prices';
     const format = url.searchParams.get('format') || 'json';
 
-    if (!symbol || !expiration) {
-      return badRequest('symbol and expiration query params required');
+    if (!symbol) {
+      return badRequest('symbol query param required');
+    }
+
+    // For monthlies: expiration required. For weeklies: encoded in symbol.
+    if (type === 'monthlies' && !expiration) {
+      return badRequest('expiration required for monthlies (e.g., aug-26)');
     }
 
     if (!/^[A-Z0-9]{2,6}$/.test(symbol)) {
-      return badRequest('invalid symbol format (e.g., BGU26, ESZ26)');
+      return badRequest('invalid symbol format (e.g., BGU26, ESZ26, BNIN26)');
     }
 
-    // Normalize expiration: accept both "AUG-26" and "aug-26"
-    const normalizedExpiration = expiration.toLowerCase();
-    if (!/^[a-z]{3}-\d{2}$/.test(normalizedExpiration)) {
-      return badRequest('invalid expiration format (e.g., aug-26, sep-26)');
+    // Normalize expiration: accept both "AUG-26" and "aug-26" (for monthlies only)
+    let normalizedExpiration = expiration;
+    if (type === 'monthlies' && expiration) {
+      normalizedExpiration = expiration.toLowerCase();
+      if (!/^[a-z]{3}-\d{2}$/.test(normalizedExpiration)) {
+        return badRequest('invalid expiration format (e.g., aug-26, sep-26)');
+      }
     }
 
     if (!['prices', 'greeks'].includes(dataType)) {
       return badRequest('dataType must be "prices" or "greeks"');
     }
 
-    console.log(`[barchart-fetch] Fetching ${symbol} ${normalizedExpiration} (${dataType}) via browser render`);
+    console.log(`[barchart-fetch] Fetching ${symbol} ${type}${normalizedExpiration ? ' ' + normalizedExpiration : ''} (${dataType}) via browser render`);
 
     // Call BARCHART Worker via service binding to do browser rendering
     if (!env.BARCHART) {
@@ -138,7 +147,7 @@ export async function onRequestGet({ request, env }) {
       );
     }
 
-    const pageUrl = buildBarchartPageUrl(symbol, normalizedExpiration, dataType);
+    const pageUrl = buildBarchartPageUrl(symbol, normalizedExpiration || 'current', dataType);
     console.log(`[barchart-fetch] Page URL: ${pageUrl}`);
 
     // Call the Worker to render the page and extract data
@@ -149,6 +158,7 @@ export async function onRequestGet({ request, env }) {
         body: JSON.stringify({
           symbol,
           expiration: normalizedExpiration,
+          type,
           dataType,
           pageUrl
         })
@@ -169,18 +179,22 @@ export async function onRequestGet({ request, env }) {
     // Return in requested format
     if (format === 'csv') {
       const csv = convertToCSV(rows, dataType);
+      const filename = normalizedExpiration
+        ? `${symbol}_${normalizedExpiration}_${dataType}.csv`
+        : `${symbol}_${dataType}.csv`;
       return new Response(csv, {
         status: 200,
         headers: {
           'Content-Type': 'text/csv;charset=utf-8',
           'Cache-Control': 'no-store',
-          'Content-Disposition': `attachment; filename="${symbol}_${normalizedExpiration}_${dataType}.csv"`
+          'Content-Disposition': `attachment; filename="${filename}"`
         }
       });
     } else {
       // Default JSON
       return json({
         symbol,
+        type,
         expiration: normalizedExpiration,
         dataType,
         count: rows.length,
