@@ -472,10 +472,14 @@
 
       if (isWeekly) {
         hint.style.display = 'block';
-        symbolInput.placeholder = 'BNIN26 (symbol encodes week)';
-        if (expLabel) expLabel.textContent = 'Week';
-        expirationSelect.innerHTML = '<option value="">Loading weekly expirations...</option>';
-        loadExpirations(); // Load weekly expirations
+        symbolInput.placeholder = 'ZNU26 (root symbol)';
+        if (expLabel) expLabel.textContent = 'Weekly Symbol';
+        // For weeklies: show week codes for ZN (T-Note) and other common contracts
+        const weeklyCodes = ['BN1Q26', 'BG6Q26', 'BNDN26', 'BN0N26', 'BNIN26'];
+        expirationSelect.innerHTML = weeklyCodes
+          .map((code, i) => `<option value="${code}" ${i === 0 ? 'selected' : ''}>${code}</option>`)
+          .join('');
+        log('Select weekly symbol code from dropdown', 'info');
       } else {
         hint.style.display = 'none';
         symbolInput.placeholder = 'ZNU26, ESZ26, etc.';
@@ -577,10 +581,11 @@
       const symbol = symbolInput.value.trim().toUpperCase();
       const type = typeSelect.value; // 'monthlies' or 'weeklies'
       if (!symbol) return;
+      if (type === 'weeklies') return; // Weeklies use hardcoded symbol codes
 
-      log('Loading expirations...');
+      log('Loading monthly expirations...');
       try {
-        const expirations = await FETCHER.getAvailableExpirations(symbol, { type });
+        const expirations = await FETCHER.getAvailableExpirations(symbol, { type: 'monthlies' });
         if (expirations.length === 0) {
           expirationSelect.innerHTML = '<option value="">No expirations found</option>';
           log('No expirations found', 'error');
@@ -589,8 +594,7 @@
         expirationSelect.innerHTML = expirations
           .map((exp, idx) => `<option value="${exp}" ${idx === 0 ? 'selected' : ''}>${exp}</option>`)
           .join('');
-        const typeLabel = type === 'weeklies' ? 'weekly' : 'monthly';
-        log(`Loaded ${expirations.length} ${typeLabel} expirations`, 'success');
+        log(`Loaded ${expirations.length} monthly expirations`, 'success');
       } catch (error) {
         log(`Failed to load expirations: ${error.message}`, 'error');
       }

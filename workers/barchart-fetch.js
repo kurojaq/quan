@@ -51,8 +51,8 @@ const BC = {
     // Presence of this on the probe page ⇒ we are logged IN.
     loggedInMarker: '[data-ng-if="user.isLoggedIn"], .bc-user-nav, a[href="/logout"]',
     // The "⤓ download" control on an options page (captureDownload also has a
-    // text-based fallback if this selector misses).
-    download: 'a.bc-download, button[data-bc-download], a[href*="download"], [class*="download"], .bc-download-link',
+    // text-based fallback if this selector misses). It's an <a class="toolbar-button download">
+    download: 'a.toolbar-button.download, a.bc-download, button[data-bc-download], a[data-bc-download-button], [class*="download"]',
     // The expiry is chosen by two CUSTOM (non-<select>) dropdowns above the chain
     // table: "Options Type" = the day-of-week series ("Monday Weekly Options"),
     // and "Week N: Mon YYYY". resolveExpiryPage() drives them by visible text
@@ -69,8 +69,8 @@ const BC = {
   // A realistic desktop UA reduces trivial bot flags.
   userAgent:
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-  navTimeoutMs: 45000,
-  downloadTimeoutMs: 30000,
+  navTimeoutMs: 60000,
+  downloadTimeoutMs: 60000,
 };
 
 /* ── KV keys (all under the autopull: prefix in the shared QUAN_PUBLISH KV) ── */
@@ -354,28 +354,38 @@ async function captureDownload(page) {
   });
 
   // Wait for download button and ensure page is fully rendered
-  await wait(1000);
-  await page.waitForSelector(BC.sel.download, { timeout: BC.navTimeoutMs }).catch(() => {});
+  await wait(2000);
 
+  // Try main selector first
   const btn = await page.$(BC.sel.download);
   if (btn) {
+    console.log('[barchart-fetch] Found download button via selector, clicking...');
     await btn.click().catch(() => {});
   } else {
-    // Fallback: find and click any element containing "download" text
+    console.log('[barchart-fetch] Main selector missed, trying fallback search...');
+    // Fallback: find and click the download element more broadly
     const clicked = await page.evaluate(() => {
-      const buttons = Array.from(document.querySelectorAll('a, button, [role="button"], [class*="button"], [class*="link"]'));
-      const downloadEl = buttons.find((e) => {
-        const text = (e.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
-        return text.includes('download') || text === '↓' || e.classList.toString().includes('download');
-      });
+      // Look for a tag with class containing "download"
+      let downloadEl = document.querySelector('a.toolbar-button.download');
+      if (!downloadEl) downloadEl = document.querySelector('a[class*="download"]');
+      if (!downloadEl) downloadEl = document.querySelector('button[class*="download"]');
+      if (!downloadEl) downloadEl = document.querySelector('[data-bc-download-button]');
+
+      // Last resort: find by text
+      if (!downloadEl) {
+        const elements = Array.from(document.querySelectorAll('a, button'));
+        downloadEl = elements.find(e => (e.textContent || '').toLowerCase().includes('download'));
+      }
+
       if (downloadEl) {
+        console.log('[captureDownload] Clicking element:', downloadEl.className || downloadEl.tagName);
         downloadEl.click();
         return true;
       }
       return false;
     });
     if (!clicked) {
-      throw new Error('Download button not found');
+      throw new Error('Download button not found after selector and fallback search');
     }
   }
   return csvBody;

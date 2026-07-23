@@ -119,7 +119,12 @@ export async function onRequestGet({ request, env }) {
 
     // Both monthlies and weeklies require expiration
     if (!expiration) {
-      return badRequest(`expiration required for ${type} (e.g., ${type === 'monthlies' ? 'aug-26' : '07/28/26'})`);
+      return badRequest(`expiration required for ${type} (e.g., ${type === 'monthlies' ? 'aug-26' : 'BNIN26'})`);
+    }
+
+    // Validate weekly symbol codes (e.g., BNIN26)
+    if (type === 'weeklies' && !/^[A-Z0-9]{6}$/.test(expiration)) {
+      return badRequest(`invalid weekly code format: ${expiration} (e.g., BNIN26)`);
     }
 
     if (!/^[A-Z0-9]{2,6}$/.test(symbol)) {
