@@ -179,12 +179,12 @@ function convertToCSV(optionRows, dataType = 'prices') {
   return csvContent;
 }
 
-async function fetchOptionsChain(symbol, expiration, type = 'monthlies', env) {
+async function fetchOptionsChain(symbol, expiration, type = 'monthlies', env, dataType = 'prices') {
   if (!symbol || !expiration) {
     throw new Error('Symbol and expiration required');
   }
 
-  const cacheKey = `${symbol}:${expiration}:${type}`;
+  const cacheKey = `${symbol}:${expiration}:${type}:${dataType}`;
 
   // Check cache
   if (cache[cacheKey]) {
@@ -214,8 +214,8 @@ async function fetchOptionsChain(symbol, expiration, type = 'monthlies', env) {
   }
 
   // Build URL using the real Barchart API endpoint
-  const url = buildBarchartUrl(symbol, expiration, type);
-  console.log(`[barchart-fetch] Fetching: ${symbol} ${expiration} (${type})`);
+  const url = buildBarchartUrl(symbol, expiration, dataType);
+  console.log(`[barchart-fetch] Fetching: ${symbol} ${expiration} (${type}, ${dataType})`);
   console.log(`[barchart-fetch] URL: ${url.substring(0, 100)}...`);
   console.log(`[barchart-fetch] Auth: ${cookieHeader ? 'cookies from autopull' : 'public (no auth)'}`);
 
@@ -315,7 +315,7 @@ export async function onRequestGet({ request, env }) {
     }
 
     // Fetch the chain (with env for cookie access)
-    const rows = await fetchOptionsChain(symbol, expiration, type, env);
+    const rows = await fetchOptionsChain(symbol, expiration, type, env, dataType);
 
     // Return in requested format
     if (format === 'csv') {
