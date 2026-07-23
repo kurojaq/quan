@@ -472,14 +472,10 @@
 
       if (isWeekly) {
         hint.style.display = 'block';
-        symbolInput.placeholder = 'ZNU26 (root symbol)';
-        if (expLabel) expLabel.textContent = 'Weekly Symbol';
-        // For weeklies: show week codes for ZN (T-Note) and other common contracts
-        const weeklyCodes = ['BN1Q26', 'BG6Q26', 'BNDN26', 'BN0N26', 'BNIN26'];
-        expirationSelect.innerHTML = weeklyCodes
-          .map((code, i) => `<option value="${code}" ${i === 0 ? 'selected' : ''}>${code}</option>`)
-          .join('');
-        log('Select weekly symbol code from dropdown', 'info');
+        symbolInput.placeholder = 'ZNU26, ESZ26, etc. (then load weeklies)';
+        if (expLabel) expLabel.textContent = 'Weekly Code';
+        expirationSelect.innerHTML = '<option value="">Enter symbol above, then load weeklies</option>';
+        log('Enter contract symbol to load available weekly codes', 'info');
       } else {
         hint.style.display = 'none';
         symbolInput.placeholder = 'ZNU26, ESZ26, etc.';
@@ -581,7 +577,11 @@
       const symbol = symbolInput.value.trim().toUpperCase();
       const type = typeSelect.value; // 'monthlies' or 'weeklies'
       if (!symbol) return;
-      if (type === 'weeklies') return; // Weeklies use hardcoded symbol codes
+
+      if (type === 'weeklies') {
+        await loadWeeklyCodes(symbol);
+        return;
+      }
 
       log('Loading monthly expirations...');
       try {
@@ -597,6 +597,39 @@
         log(`Loaded ${expirations.length} monthly expirations`, 'success');
       } catch (error) {
         log(`Failed to load expirations: ${error.message}`, 'error');
+      }
+    }
+
+    async function loadWeeklyCodes(symbol) {
+      if (!symbol) {
+        log('Enter a symbol first', 'error');
+        return;
+      }
+
+      log('Loading weekly codes for ' + symbol + '...');
+      expirationSelect.innerHTML = '<option value="">Loading...</option>';
+
+      try {
+        const response = await fetch(`/api/barchart-fetch?symbol=${symbol}&action=get-weekly-codes`);
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+          throw new Error(err.error || 'Failed to fetch weekly codes');
+        }
+
+        const result = await response.json();
+        if (!result.codes || result.codes.length === 0) {
+          expirationSelect.innerHTML = '<option value="">No weekly options found</option>';
+          log('No weekly options found for ' + symbol, 'error');
+          return;
+        }
+
+        expirationSelect.innerHTML = result.codes
+          .map((item, idx) => `<option value="${item.code}" ${idx === 0 ? 'selected' : ''}>${item.label}</option>`)
+          .join('');
+        log(`Loaded ${result.codes.length} weekly codes`, 'success');
+      } catch (error) {
+        expirationSelect.innerHTML = '<option value="">Error loading codes</option>';
+        log(`Failed to load weekly codes: ${error.message}`, 'error');
       }
     }
 

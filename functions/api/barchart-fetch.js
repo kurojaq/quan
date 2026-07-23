@@ -108,6 +108,34 @@ export async function onRequestGet({ request, env }) {
   try {
     const url = new URL(request.url);
     const symbol = url.searchParams.get('symbol');
+    const action = url.searchParams.get('action');
+
+    // Fetch available weekly codes for a symbol
+    if (action === 'get-weekly-codes' && symbol) {
+      if (!env.BARCHART) {
+        return serverError('BARCHART Worker binding not configured');
+      }
+
+      try {
+        const workerResponse = await env.BARCHART.fetch(
+          new Request('https://barchart-fetch.internal/get-weekly-codes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbol })
+          })
+        );
+
+        if (!workerResponse.ok) {
+          const errText = await workerResponse.text().catch(() => '');
+          return serverError(`Failed to fetch weekly codes: ${errText.substring(0, 100)}`);
+        }
+
+        return workerResponse;
+      } catch (err) {
+        return serverError(`Weekly codes error: ${err.message}`);
+      }
+    }
+
     const expiration = url.searchParams.get('expiration');
     const type = url.searchParams.get('type') || 'monthlies';
     const dataType = url.searchParams.get('dataType') || 'prices';

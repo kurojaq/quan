@@ -544,6 +544,50 @@ async function run(env, jobsOverride, opts = {}) {
   return status;
 }
 
+// Extract available weekly option codes from Barchart page
+async function getWeeklyOptionCodes(env, symbol) {
+  let browser;
+  try {
+    browser = await puppeteer.launch(env.BROWSER);
+    const page = await browser.newPage();
+    await page.setUserAgent(BC.userAgent);
+    page.setDefaultTimeout(45000);
+    page.setDefaultNavigationTimeout(45000);
+
+    const pageUrl = `https://www.barchart.com/futures/quotes/${symbol}/options?moneyness=allRows&futuresOptionsView=split`;
+    console.log(`[barchart-fetch] Loading ${symbol} to extract weekly codes...`);
+
+    await page.goto(pageUrl, { waitUntil: 'domcontentloaded' });
+    await wait(2000); // Wait for dropdown to render
+
+    // Extract weekly option codes from the "Options Type" dropdown
+    const codes = await page.evaluate(() => {
+      const options = Array.from(document.querySelectorAll('select option'));
+      const weeklyOptions = options.filter(opt =>
+        opt.textContent.toLowerCase().includes('weekly') ||
+        opt.textContent.toLowerCase().includes('week')
+      );
+
+      return weeklyOptions.map(opt => {
+        // Extract code from value (e.g., "/futures/quotes/ZNU26/options/BNIN26" -> "BNIN26")
+        const match = opt.value.match(/\/options\/([A-Z0-9]+)$/);
+        return {
+          code: match ? match[1] : '',
+          label: opt.textContent.trim()
+        };
+      }).filter(item => item.code);
+    });
+
+    console.log(`[barchart-fetch] Found ${codes.length} weekly option codes for ${symbol}`);
+    return codes;
+  } catch (err) {
+    console.error(`[barchart-fetch] Weekly codes extraction error: ${err.message}`);
+    throw err;
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+  }
+}
+
 // On-demand options extraction for the Barchart importer
 // Downloads the actual CSV file from Barchart instead of parsing HTML
 async function fetchOptionsViaRenderer(env, symbol, expiration, dataType) {
@@ -629,6 +673,32 @@ export default {
   //        without ever exposing this Worker's URL/secret to the browser.
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    // Fetch available weekly option codes for a symbol
+    if (request.method === 'POST' && url.pathname === '/get-weekly-codes') {
+      try {
+        const body = await request.json().catch(() => ({}));
+        const { symbol } = body;
+
+        if (!symbol) {
+          return new Response(JSON.stringify({ error: 'symbol required' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        const codes = await getWeeklyOptionCodes(env, symbol);
+        return new Response(JSON.stringify({ codes: codes, count: codes.length }), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      } catch (err) {
+        console.error(`[barchart-fetch] /get-weekly-codes error: ${err.message}`);
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
 
     // On-demand options fetching via browser rendering (for the importer)
     if (request.method === 'POST' && url.pathname === '/fetch-options') {
