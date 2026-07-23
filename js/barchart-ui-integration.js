@@ -442,6 +442,34 @@
     const cookiesTA = document.getElementById('barchartCookies');
     const authStatusDiv = document.getElementById('barchartAuthStatus');
 
+    // Try to detect current instrument from terminal
+    function detectCurrentInstrument() {
+      // Check if there's a global instrument selector
+      if (global.__quan && global.__quan.currentInstrument) {
+        return global.__quan.currentInstrument.toUpperCase();
+      }
+      // Check for instrument in page state or URL
+      try {
+        const url = new URL(window.location);
+        const pathMatch = url.pathname.match(/\/([A-Z]{2,6}\d{2,4})/);
+        if (pathMatch) return pathMatch[1];
+      } catch (_) {}
+      return null;
+    }
+
+    // Auto-populate symbol if not set
+    if (!symbolInput.value.trim()) {
+      const detectedInstrument = detectCurrentInstrument();
+      if (detectedInstrument) {
+        symbolInput.value = detectedInstrument;
+        log(`Auto-detected instrument: ${detectedInstrument}`, 'info');
+        // Auto-load weeklies if that type is selected
+        if (typeSelect.value === 'weeklies') {
+          setTimeout(() => loadWeeklyCodes(detectedInstrument), 500);
+        }
+      }
+    }
+
     // Tab switching
     const switchTab = (tab) => {
       if (tab === 'import') {
@@ -500,6 +528,15 @@
     // Load expirations when symbol or type changes
     symbolInput.addEventListener('change', loadExpirations);
     symbolInput.addEventListener('blur', loadExpirations);
+    symbolInput.addEventListener('input', () => {
+      // Auto-load weeklies as user types
+      if (typeSelect.value === 'weeklies') {
+        const symbol = symbolInput.value.trim().toUpperCase();
+        if (symbol.length >= 2) {
+          loadWeeklyCodes(symbol);
+        }
+      }
+    });
     typeSelect.addEventListener('change', loadExpirations);
 
     // Download CSV
