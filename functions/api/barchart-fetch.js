@@ -132,7 +132,7 @@ function convertToCSV(optionRows) {
   return csvContent;
 }
 
-async function fetchOptionsChain(symbol, expiration, type = 'monthlies') {
+async function fetchOptionsChain(symbol, expiration, type = 'monthlies', env) {
   if (!symbol || !expiration) {
     throw new Error('Symbol and expiration required');
   }
@@ -148,10 +148,29 @@ async function fetchOptionsChain(symbol, expiration, type = 'monthlies') {
     }
   }
 
+  // Try to get session cookies from autopull KV (set by the operator)
+  let cookieHeader = '';
+  if (env && env.QUAN_PUBLISH) {
+    try {
+      const cookiesJSON = await env.QUAN_PUBLISH.get('autopull:cookies');
+      if (cookiesJSON) {
+        const cookies = JSON.parse(cookiesJSON);
+        if (Array.isArray(cookies)) {
+          cookieHeader = cookies
+            .map(c => `${c.name}=${c.value}`)
+            .join('; ');
+        }
+      }
+    } catch (e) {
+      console.warn(`[barchart-fetch] Could not read cookies from KV: ${e.message}`);
+    }
+  }
+
   // Build URL using the real Barchart API endpoint
   const url = buildBarchartUrl(symbol, expiration);
   console.log(`[barchart-fetch] Fetching: ${symbol} ${expiration} (${type})`);
   console.log(`[barchart-fetch] URL: ${url.substring(0, 100)}...`);
+  console.log(`[barchart-fetch] Auth: ${cookieHeader ? 'cookies from autopull' : 'public (no auth)'}`);
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
@@ -159,12 +178,18 @@ async function fetchOptionsChain(symbol, expiration, type = 'monthlies') {
       const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
       try {
+        const headers = {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Referer': 'https://www.barchart.com/futures'
+        };
+        if (cookieHeader) {
+          headers['Cookie'] = cookieHeader;
+        }
+
         const response = await fetch(url, {
           method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          },
+          headers,
           signal: controller.signal
         });
 
@@ -238,8 +263,8 @@ export async function onRequestGet({ request, env }) {
       return badRequest('type must be "monthlies" or "weeklies"');
     }
 
-    // Fetch the chain
-    const rows = await fetchOptionsChain(symbol, expiration, type);
+    // Fetch the chain (with env for cookie access)
+    const rows = await fetchOptionsChain(symbol, expiration, type, env);
 
     // Return in requested format
     if (format === 'csv') {
